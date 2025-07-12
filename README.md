@@ -8,7 +8,7 @@ pinned: false
 app_build_command: npm run build
 app_file: build/index.html
 license: mit
-short_description: NVIDIA Parakeet speech recognition for the browser (WebGPU/WASM)
+short_description: NVIDIA Parakeet speech recognition for the browser
 models:
 - ysdede/parakeet-tdt-0.6b-v2-onnx
 tags:
