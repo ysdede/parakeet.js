@@ -8,76 +8,85 @@ pinned: false
 app_build_command: npm run build
 app_file: build/index.html
 license: mit
-short_description: NVIDIA Parakeet speech recognition for the browser (WebGPU)
+short_description: NVIDIA Parakeet speech recognition for the browser (WebGPU/WASM)
+models:
+- ysdede/parakeet-tdt-0.6b-v2-onnx
+tags:
+- parakeet
+- speech
+- onnx
+- webgpu
+- wasm
+- transcription
+- nvidia
+- speech-recognition
+- browser
 ---
 
-# Getting Started with Create React App
+# 🐠 Parakeet.js - HF Spaces Demo
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+> **NVIDIA Parakeet speech recognition for the browser using WebGPU/WASM**
 
-## Available Scripts
+This demo showcases the **[parakeet.js](https://www.npmjs.com/package/parakeet.js)** library, which brings NVIDIA's Parakeet speech recognition models to the browser using ONNX Runtime Web with WebGPU and WASM backends.
 
-In the project directory, you can run:
+## 🚀 Features
 
-### `npm start`
+- **🖥️ Browser-based**: Runs entirely in your browser - no server required
+- **⚡ WebGPU acceleration**: Fast inference using WebGPU when available
+- **🔧 WASM fallback**: CPU-based inference using WebAssembly
+- **📱 Multiple formats**: Supports various audio formats (WAV, MP3, etc.)
+- **🎯 Real-time performance**: Optimized for fast transcription
+- **📊 Performance metrics**: Shows detailed timing information
+- **🎛️ Configurable**: Adjustable quantization, preprocessing, and backend settings
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 🔧 How to Use
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+1. **Click "Load Model"** to download and initialize the speech recognition model
+2. **Select your preferences**:
+   - **Backend**: Choose WebGPU (faster) or WASM (more compatible)
+   - **Quantization**: fp32 (higher quality) or int8 (faster)
+   - **Preprocessor**: Different audio processing options
+3. **Upload an audio file** using the file input
+4. **View the transcription** in real-time with performance metrics
 
-### `npm test`
+## 📦 Integration
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+You can use parakeet.js in your own projects:
 
-### `npm run build`
+```bash
+npm install parakeet.js onnxruntime-web
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```javascript
+import { ParakeetModel, getParakeetModel } from 'parakeet.js';
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+// Load model from HuggingFace Hub
+const modelUrls = await getParakeetModel('ysdede/parakeet-tdt-0.6b-v2-onnx');
+const model = await ParakeetModel.fromUrls(modelUrls);
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+// Transcribe audio
+const result = await model.transcribe(audioData, sampleRate);
+console.log(result.utterance_text);
+```
 
-### `npm run eject`
+## 🔗 Links
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+- **📚 [GitHub Repository](https://github.com/ysdede/parakeet.js)** - Source code and documentation
+- **📦 [npm Package](https://www.npmjs.com/package/parakeet.js)** - Install via npm
+- **🤖 [NVIDIA Parakeet Model](https://huggingface.co/nvidia/parakeet-tdt-1.1b)** - Original model on HuggingFace
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 🧠 Model Information
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+This demo uses the **ysdede/parakeet-tdt-0.6b-v2-onnx** model, which is an ONNX-converted version of NVIDIA's Parakeet speech recognition model optimized for browser deployment.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 💡 Technical Details
 
-## Learn More
+- **Model Format**: ONNX for cross-platform compatibility
+- **Backends**: WebGPU (GPU acceleration) and WASM (CPU fallback)
+- **Quantization**: Support for both fp32 and int8 precision
+- **Audio Processing**: Built-in preprocessing for various audio formats
+- **Performance**: Real-time factor (RTF) typically < 1.0x for fast transcription
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+---
 
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+*Built with ❤️ using React and deployed on Hugging Face Spaces*
