@@ -21,6 +21,10 @@ tags:
 - nvidia
 - speech-recognition
 - browser
+custom_headers:
+  cross-origin-embedder-policy: require-corp
+  cross-origin-opener-policy: same-origin
+  cross-origin-resource-policy: cross-origin
 ---
 
 # 🐠 Parakeet.js - HF Spaces Demo
