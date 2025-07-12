@@ -1,6 +1,6 @@
 ---
 title: Parakeet.js Demo
-emoji: 🐠
+emoji: 🦜
 colorFrom: indigo
 colorTo: red
 sdk: static
@@ -27,7 +27,7 @@ custom_headers:
   cross-origin-resource-policy: cross-origin
 ---
 
-# 🐠 Parakeet.js - HF Spaces Demo
+# 🦜 Parakeet.js - HF Spaces Demo
 
 > **NVIDIA Parakeet speech recognition for the browser using WebGPU/WASM**
 
@@ -77,7 +77,6 @@ console.log(result.utterance_text);
 
 - **📚 [GitHub Repository](https://github.com/ysdede/parakeet.js)** - Source code and documentation
 - **📦 [npm Package](https://www.npmjs.com/package/parakeet.js)** - Install via npm
-- **🤖 [NVIDIA Parakeet Model](https://huggingface.co/nvidia/parakeet-tdt-1.1b)** - Original model on HuggingFace
 
 ## 🧠 Model Information
 

@@ -149,7 +149,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <h2>🐠 Parakeet.js - HF Spaces Demo</h2>
+      <h2>🦜 Parakeet.js - HF Spaces Demo</h2>
       <p>NVIDIA Parakeet speech recognition for the browser using WebGPU/WASM</p>
 
       <div className="controls">
@@ -308,10 +308,6 @@ export default function App() {
           {' | '}
           <a href="https://www.npmjs.com/package/parakeet.js" target="_blank" rel="noopener noreferrer">
             npm Package
-          </a>
-          {' | '}
-          <a href="https://huggingface.co/nvidia/parakeet-tdt-1.1b" target="_blank" rel="noopener noreferrer">
-            NVIDIA Parakeet Model
           </a>
         </p>
       </div>
