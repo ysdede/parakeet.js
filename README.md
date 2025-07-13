@@ -12,15 +12,12 @@ short_description: NVIDIA Parakeet speech recognition for the browser
 models:
 - ysdede/parakeet-tdt-0.6b-v2-onnx
 tags:
+- parakeet-js
 - parakeet
-- speech
 - onnx
 - webgpu
-- wasm
-- transcription
-- nvidia
-- speech-recognition
-- browser
+- asr
+- istupakov/parakeet-tdt-0.6b-v2-onnx
 custom_headers:
   cross-origin-embedder-policy: require-corp
   cross-origin-opener-policy: same-origin
@@ -65,7 +62,7 @@ npm install parakeet.js onnxruntime-web
 import { ParakeetModel, getParakeetModel } from 'parakeet.js';
 
 // Load model from HuggingFace Hub
-const modelUrls = await getParakeetModel('ysdede/parakeet-tdt-0.6b-v2-onnx');
+const modelUrls = await getParakeetModel('istupakov/parakeet-tdt-0.6b-v2-onnx');
 const model = await ParakeetModel.fromUrls(modelUrls);
 
 // Transcribe audio
@@ -80,7 +77,7 @@ console.log(result.utterance_text);
 
 ## 🧠 Model Information
 
-This demo uses the **ysdede/parakeet-tdt-0.6b-v2-onnx** model, which is an ONNX-converted version of NVIDIA's Parakeet speech recognition model optimized for browser deployment.
+This demo uses the **istupakov/parakeet-tdt-0.6b-v2-onnx** model, which is an ONNX-converted version of NVIDIA's Parakeet speech recognition model optimized for browser deployment.
 
 ## 💡 Technical Details
 
