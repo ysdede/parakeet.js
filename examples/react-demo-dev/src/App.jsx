@@ -3,7 +3,7 @@ import { ParakeetModel, getParakeetModel } from 'parakeet.js';
 import './App.css';
 
 export default function App() {
-  const repoId = 'ysdede/parakeet-tdt-0.6b-v2-onnx';
+  const repoId = 'istupakov/parakeet-tdt-0.6b-v2-onnx';
   const [backend, setBackend] = useState('webgpu-hybrid');
   const [quant, setQuant] = useState('fp32');
   const [preprocessor, setPreprocessor] = useState('nemo128');
@@ -209,7 +209,6 @@ export default function App() {
         <label>
           Preprocessor:
           <select value={preprocessor} onChange={e=>setPreprocessor(e.target.value)}>
-            <option value="nemo80">nemo80 (smaller)</option>
             <option value="nemo128">nemo128 (default)</option>
           </select>
         </label>

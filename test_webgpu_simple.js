@@ -21,7 +21,7 @@ async function testBackend() {
     console.log('3. Testing Hub integration...');
     const { getParakeetModel } = await import('./src/hub.js');
     
-    const modelUrls = await getParakeetModel('ysdede/parakeet-tdt-0.6b-v2-onnx', { 
+    const modelUrls = await getParakeetModel('istupakov/parakeet-tdt-0.6b-v2-onnx', { 
       quantization: 'int8',
       preprocessor: 'nemo128'
     });
