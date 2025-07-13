@@ -10,7 +10,7 @@ app_file: build/index.html
 license: mit
 short_description: NVIDIA Parakeet speech recognition for the browser
 models:
-- ysdede/parakeet-tdt-0.6b-v2-onnx
+- istupakov/parakeet-tdt-0.6b-v2-onnx
 tags:
 - parakeet-js
 - parakeet
