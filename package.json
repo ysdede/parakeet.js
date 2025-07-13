@@ -7,7 +7,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
-    "parakeet.js": "^0.0.1",
+    "parakeet.js": "^0.0.2",
     "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
