@@ -30,7 +30,7 @@ yarn add parakeet.js onnxruntime-web
 We host ready-to-use ONNX exports on the HuggingFace Hub:
 
 ```
-ysdede/parakeet-tdt-0.6b-v2-onnx
+istupakov/parakeet-tdt-0.6b-v2-onnx
 ```
 
 The helper `getParakeetModel()` downloads all required files and caches them in **IndexedDB**:
@@ -38,12 +38,12 @@ The helper `getParakeetModel()` downloads all required files and caches them in 
 ```js
 import { getParakeetModel } from 'parakeet.js';
 
-const repoId = 'ysdede/parakeet-tdt-0.6b-v2-onnx';
+const repoId = 'istupakov/parakeet-tdt-0.6b-v2-onnx';
 const { urls, filenames } = await getParakeetModel(repoId, {
   backend: 'webgpu-hybrid', // webgpu-hybrid | wasm
   quantization: 'fp32',     // fp32 | int8
   decoderInt8: true,        // load INT8 decoder even when encoder fp32
-  preprocessor: 'nemo128',  // nemo80 | nemo128
+  preprocessor: 'nemo128',  // nemo128
   progress: ({file,loaded,total}) => console.log(file, loaded/total)
 });
 ```
@@ -231,7 +231,7 @@ See `OPTIMIZATION_PLAN.md` for a timeline of performance tweaks and planned feat
 This project builds upon the excellent work of:
 
 - **[istupakov](https://github.com/istupakov)** - For providing the [ONNX-ASR](https://github.com/istupakov/onnx-asr) repository, which served as the foundation and starting point for this JavaScript implementation
-- **[istupakov/parakeet-tdt-0.6b-v2-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v2-onnx)** - For the original ONNX model exports and preprocessor implementations that made browser deployment possible
+- **[istupakov/parakeet-tdt-0.6b-v2-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v2-onnx)** - For the ONNX model exports and preprocessor implementations that made this library possible.
 - **ONNX Runtime Web** - For powering the browser-based inference engine
 - **ONNX Runtime Node** - For enabling high-performance server-side inference
 
