@@ -300,11 +300,13 @@ export class ParakeetModel {
 
       // Temperature scaling & argmax
       let maxVal = -Infinity, maxId = 0;
-      let sumExp = 0; // for confidence
       for (let i = 0; i < tokenLogits.length; i++) {
         const v = tokenLogits[i] / temperature;
         if (v > maxVal) { maxVal = v; maxId = i; }
-        sumExp += Math.exp(v - maxVal); // softmax denominator trick
+      }
+      let sumExp = 0;
+      for (let i = 0; i < tokenLogits.length; i++) {
+        sumExp += Math.exp((tokenLogits[i] / temperature) - maxVal);
       }
       const confVal = 1 / sumExp;
       frameConfs.push(confVal);
