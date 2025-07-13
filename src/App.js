@@ -121,7 +121,7 @@ export default function App() {
         timestamp: new Date().toLocaleTimeString(),
         duration: pcm.length / 16000, // duration in seconds
         wordCount: res.words?.length || 0,
-        confidence: res.confidence_scores?.overall_log_prob || null,
+        confidence: res.confidence_scores?.token_avg ?? res.confidence_scores?.word_avg ?? null,
         metrics: res.metrics
       };
 
