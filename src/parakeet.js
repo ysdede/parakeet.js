@@ -63,8 +63,6 @@ export class ParakeetModel {
       verbose = false,
       enableProfiling = false,
       enableGraphCapture,
-      decoderOnWasm = true,
-      decoderInt8 = false,
       cpuThreads = undefined,
     } = cfg;
 
@@ -80,8 +78,15 @@ export class ParakeetModel {
     const ort = await initOrt({ backend: ortBackend, wasmPaths, numThreads: cpuThreads });
 
     // 2. Configure session options for better performance
-    // Determine default graph-capture: only safe on pure WASM.
-    const graphCaptureEnabled = enableGraphCapture ?? (backend === 'wasm');
+    // Graph-capture is beneficial only when every node runs on the same EP and
+    // ORT can fully record the graph (currently true only for a “strict”
+    // WebGPU session).  We therefore enable it *only* when the caller passes
+    // `enableGraphCapture:true` **and** the selected backend is the strict
+    // WebGPU preset.  In all other scenarios (hybrid WebGPU or pure WASM)
+    // it is forced off to avoid the “External buffer must be provided …”
+    // runtime error on recent ORT builds.
+    const graphCaptureEnabled = !!enableGraphCapture && backend === 'webgpu-strict';
+    const isFullWasm = backend === 'wasm';
 
     const baseSessionOptions = {
       executionProviders: [],
@@ -139,8 +144,10 @@ export class ParakeetModel {
         }];
     }
 
-    // If requested, run decoder entirely on WASM to avoid per-step GPU overhead.
-    if (backend === 'webgpu-hybrid' && decoderOnWasm) {
+    // In hybrid mode, the decoder is always run on WASM to avoid per-step
+    // stalls. In pure WASM mode, both EPs are WASM anyway.
+    if (backend.startsWith('webgpu')) {
+      // Force decoder to run on WASM
       decoderSessionOptions.executionProviders = ['wasm'];
     }
 
@@ -161,10 +168,10 @@ export class ParakeetModel {
     }
 
     const tokenizerPromise = ParakeetTokenizer.fromUrl(tokenizerUrl);
-    const preprocPromise = Promise.resolve(new OnnxPreprocessor(preprocessorUrl, { backend, wasmPaths, enableProfiling, enableGraphCapture: graphCaptureEnabled, numThreads: cpuThreads }));
+    const preprocPromise = Promise.resolve(new OnnxPreprocessor(preprocessorUrl, { backend, wasmPaths, enableProfiling, enableGraphCapture: isFullWasm ? false : graphCaptureEnabled, numThreads: cpuThreads }));
 
     let encoderSession, joinerSession;
-    if (backend === 'webgpu-hybrid' && decoderOnWasm) {
+    if (backend === 'webgpu-hybrid') {
       // avoid parallel create to prevent double initWasm race
       encoderSession = await createSession(encoderUrl, encoderSessionOptions);
       joinerSession = await createSession(decoderUrl, decoderSessionOptions);

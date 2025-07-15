@@ -20,9 +20,16 @@ export class OnnxPreprocessor {
   async _ensureSession() {
     if (!this.session) {
       this.ort = await initOrt(this.opts);
-      const sessOpts = {
+      // Build session options. Workaround for ORT-web bug where
+      // passing `enableGraphCapture:false` still triggers the
+      // graph-capture execution path (which then requires external
+      // buffers). We therefore only include the flag when it is
+      // explicitly **true**.
+      const sessOpts = this.opts.enableGraphCapture ? {
         enableProfiling: this.opts.enableProfiling || false,
-        enableGraphCapture: this.opts.enableGraphCapture
+        enableGraphCapture: true
+      } : {
+        enableProfiling: this.opts.enableProfiling || false
       };
       const create = async () => {
         try {

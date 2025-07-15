@@ -40,10 +40,10 @@ import { getParakeetModel } from 'parakeet.js';
 
 const repoId = 'istupakov/parakeet-tdt-0.6b-v2-onnx';
 const { urls, filenames } = await getParakeetModel(repoId, {
-  backend: 'webgpu-hybrid', // webgpu-hybrid | wasm
-  quantization: 'fp32',     // fp32 | int8
-  decoderInt8: true,        // load INT8 decoder even when encoder fp32
-  preprocessor: 'nemo128',  // nemo128
+  backend: 'webgpu', // 'webgpu' or 'wasm'
+  encoderQuant: 'fp32',    // 'fp32' or 'int8'
+  decoderQuant: 'int8',    // 'fp32' or 'int8'
+  preprocessor: 'nemo128',
   progress: ({file,loaded,total}) => console.log(file, loaded/total)
 });
 ```
@@ -60,8 +60,7 @@ Returned structure:
     tokenizerUrl: string,
     preprocessorUrl: string
   },
-  filenames: { encoder: string; decoder: string },
-  quantisation: { encoder: 'fp32' | 'int8'; decoder: 'fp32' | 'int8' }
+  filenames: { encoder: string; decoder: string }
 }
 ```
 
@@ -75,21 +74,23 @@ import { ParakeetModel } from 'parakeet.js';
 const model = await ParakeetModel.fromUrls({
   ...urls,                 // spread the URLs returned above
   filenames,               // needed for external .data mapping
-  backend: 'webgpu-hybrid',
-  decoderOnWasm: true,     // force decoder to CPU/WASM for micro-kernels
-  decoderInt8: true,       // decoder uses INT8 weights
-  cpuThreads: 6,           // WASM threads (defaults to cores-2)
-  verbose: false           // ORT verbose log
+  backend: 'webgpu',       // 'webgpu' or 'wasm'
+  cpuThreads: 6,           // For WASM backend
+  verbose: false,          // ORT verbose logging
 });
 ```
 
 ### Back-end presets
 
-| Backend string      | Encoder EP | Decoder EP | Typical use-case |
-|---------------------|------------|------------|------------------|
-| `webgpu-hybrid` (default) | WebGPU (fp32) | WASM (fp32/int8) | Modern desktop browsers |
-| `webgpu-strict`    | WebGPU (fp32) | **fail** if op unsupported | Benchmarking kernels |
-| `wasm`             | WASM (int8/fp32) | WASM | Low-end devices, Node.js |
+The library supports two primary backends: `webgpu` and `wasm`.
+
+- **`webgpu` (Default):** This is the fastest option for modern desktop browsers. It runs in a hybrid configuration:
+  - The heavy **encoder** model runs on the **GPU** (WebGPU) for maximum throughput.
+  - The **decoder** model runs on the **CPU** (WASM). The decoder's architecture contains operations not fully supported by the ONNX Runtime WebGPU backend, causing it to fall back to WASM anyway. This configuration makes the behavior explicit and stable, avoiding performance issues and warnings.
+  - In this mode, the encoder must be `fp32`, but you can choose `fp32` or `int8` for the decoder.
+
+- **`wasm`:** Both encoder and decoder run on the CPU. This is best for compatibility with older devices or environments without WebGPU support. Both models can be `fp32` or `int8`.
+
 
 ---
 
@@ -162,8 +163,8 @@ if (utterance_text.toLowerCase().includes(expected)) {
 | Property | Where | Effect |
 |----------|-------|--------|
 | `cpuThreads` | `fromUrls()` | Sets `ort.env.wasm.numThreads`; pick *cores-2* for best balance |
-| `decoderOnWasm` | `fromUrls()` | Forces decoder session to WASM even in hybrid mode |
-| `decoderInt8` | `getParakeetModel()` + `fromUrls()` | Load INT8 weights for decoder only |
+| `encoderQuant` | `getParakeetModel()` | Selects `fp32` or `int8` model for the encoder. |
+| `decoderQuant` | `getParakeetModel()` | Selects `fp32` or `int8` model for the decoder. |
 | `frameStride` | `transcribe()` | Trade-off latency vs accuracy |
 | `enableProfiling` | `fromUrls()` | Enables ORT profiler (JSON written to `/tmp/profile_*.json`) |
 
@@ -214,9 +215,9 @@ The demo is also available locally at `examples/hf-spaces-demo` and can be deplo
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `multiple calls to initWasm()` | Two WASM sessions initialised in parallel | In hybrid mode we create encoder session first, then decoder. Keep this order. |
-| GPU memory still ~2.4 GB with INT8 selected | WebGPU kernels don't support INT8 yet – weights are automatically converted to FP32 | Use `decoderInt8:true` (CPU) or wait for upcoming WebGPU INT8 kernels. |
-| `Graph capture feature not available` error | Mixed EPs prevent GPU graph capture | We auto-retry without capture; nothing to do. |
+| `Some nodes were not assigned...` warning | When using the `webgpu` backend, ORT assigns minor operations (`Shape`, `Gather`, etc.) in the encoder to the CPU for efficiency. | This is expected and harmless. The heavy-lifting is still on the GPU. |
+| GPU memory still ~2.4 GB with INT8 selected | In WebGPU mode, the encoder must be `fp32`. The `int8` option only applies to the WASM backend or the decoder in hybrid mode. | This is the expected behavior for the `webgpu` backend. |
+| `Graph capture feature not available` error | Mixed EPs (CPU/GPU) or unsupported ops prevent GPU graph capture. | The library automatically retries without capture; safe to ignore. |
 
 ---
 

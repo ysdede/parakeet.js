@@ -5,7 +5,8 @@ import './App.css';
 export default function App() {
   const repoId = 'istupakov/parakeet-tdt-0.6b-v2-onnx';
   const [backend, setBackend] = useState('webgpu-hybrid');
-  const [quant, setQuant] = useState('fp32');
+  const [encoderQuant, setEncoderQuant] = useState('fp32');
+  const [decoderQuant, setDecoderQuant] = useState('int8');
   const [preprocessor, setPreprocessor] = useState('nemo128');
   const [status, setStatus] = useState('Idle');
   const [progress, setProgress] = useState('');
@@ -16,7 +17,6 @@ export default function App() {
   const [transcriptions, setTranscriptions] = useState([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [verboseLog, setVerboseLog] = useState(false);
-  const [decoderInt8, setDecoderInt8] = useState(true);
   const [frameStride, setFrameStride] = useState(1);
   const [dumpDetail, setDumpDetail] = useState(false);
   const maxCores = navigator.hardwareConcurrency || 8;
@@ -24,12 +24,14 @@ export default function App() {
   const modelRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Auto-adjust quant preset when backend changes
+  // Auto-adjust quant presets when backend changes
   useEffect(() => {
     if (backend.startsWith('webgpu')) {
-      setQuant('fp32');
-    } else if (backend === 'wasm') {
-      setQuant('int8');
+      setEncoderQuant('fp32');
+      setDecoderQuant('int8');
+    } else {
+      setEncoderQuant('int8');
+      setDecoderQuant('int8');
     }
   }, [backend]);
 
@@ -49,10 +51,10 @@ export default function App() {
 
       // 1. Download all model files from HuggingFace Hub
       const modelUrls = await getParakeetModel(repoId, { 
-        quantization: quant, 
+        encoderQuant,
+        decoderQuant,
         preprocessor,
-        backend, // Pass backend to enable automatic fp32 selection for WebGPU
-        decoderInt8,
+        backend,
         progress: progressCallback 
       });
 
@@ -67,8 +69,6 @@ export default function App() {
         filenames: modelUrls.filenames,
         backend, 
         verbose: verboseLog,
-        decoderOnWasm: decoderInt8, // if we selected int8 decoder, keep it on WASM
-        decoderInt8,
         cpuThreads,
       });
 
@@ -185,26 +185,26 @@ export default function App() {
         <label>
           Backend:
           <select value={backend} onChange={e=>setBackend(e.target.value)}>
-            <option value="webgpu-hybrid">WebGPU (Hybrid)</option>
-            <option value="webgpu-strict">WebGPU (Strict)</option>
+            <option value="webgpu-hybrid">WebGPU</option>
             <option value="wasm">WASM (CPU)</option>
           </select>
         </label>
         {' '}
         <label>
-          Quant:
-          <select value={quant} onChange={e=>setQuant(e.target.value)}>
+          Encoder Quant:
+          <select value={encoderQuant} onChange={e=>setEncoderQuant(e.target.value)}>
             <option value="int8">int8 (faster)</option>
             <option value="fp32">fp32 (higher quality)</option>
           </select>
         </label>
         {' '}
-        {backend.startsWith('webgpu') && (
-          <label style={{ fontSize:'0.9em' }}>
-            <input type="checkbox" checked={decoderInt8} onChange={e=>setDecoderInt8(e.target.checked)} />
-            Decoder INT8 on CPU
-          </label>
-        )}
+        <label>
+          Decoder Quant:
+          <select value={decoderQuant} onChange={e=>setDecoderQuant(e.target.value)}>
+            <option value="int8">int8 (faster)</option>
+            <option value="fp32">fp32 (higher quality)</option>
+          </select>
+        </label>
         {' '}
         <label>
           Preprocessor:
@@ -231,7 +231,7 @@ export default function App() {
           <input type="checkbox" checked={dumpDetail} onChange={e=>setDumpDetail(e.target.checked)} />
           Dump result to console
         </label>
-        {(backend === 'wasm' || decoderInt8) && (
+        {(backend === 'wasm' || backend.startsWith('webgpu')) && (
           <label style={{fontSize:'0.9em'}}>
             Threads:
             <input type="number" min="1" max={maxCores} value={cpuThreads} onChange={e=>setCpuThreads(Number(e.target.value))} style={{width:'4rem'}} />
