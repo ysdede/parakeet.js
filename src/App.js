@@ -60,7 +60,8 @@ export default function App() {
 
       // 2. Create the model instance with all file URLs
       modelRef.current = await ParakeetModel.fromUrls({ 
-        ...modelUrls.urls, 
+        ...modelUrls.urls,
+        filenames: modelUrls.filenames, // Pass the filenames object
         backend, 
       });
 
