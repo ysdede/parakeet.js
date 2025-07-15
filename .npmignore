@@ -25,3 +25,4 @@ OPTIMIZATION_PLAN.md
 docs/
 test_webgpu_fix.js
 test_webgpu_simple.js
+scripts/
