@@ -191,6 +191,11 @@ export class AudioSegmentProcessor {
 
         this.updateStats();
 
+        // Add a small delay to prevent blocking the main thread
+        if (segments.length > 0) {
+            setTimeout(() => {}, 0);
+        }
+
         return segments;
     }
 

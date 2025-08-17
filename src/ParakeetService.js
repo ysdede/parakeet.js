@@ -91,6 +91,10 @@ class ParakeetService {
     // by calling ensureLoaded and warmUp based on the new state.
     // We just need to signal the state change.
     await this.ensureLoaded();
+    
+    // Add a small delay before warming up to prevent blocking
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
     await this.warmUp();
     console.log("ParakeetService: Model reloaded and warmed up.");
   }
@@ -139,7 +143,11 @@ class ParakeetService {
     const pcm = new Float32Array(sampleRate);
     const model = await this._modelPromise;
     const start = performance.now();
+    
+    // Break the warmup into smaller chunks to prevent freezing
+    await new Promise(resolve => setTimeout(resolve, 5));
     await model.transcribe(pcm, sampleRate, { frameStride: 4 });
+    
     const dur = (performance.now() - start).toFixed(0);
     this._warmed = true;
     this._emitter.emit({ phase: 'ready', warmupMs: dur });

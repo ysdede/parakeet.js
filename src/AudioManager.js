@@ -293,9 +293,12 @@ export class AudioManager {
 
         // Process any new segments that were detected
         if (newSegments.length > 0) {
-            for (const segment of newSegments) {
-                this.handleNewSegment(segment);
-            }
+            // Process segments asynchronously to prevent blocking
+            setTimeout(() => {
+                for (const segment of newSegments) {
+                    this.handleNewSegment(segment);
+                }
+            }, 0);
         }
         
         // Now get the updated processor stats including SNR and noise floor
@@ -333,10 +336,14 @@ export class AudioManager {
         // Buffer maintenance is handled internally by RingBuffer – legacy trim disabled
 
         // Notify listeners about the update for visualization
-        this.notifyListeners('visualizationUpdate', { 
-            waveformData: this.getVisualizationData(), // Send the ordered waveform buffer
-            metrics: this.getMetrics() // Also send current metrics for StatsWidget
-        });
+        // Throttle visualization updates to prevent excessive processing
+        if (this.lastVisualizationUpdate === undefined || (Date.now() - this.lastVisualizationUpdate) > 50) {
+            this.lastVisualizationUpdate = Date.now();
+            this.notifyListeners('visualizationUpdate', { 
+                waveformData: this.getVisualizationData(), // Send the ordered waveform buffer
+                metrics: this.getMetrics() // Also send current metrics for StatsWidget
+            });
+        }
     }
 
     /**

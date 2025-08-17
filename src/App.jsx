@@ -29,6 +29,7 @@ import { audioManager } from './AudioManager';
 import { transcriptionDataManager } from './TranscriptionDataManager';
 import { settingsManager } from './utils/settingsManager';
 import TranscriptionWorkerModule from './workers/transcription.worker.js?worker';
+import ResamplingWorkerModule from './workers/resampling.worker.js?url';
 import audioProcessorUrl from './audio-processor.js?url';
 import { segmentationPresets } from './config/audioParams.js';
 import SentenceProcessor from './utils/sentenceProcessor.js';
@@ -193,6 +194,14 @@ function AppContent() {
       }
       // All other messages are handled by TranscriptionDataManager.
     };
+
+    // Initialize the resampling worker in the transcription worker
+    asrWorker.postMessage({ 
+      type: 'init_resampling_worker', 
+      data: { 
+        workerUrl: ResamplingWorkerModule 
+      } 
+    });
 
     audioManager.worker = asrWorker;
     setWorker(asrWorker); // Save worker instance

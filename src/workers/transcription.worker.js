@@ -18,30 +18,8 @@ let sampleRate = 16000;
 let sessionId = 'default';
 let isModelReady = false;
 
-function resample(audio, from, to) {
-  if (from === to) {
-    return audio;
-  }
-
-  const ratio = to / from;
-  const newLength = Math.round(audio.length * ratio);
-  const newAudio = new Float32Array(newLength);
-
-  for (let i = 0; i < newLength; i++) {
-    const t = i / ratio;
-    const t0 = Math.floor(t);
-    const t1 = Math.ceil(t);
-    const dt = t - t0;
-
-    if (t1 >= audio.length) {
-      newAudio[i] = audio[t0];
-    } else {
-      newAudio[i] = (1 - dt) * audio[t0] + dt * audio[t1];
-    }
-  }
-
-  return newAudio;
-}
+// Resampling worker for offloading resampling work
+let resamplingWorker = null;
 
 self.onmessage = async (e) => {
   const { type, data } = e.data || {};
@@ -124,8 +102,38 @@ self.onmessage = async (e) => {
       }
       break;
     }
+    case 'init_resampling_worker': {
+      // Initialize the resampling worker
+      if (!resamplingWorker) {
+        try {
+          const ResamplingWorkerModule = data.workerUrl;
+          resamplingWorker = new Worker(ResamplingWorkerModule, { type: 'module' });
+          resamplingWorker.onmessage = handleResamplingWorkerMessage;
+          console.log('[Worker] Resampling worker initialized');
+        } catch (err) {
+          console.error('[Worker] Failed to initialize resampling worker:', err);
+        }
+      }
+      break;
+    }
   }
 };
+
+function handleResamplingWorkerMessage(e) {
+  const { type, data } = e.data || {};
+  
+  switch (type) {
+    case 'resample_complete': {
+      // Handle resampled audio - this would be used in the transcription process
+      console.log(`[Worker] Resampling complete: ${data.originalLength} -> ${data.resampledLength} samples`);
+      break;
+    }
+    case 'error': {
+      console.error('[Worker] Resampling worker error:', data.message);
+      break;
+    }
+  }
+}
 
 async function transcribeRecentWindow() {
   if (isTranscribing || !ringBuffer) return;
@@ -136,7 +144,9 @@ async function transcribeRecentWindow() {
   const endFrame = ringBuffer.getCurrentFrame();
   if (endFrame === 0) return;
 
-  const windowStartAbs = Math.max(matureCursorTime, (bufferStartAbs + endFrame / sampleRate) - 45);
+  // Reduce window size to decrease processing time and prevent freezing
+  const WINDOW_SIZE_SECONDS = 30; // Reduced from 45 seconds
+  const windowStartAbs = Math.max(matureCursorTime, (bufferStartAbs + endFrame / sampleRate) - WINDOW_SIZE_SECONDS);
   let startFrame = Math.floor((windowStartAbs - bufferStartAbs) * sampleRate);
   const baseFrame = ringBuffer.getBaseFrameOffset();
   if (startFrame < baseFrame) {
@@ -147,11 +157,59 @@ async function transcribeRecentWindow() {
   const audioToProcess = ringBuffer.read(startFrame, endFrame);
   if (audioToProcess.length === 0) return;
 
+  // Add a small delay to prevent blocking the worker thread completely
+  await new Promise(resolve => setTimeout(resolve, 0));
+
   isTranscribing = true;
   try {
     const t0 = performance.now();
-    const resampledAudio = resample(audioToProcess, sampleRate, 16000);
-    const result = await parakeetService.transcribe(resampledAudio, 16000);
+    
+    // Use resampling worker if available, otherwise fall back to direct resampling
+    let audioForTranscription;
+    if (sampleRate !== 16000) {
+      if (resamplingWorker) {
+        // Send to resampling worker
+        const resamplingPromise = new Promise((resolve, reject) => {
+          const handleResamplingResponse = (e) => {
+            const { type, data } = e.data || {};
+            if (type === 'resample_complete') {
+              resamplingWorker.removeEventListener('message', handleResamplingResponse);
+              resolve(data.audio);
+            } else if (type === 'error') {
+              resamplingWorker.removeEventListener('message', handleResamplingResponse);
+              reject(new Error(data.message));
+            }
+          };
+          
+          resamplingWorker.addEventListener('message', handleResamplingResponse);
+          resamplingWorker.postMessage({ 
+            type: 'resample', 
+            data: { 
+              audio: audioToProcess,
+              from: sampleRate,
+              to: 16000
+            } 
+          }, [audioToProcess.buffer.slice(0)]); // Send a copy to avoid transfer issues
+        });
+        
+        try {
+          audioForTranscription = await resamplingPromise;
+        } catch (resampleError) {
+          console.warn('[Worker] Resampling worker failed, falling back to direct resampling:', resampleError);
+          audioForTranscription = resampleDirect(audioToProcess, sampleRate, 16000);
+        }
+      } else {
+        // Direct resampling in worker thread
+        audioForTranscription = resampleDirect(audioToProcess, sampleRate, 16000);
+      }
+    } else {
+      audioForTranscription = audioToProcess;
+    }
+    
+    // Add another small delay before transcription to allow other tasks to run
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
+    const result = await parakeetService.transcribe(audioForTranscription, 16000);
     const elapsed = performance.now() - t0;
 
     const adjustedWords = result.words.map(w => ({
@@ -201,4 +259,30 @@ async function transcribeRecentWindow() {
   } finally {
     isTranscribing = false;
   }
-} 
+}
+
+// Direct resampling function (fallback)
+function resampleDirect(audio, from, to) {
+  if (from === to) {
+    return audio;
+  }
+
+  const ratio = to / from;
+  const newLength = Math.round(audio.length * ratio);
+  const newAudio = new Float32Array(newLength);
+
+  for (let i = 0; i < newLength; i++) {
+    const t = i / ratio;
+    const t0 = Math.floor(t);
+    const t1 = Math.ceil(t);
+    const dt = t - t0;
+
+    if (t1 >= audio.length) {
+      newAudio[i] = audio[t0];
+    } else {
+      newAudio[i] = (1 - dt) * audio[t0] + dt * audio[t1];
+    }
+  }
+
+  return newAudio;
+}
