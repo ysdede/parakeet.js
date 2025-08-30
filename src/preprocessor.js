@@ -55,8 +55,18 @@ export class OnnxPreprocessor {
   async process(audio) {
     await this._ensureSession();
 
-    // The model expects [B, N] float32 waveforms and lengths.
-    const buffer = new Float32Array(audio); // copy to ensure contiguous
+    // Avoid copying if input is already Float32Array and contiguous
+    let buffer;
+    if (audio instanceof Float32Array) {
+      // Check if the array is contiguous (not a view with stride)
+      const isContiguous = audio.byteOffset === 0 || 
+                          (audio.byteLength === audio.length * 4); // 4 bytes per float32
+      buffer = isContiguous ? audio : new Float32Array(audio);
+    } else {
+      // Convert other array types to Float32Array
+      buffer = new Float32Array(audio);
+    }
+    
     const waveforms = new this.ort.Tensor('float32', buffer, [1, buffer.length]);
 
     const lenArr = new BigInt64Array([BigInt(buffer.length)]);
