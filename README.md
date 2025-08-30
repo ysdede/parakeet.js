@@ -109,7 +109,7 @@ Extra options:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `temperature` | 1.2 | Softmax temperature for decoding |
+| `temperature` | 1.0 | Softmax temperature for decoding (1.0 = greedy, >1.0 = sampling) |
 | `frameStride` | 1 | Advance decoder by *n* encoder frames per step |
 
 ### Result schema
