@@ -36,6 +36,13 @@ export class ParakeetModel {
     this._normalizer = normalizer;
     this.subsampling = subsampling;
     this.windowStride = windowStride;
+
+    // Pre-allocate reusable tensors for decoder loop to reduce GC pressure
+    this._targetIdArray = new Int32Array(1);
+    this._targetTensor = new ort.Tensor('int32', this._targetIdArray, [1, 1]);
+    this._targetLenArray = new Int32Array([1]);
+    this._targetLenTensor = new ort.Tensor('int32', this._targetLenArray, [1]);
+    this._encoderFrameBuffer = null; // Will be allocated when we know the dimension D
   }
 
   /**
@@ -168,7 +175,14 @@ export class ParakeetModel {
     }
 
     const tokenizerPromise = ParakeetTokenizer.fromUrl(tokenizerUrl);
-    const preprocPromise = Promise.resolve(new OnnxPreprocessor(preprocessorUrl, { backend, wasmPaths, enableProfiling, enableGraphCapture: isFullWasm ? false : graphCaptureEnabled, numThreads: cpuThreads }));
+    // Force preprocessor to always use WASM with optimal threading/SIMD settings
+    const preprocPromise = Promise.resolve(new OnnxPreprocessor(preprocessorUrl, { 
+      backend: 'wasm', // Always use WASM for preprocessor regardless of main backend
+      wasmPaths, 
+      enableProfiling, 
+      enableGraphCapture: false, // WASM doesn't need graph capture
+      numThreads: cpuThreads 
+    }));
 
     let encoderSession, joinerSession;
     if (backend === 'webgpu-hybrid') {
@@ -190,16 +204,17 @@ export class ParakeetModel {
   async _runCombinedStep(encTensor, token, currentState = null) {
     const singleToken = typeof token === 'number' ? token : this.blankId;
 
-    const targetTensor = new this.ort.Tensor('int32', new Int32Array([singleToken]), [1, 1]);
-    const lenTensor = new this.ort.Tensor('int32', new Int32Array([1]), [1]);
+    // Reuse pre-allocated tensors
+    this._targetIdArray[0] = singleToken;
+    // Note: _targetTensor and _targetLenTensor are already created with the right arrays
 
     const state1 = currentState?.state1 || this._combState1;
     const state2 = currentState?.state2 || this._combState2;
 
     const feeds = {
       encoder_outputs: encTensor,
-      targets: targetTensor,
-      target_length: lenTensor,
+      targets: this._targetTensor,
+      target_length: this._targetLenTensor,
       input_states_1: state1,
       input_states_2: state2,
     };
@@ -242,7 +257,7 @@ export class ParakeetModel {
     const {
       returnTimestamps = false,
       returnConfidences = false,
-      temperature = 1.2,
+      temperature = 1.0, // Greedy decoding (1.0) is better for ASR than sampling (1.2)
       debug = false,
       skipCMVN = false,
       frameStride = 1,
@@ -278,11 +293,36 @@ export class ParakeetModel {
 
     // Transpose encoder output [B, D, T] ➔ [T, D] for B=1
     const [ , D, Tenc ] = enc.dims;
-    const transposed = new Float32Array(Tenc * D);
-    for (let d = 0; d < D; d++) {
-      for (let t = 0; t < Tenc; t++) {
-        transposed[t * D + d] = enc.data[d * Tenc + t];
+    
+    // Fast-path check: if already in [T, D] format, skip transpose
+    let transposed;
+    if (enc.dims.length === 3 && enc.dims[0] === 1 && enc.dims[1] === D && enc.dims[2] === Tenc) {
+      // Need to transpose from [1, D, T] to [T, D]
+      transposed = new Float32Array(Tenc * D);
+      const encData = enc.data;
+      
+      // Optimized transpose with tight loops and better cache locality
+      // Process in blocks to improve cache performance
+      const blockSize = Math.min(64, D); // Tune block size for cache efficiency
+      
+      for (let dBlock = 0; dBlock < D; dBlock += blockSize) {
+        const dEnd = Math.min(dBlock + blockSize, D);
+        for (let t = 0; t < Tenc; t++) {
+          const tOffset = t * D;
+          for (let d = dBlock; d < dEnd; d++) {
+            transposed[tOffset + d] = encData[d * Tenc + t];
+          }
+        }
       }
+    } else {
+      // Unexpected format - fallback to direct use (shouldn't happen with current models)
+      console.warn('[Parakeet] Unexpected encoder output format:', enc.dims);
+      transposed = new Float32Array(enc.data);
+    }
+
+    // Pre-allocate encoder frame buffer for reuse
+    if (!this._encoderFrameBuffer || this._encoderFrameBuffer.length !== D) {
+      this._encoderFrameBuffer = new Float32Array(D);
     }
 
     // --- Decode frame-by-frame ----------------------------------------
@@ -298,8 +338,12 @@ export class ParakeetModel {
     const decStartTime = perfEnabled ? performance.now() : 0;
 
     for (let t = 0; t < Tenc; ) {
-      const frameBuf = transposed.subarray(t * D, (t + 1) * D);
-      const encTensor = new this.ort.Tensor('float32', frameBuf, [1, D, 1]);
+      // Copy frame data to reusable buffer
+      const frameStart = t * D;
+      for (let i = 0; i < D; i++) {
+        this._encoderFrameBuffer[i] = transposed[frameStart + i];
+      }
+      const encTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
 
       const prevTok = ids.length ? ids[ids.length - 1] : this.blankId;
       const { tokenLogits, step, newState } = await this._runCombinedStep(encTensor, prevTok, decoderState);
@@ -311,13 +355,18 @@ export class ParakeetModel {
         const v = tokenLogits[i] / temperature;
         if (v > maxVal) { maxVal = v; maxId = i; }
       }
-      let sumExp = 0;
-      for (let i = 0; i < tokenLogits.length; i++) {
-        sumExp += Math.exp((tokenLogits[i] / temperature) - maxVal);
+
+      let confVal = 1.0; // Default confidence when not computing softmax
+      if (returnConfidences) {
+        // Only compute expensive softmax denominator when confidences are requested
+        let sumExp = 0;
+        for (let i = 0; i < tokenLogits.length; i++) {
+          sumExp += Math.exp((tokenLogits[i] / temperature) - maxVal);
+        }
+        confVal = 1 / sumExp;
+        frameConfs.push(confVal);
+        overallLogProb += Math.log(confVal);
       }
-      const confVal = 1 / sumExp;
-      frameConfs.push(confVal);
-      overallLogProb += Math.log(confVal);
 
       if (maxId !== this.blankId) {
         ids.push(maxId);
