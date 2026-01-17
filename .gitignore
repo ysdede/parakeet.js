@@ -8,3 +8,6 @@ dist
 *.pem
 docs/
 scripts/
+
+# Internal planning notes
+*OPTIMIZATION*.md
