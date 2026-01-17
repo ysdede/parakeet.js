@@ -43,6 +43,7 @@ export class ParakeetModel {
     this._targetLenArray = new Int32Array([1]);
     this._targetLenTensor = new ort.Tensor('int32', this._targetLenArray, [1]);
     this._encoderFrameBuffer = null; // Will be allocated when we know the dimension D
+    this._encoderFrameTensor = null; // Will be allocated when we know D
   }
 
   /**
@@ -323,6 +324,7 @@ export class ParakeetModel {
     // Pre-allocate encoder frame buffer for reuse
     if (!this._encoderFrameBuffer || this._encoderFrameBuffer.length !== D) {
       this._encoderFrameBuffer = new Float32Array(D);
+      this._encoderFrameTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
     }
 
     // --- Decode frame-by-frame ----------------------------------------
@@ -343,10 +345,10 @@ export class ParakeetModel {
       for (let i = 0; i < D; i++) {
         this._encoderFrameBuffer[i] = transposed[frameStart + i];
       }
-      const encTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
+      // const encTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
 
       const prevTok = ids.length ? ids[ids.length - 1] : this.blankId;
-      const { tokenLogits, step, newState } = await this._runCombinedStep(encTensor, prevTok, decoderState);
+      const { tokenLogits, step, newState } = await this._runCombinedStep(this._encoderFrameTensor, prevTok, decoderState);
       decoderState = newState;
 
       // Temperature scaling & argmax
