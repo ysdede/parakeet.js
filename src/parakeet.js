@@ -437,10 +437,22 @@ export class ParakeetModel {
         emittedTokens += 1;
       }
 
-      const shouldAdvance = maxId === this.blankId || emittedTokens >= this.maxTokensPerStep;
-      t += step > 0 ? step : (shouldAdvance ? frameStride : 0);
-      if (!shouldAdvance && step === 0) t += 1; // safeguard
-      if (maxId === this.blankId) emittedTokens = 0;
+      // Frame advancement logic matching onnx-asr:
+      // 1. If step > 0 (TDT duration prediction), advance by step and reset counter
+      // 2. Otherwise, advance by 1 if blank OR max tokens per step reached
+      const prevT = t;
+      if (step > 0) {
+        t += step;
+        emittedTokens = 0;  // Reset on TDT step advance
+      } else if (maxId === this.blankId || emittedTokens >= this.maxTokensPerStep) {
+        t += frameStride;
+        emittedTokens = 0;  // Reset on blank or max tokens
+      }
+      // Safety: if we didn't advance and emitted a non-blank token, ensure progress
+      // This prevents infinite loops in edge cases
+      if (t === prevT && maxId !== this.blankId) {
+        t += 1;
+      }
 
       // Capture decoder state at end of prefix when decoding from frame 0
       if (inc && inc.cacheKey && !prefixStateCaptured && t >= prefixFrames) {
