@@ -94,6 +94,14 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
   // Store the final backend choice for use in model selection
   ort._selectedBackend = backend;
 
+  // Expose ort globally so other modules (like SileroVAD) can use the same configured instance
+  if (typeof globalThis !== 'undefined') {
+    globalThis.ort = ort;
+  }
+  if (typeof self !== 'undefined') {
+    self.ort = ort;
+  }
+
   // Return the ort module for use in creating sessions and tensors
   return ort;
 }
