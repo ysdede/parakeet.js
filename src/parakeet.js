@@ -44,6 +44,11 @@ export class ParakeetModel {
     this._targetLenTensor = new ort.Tensor('int32', this._targetLenArray, [1]);
     this._encoderFrameBuffer = null; // Will be allocated when we know the dimension D
     this._encoderFrameTensor = null; // Will be allocated when we know D
+
+    // Incremental decode cache: stores decoder state at the end of the prefix
+    // keyed by a caller-provided cacheKey. This lets us skip decoding the
+    // left-context on subsequent calls when the prefix is unchanged.
+    this._incrementalCache = new Map();
   }
 
   /**
@@ -244,6 +249,25 @@ export class ParakeetModel {
     return { tokenLogits, step, newState };
   }
 
+  _snapshotDecoderState(state) {
+    if (!state) return null;
+    const s1 = state.state1;
+    const s2 = state.state2;
+    return {
+      s1: new Float32Array(s1.data),
+      s2: new Float32Array(s2.data),
+      dims1: s1.dims.slice(),
+      dims2: s2.dims.slice(),
+    };
+  }
+
+  _restoreDecoderState(snap) {
+    if (!snap) return null;
+    const state1 = new this.ort.Tensor('float32', new Float32Array(snap.s1), snap.dims1);
+    const state2 = new this.ort.Tensor('float32', new Float32Array(snap.s2), snap.dims2);
+    return { state1, state2 };
+  }
+
   async computeFeatures(audio, sampleRate = 16000) {
     const { features, length } = await this.preprocessor.process(audio);
     const T = length; // number of frames returned by preprocessor
@@ -279,6 +303,20 @@ export class ParakeetModel {
     }
 
     // 2. Encode entire utterance
+    // Guard for empty input; return quickly to avoid ORT errors
+    if (!features || !features.length || T <= 0 || melBins <= 0) {
+      return {
+        utterance_text: '',
+        words: [],
+        tokens: [],
+        confidence_scores: { overall_log_prob: null, frame: null, frame_avg: null },
+        metrics: perfEnabled ? {
+          preprocess_ms: +tPreproc.toFixed(1), encode_ms: 0, decode_ms: 0, tokenize_ms: 0, total_ms: +( (performance.now() - t0).toFixed(1) ), rtf: 0
+        } : null,
+        is_final: !opts?.incremental,
+      };
+    }
+
     const input = new this.ort.Tensor('float32', features, [1, melBins, T]);
     const lenTensor = new this.ort.Tensor('int64', BigInt64Array.from([BigInt(T)]), [1]);
     let enc;
@@ -334,12 +372,29 @@ export class ParakeetModel {
     const frameConfs = [];
     let overallLogProb = 0;
 
+    // Incremental decode settings
+    const TIME_STRIDE = this.subsampling * this.windowStride;
+    let startFrame = 0;
+    let timeOffset = 0;
     let decoderState = null;
+    let prefixFrames = 0;
+    const inc = opts.incremental;
+    if (inc && inc.cacheKey) {
+      prefixFrames = Math.max(0, Math.min(Tenc, Math.floor(((inc.prefixSeconds || 0) + 1e-6) / TIME_STRIDE)));
+      const cached = this._incrementalCache.get(inc.cacheKey);
+      if (cached && cached.prefixFrames === prefixFrames && cached.D === D) {
+        startFrame = prefixFrames;
+        timeOffset = prefixFrames * TIME_STRIDE;
+        decoderState = this._restoreDecoderState(cached.state);
+      }
+    }
     let emittedTokens = 0;
 
     const decStartTime = perfEnabled ? performance.now() : 0;
 
-    for (let t = 0; t < Tenc; ) {
+    // When not using cache, we will capture decoder state at prefixFrames once
+    let prefixStateCaptured = startFrame > 0 || prefixFrames === 0;
+    for (let t = startFrame; t < Tenc; ) {
       // Copy frame data to reusable buffer
       const frameStart = t * D;
       for (let i = 0; i < D; i++) {
@@ -373,10 +428,9 @@ export class ParakeetModel {
       if (maxId !== this.blankId) {
         ids.push(maxId);
         if (returnTimestamps) {
-          const TIME_STRIDE = this.subsampling * this.windowStride;
           const durFrames = step > 0 ? step : 1;
-          const start = t * TIME_STRIDE;
-          const end = (t + durFrames) * TIME_STRIDE;
+          const start = timeOffset + (t * TIME_STRIDE);
+          const end = timeOffset + ((t + durFrames) * TIME_STRIDE);
           tokenTimes.push([start, end]);
         }
         if (returnConfidences) tokenConfs.push(confVal);
@@ -387,6 +441,13 @@ export class ParakeetModel {
       t += step > 0 ? step : (shouldAdvance ? frameStride : 0);
       if (!shouldAdvance && step === 0) t += 1; // safeguard
       if (maxId === this.blankId) emittedTokens = 0;
+
+      // Capture decoder state at end of prefix when decoding from frame 0
+      if (inc && inc.cacheKey && !prefixStateCaptured && t >= prefixFrames) {
+        const snap = this._snapshotDecoderState(decoderState);
+        this._incrementalCache.set(inc.cacheKey, { state: snap, prefixFrames, D });
+        prefixStateCaptured = true;
+      }
     }
 
     if (perfEnabled) {
@@ -434,7 +495,7 @@ export class ParakeetModel {
       const conf = tokenConfs[i];
 
       // tokensDetailed entry
-      const tokEntry = { token: [cleanTok] };
+      const tokEntry = { token: cleanTok, raw_token: raw, is_word_start: isWordStart };
       if (returnTimestamps) { tokEntry.start_time = +ts[0].toFixed(3); tokEntry.end_time = +ts[1].toFixed(3); }
       if (returnConfidences) tokEntry.confidence = +conf.toFixed(4);
       tokensDetailed.push(tokEntry);
@@ -492,7 +553,7 @@ export class ParakeetModel {
         total_ms: +( (performance.now() - t0).toFixed(1) ),
         rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2)
       } : null,
-      is_final: true,
+      is_final: !inc, // mark non-final when incremental mode is used
     };
   }
 
