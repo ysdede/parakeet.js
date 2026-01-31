@@ -1,92 +1,98 @@
----
-title: Parakeet.js Demo
-emoji: 🦜
-colorFrom: indigo
-colorTo: blue
-sdk: static
-pinned: false
-app_build_command: npm run build
-app_file: build/index.html
-license: mit
-short_description: NVIDIA Parakeet speech recognition for the browser
-models:
-- istupakov/parakeet-tdt-0.6b-v2-onnx
-tags:
-- parakeet-js
-- parakeet
-- onnx
-- webgpu
-- asr
-- istupakov/parakeet-tdt-0.6b-v2-onnx
-custom_headers:
-  cross-origin-embedder-policy: require-corp
-  cross-origin-opener-policy: same-origin
-  cross-origin-resource-policy: cross-origin
----
-
-# 🦜 Parakeet.js - HF Spaces Demo
+# 🦜 Parakeet.js - HuggingFace Spaces Demo
 
 > **NVIDIA Parakeet speech recognition for the browser using WebGPU/WASM**
 
-This demo showcases the **[parakeet.js](https://www.npmjs.com/package/parakeet.js)** library, which brings NVIDIA's Parakeet speech recognition models to the browser using ONNX Runtime Web with WebGPU and WASM backends.
+This is the source code for the [Parakeet.js Demo on HuggingFace Spaces](https://huggingface.co/spaces/ysdede/parakeet.js-demo).
 
-## 🚀 Features
+## 📁 Project Structure
 
-- **🖥️ Browser-based**: Runs entirely in your browser - no server required
-- **⚡ WebGPU acceleration**: Fast inference using WebGPU when available
-- **🔧 WASM fallback**: CPU-based inference using WebAssembly
-- **📱 Multiple formats**: Supports various audio formats (WAV, MP3, etc.)
-- **🎯 Real-time performance**: Optimized for fast transcription
-- **📊 Performance metrics**: Shows detailed timing information
-- **🎛️ Configurable**: Adjustable quantization, preprocessing, and backend settings
+```
+hf-spaces-demo/
+├── src/                    # React source code
+│   ├── App.jsx             # Main application component
+│   ├── App.css             # Tailwind CSS styles
+│   └── utils/
+│       └── speechDatasets.js   # HF dataset utilities
+├── scripts/
+│   └── deploy-to-hf.js     # Deployment script
+├── space_template/
+│   └── README.md           # HF Space metadata
+└── dist/                   # Built files (gitignored)
+```
 
-## 🔧 How to Use
-
-1. **Click "Load Model"** to download and initialize the speech recognition model
-2. **Select your preferences**:
-   - **Backend**: Choose WebGPU (faster) or WASM (more compatible)
-   - **Quantization**: fp32 (higher quality) or int8 (faster)
-   - **Preprocessor**: Different audio processing options
-3. **Upload an audio file** using the file input
-4. **View the transcription** in real-time with performance metrics
-
-## 📦 Integration
-
-You can use parakeet.js in your own projects:
+## 🚀 Development
 
 ```bash
-npm install parakeet.js onnxruntime-web
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
 ```
+
+## 📦 Deployment to HuggingFace Spaces
+
+This project uses a **static build deployment** strategy. The source code stays on GitHub, and only the built `dist/` files are pushed to HuggingFace Spaces.
+
+### Deploy Command
+
+```bash
+npm run deploy-to-hf
+```
+
+This script:
+1. Builds the project (`npm run build`)
+2. Creates a temporary directory
+3. Clones the HF Space repo
+4. Copies `dist/` contents + `space_template/README.md`
+5. Force pushes to HuggingFace
+
+### Manual Deployment
+
+If you prefer manual deployment:
+
+```bash
+# Build
+npm run build
+
+# The dist/ folder contains the static files
+# Push these to your HF Space along with space_template/README.md
+```
+
+## 🔧 Configuration
+
+### HF Space Settings
+
+The `space_template/README.md` contains HuggingFace Space metadata:
+
+```yaml
+---
+title: Parakeet.js Demo
+emoji: 🦜
+colorFrom: green
+colorTo: blue
+sdk: static
+pinned: false
+---
+```
+
+### Changing the HF Space URL
+
+Edit `scripts/deploy-to-hf.js`:
 
 ```javascript
-import { ParakeetModel, getParakeetModel } from 'parakeet.js';
-
-// Load model from HuggingFace Hub
-const modelUrls = await getParakeetModel('istupakov/parakeet-tdt-0.6b-v2-onnx');
-const model = await ParakeetModel.fromUrls(modelUrls);
-
-// Transcribe audio
-const result = await model.transcribe(audioData, sampleRate);
-console.log(result.utterance_text);
+const HF_SPACE_REPO = 'https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE';
 ```
 
-## 🔗 Links
+## 🔗 Related
 
-- **📚 [GitHub Repository](https://github.com/ysdede/parakeet.js)** - Source code and documentation
-- **📦 [npm Package](https://www.npmjs.com/package/parakeet.js)** - Install via npm
+- **[parakeet.js](https://www.npmjs.com/package/parakeet.js)** - npm package
+- **[GitHub Repository](https://github.com/ysdede/parakeet.js)** - Full source code
+- **[react-demo](../react-demo)** - Production demo (same codebase)
+- **[react-demo-dev](../react-demo-dev)** - Development demo (links to local library)
 
-## 🧠 Model Information
+## 📝 Notes
 
-This demo uses the **istupakov/parakeet-tdt-0.6b-v2-onnx** model, which is an ONNX-converted version of NVIDIA's Parakeet speech recognition model optimized for browser deployment.
-
-## 💡 Technical Details
-
-- **Model Format**: ONNX for cross-platform compatibility
-- **Backends**: WebGPU (GPU acceleration) and WASM (CPU fallback)
-- **Quantization**: Support for both fp32 and int8 precision
-- **Audio Processing**: Built-in preprocessing for various audio formats
-- **Performance**: Real-time factor (RTF) typically < 1.0x for fast transcription
-
----
-
-*Built with ❤️ using React and deployed on Hugging Face Spaces*
+- This demo uses the same UI codebase as `react-demo`
+- The only difference is the `deploy-to-hf` script and HF-specific metadata
+- Uses `parakeet.js` npm package (not local link like `react-demo-dev`)
