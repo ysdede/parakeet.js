@@ -1,0 +1,66 @@
+name: Deploy Demo to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'examples/hf-spaces-demo/**'
+      - '.github/workflows/deploy-gh-pages.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: examples/hf-spaces-demo/package-lock.json
+          
+      - name: Install dependencies
+        working-directory: examples/hf-spaces-demo
+        run: npm ci
+        
+      - name: Build
+        working-directory: examples/hf-spaces-demo
+        run: npm run build
+        
+      - name: Prepare deployment files
+        run: |
+          # Create a temp directory for deployment
+          mkdir -p deploy_temp
+          
+          # Copy built assets
+          cp -r examples/hf-spaces-demo/dist/* deploy_temp/
+          
+          # Add .nojekyll to prevent Jekyll processing
+          touch deploy_temp/.nojekyll
+          
+          # Create git-info.json
+          echo "{\"branch\": \"master\", \"commit\": \"$(git rev-parse --short HEAD)\"}" > deploy_temp/git-info.json
+          
+          # Fix paths for GitHub Pages subpath (/parakeet.js/)
+          # The assets need to reference /parakeet.js/assets/ not just /assets/
+          sed -i 's|"/assets/|"/parakeet.js/assets/|g' deploy_temp/index.html
+          sed -i 's|"/favicon.ico"|"/parakeet.js/favicon.ico"|g' deploy_temp/index.html
+          sed -i 's|src="coi-serviceworker.js"|src="/parakeet.js/coi-serviceworker.js"|g' deploy_temp/index.html
+          
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy_temp
+          publish_branch: gh-pages
+          force_orphan: true
+          commit_message: 'Deploy: ${{ github.event.head_commit.message }}'
