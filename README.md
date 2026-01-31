@@ -265,7 +265,13 @@ console.log(LANGUAGE_NAMES['fr']); // 'French'
 
 ## Using the React demo as a template
 
-Located at `examples/react-demo` (production) and `examples/react-demo-dev` (development).
+The library includes three demo variants:
+
+| Demo | Purpose | Dependency |
+|------|---------|------------|
+| `examples/react-demo` | Production demo | `parakeet.js` npm package |
+| `examples/react-demo-dev` | Development demo | Local library (`file:../../`) |
+| `examples/hf-spaces-demo` | HuggingFace Spaces deployment | `parakeet.js` npm package |
 
 Quick start:
 
@@ -277,12 +283,13 @@ npm run dev  # Vite => http://localhost:5173
 
 ### Demo Features
 
-The development demo (`react-demo-dev`) includes advanced features:
+All demos share the same modern UI with:
 
 - **Model Selector**: Switch between v2 (English) and v3 (Multilingual)
 - **Language Selector**: Context-aware dropdown showing only supported languages
 - **Quick Test**: Load random samples from HuggingFace speech datasets
 - **Reference Text**: Compare transcription against ground truth
+- **Dark Mode**: Automatic theme toggle
 
 ### Speech Dataset Utilities (Demo Only)
 
@@ -332,7 +339,17 @@ This demo showcases:
 - **Multi-threaded WASM** - Optimized for maximum performance
 - **Complete feature set** - All library capabilities in one place
 
-The demo is also available locally at `examples/hf-spaces-demo` and can be deployed to your own HF Space.
+### Deploy Your Own
+
+The demo source is at `examples/hf-spaces-demo`. Deploy to your own HF Space:
+
+```bash
+cd examples/hf-spaces-demo
+npm install
+npm run deploy-to-hf  # Builds and pushes to HuggingFace
+```
+
+Edit `scripts/deploy-to-hf.js` to change the target Space URL.
 
 ---
 
