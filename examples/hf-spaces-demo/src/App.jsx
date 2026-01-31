@@ -11,6 +11,60 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
   languages: config.languages,
 }));
 
+// Cache audio file from GitHub raw URL to IndexedDB
+async function getCachedAudioFile(url, cacheKey) {
+  const dbName = 'parakeet-demo-cache';
+  const storeName = 'audio-files';
+  
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+    
+    request.onerror = () => reject(new Error('Failed to open IndexedDB'));
+    request.onsuccess = async (event) => {
+      const db = event.target.result;
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const getReq = store.get(cacheKey);
+      
+      getReq.onsuccess = async () => {
+        if (getReq.result) {
+          // Cache hit - return cached blob
+          console.log(`[Cache] Using cached audio: ${cacheKey}`);
+          resolve(getReq.result.blob);
+        } else {
+          // Cache miss - fetch from URL and cache
+          console.log(`[Cache] Fetching audio from: ${url}`);
+          try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const blob = await response.blob();
+            
+            // Store in cache
+            const writeTx = db.transaction(storeName, 'readwrite');
+            const writeStore = writeTx.objectStore(storeName);
+            writeStore.put({ key: cacheKey, blob, timestamp: Date.now() });
+            writeTx.oncomplete = () => {
+              console.log(`[Cache] Cached audio: ${cacheKey}`);
+              resolve(blob);
+            };
+            writeTx.onerror = () => resolve(blob); // Fallback: return without caching
+          } catch (err) {
+            reject(err);
+          }
+        }
+      };
+      getReq.onerror = () => reject(new Error('Failed to read from cache'));
+    };
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.createObjectStore(storeName, { keyPath: 'key' });
+      }
+    };
+  });
+}
+
 // Convert Float32Array PCM to WAV blob for playback
 function pcmToWavBlob(pcm, sampleRate = 16000) {
   const numChannels = 1;
@@ -245,8 +299,10 @@ export default function App() {
       const expectedText = 'it is not life as we know or understand it';
       
       try {
-        const audioRes = await fetch('/assets/life_Jim.wav');
-        const buf = await audioRes.arrayBuffer();
+        // Use GitHub raw URL for the test audio file
+        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/react-demo/public/assets/life_Jim.wav';
+        const audioBlob = await getCachedAudioFile(audioUrl, 'life_Jim.wav');
+        const buf = await audioBlob.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });
         const decoded = await audioCtx.decodeAudioData(buf);
         const pcm = decoded.getChannelData(0);
