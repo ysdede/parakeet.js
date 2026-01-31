@@ -326,11 +326,14 @@ Copy-paste the `loadModel()` and `transcribeFile()` functions into your app, adj
 
 ---
 
-## 🚀 Live Demo on Hugging Face Spaces
+## 🚀 Live Demos
 
 Try the library instantly in your browser without any setup:
 
-**🦜 [Parakeet.js Demo on HF Spaces](https://huggingface.co/spaces/ysdede/parakeet.js-demo)**
+| Demo | Features | Best For |
+|------|----------|----------|
+| **🦜 [GitHub Pages Demo](https://ysdede.github.io/parakeet.js/)** | WebGPU + fp32, full performance | Desktop browsers with WebGPU |
+| **🤗 [HuggingFace Spaces](https://huggingface.co/spaces/ysdede/parakeet.js-demo)** | WASM + int8, memory-efficient | All browsers, mobile |
 
 This demo showcases:
 - **WebGPU/WASM backend selection** - Choose the best performance for your device
@@ -341,15 +344,21 @@ This demo showcases:
 
 ### Deploy Your Own
 
-The demo source is at `examples/hf-spaces-demo`. Deploy to your own HF Space:
+**GitHub Pages** (recommended for full performance):
+```bash
+cd examples/react-demo
+npm install
+npm run deploy-to-gh-pages  # Builds and pushes to gh-pages branch
+```
 
+**HuggingFace Spaces** (memory-efficient, broader compatibility):
 ```bash
 cd examples/hf-spaces-demo
 npm install
 npm run deploy-to-hf  # Builds and pushes to HuggingFace
 ```
 
-Edit `scripts/deploy-to-hf.js` to change the target Space URL.
+Edit the respective `scripts/deploy-to-*.js` files to change target URLs.
 
 ---
 
