@@ -300,7 +300,7 @@ export default function App() {
       
       try {
         // Use GitHub raw URL for the test audio file
-        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/react-demo/public/assets/life_Jim.wav';
+        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/refs/heads/master/examples/react-demo-dev/public/assets/life_Jim.wav';
         const audioBlob = await getCachedAudioFile(audioUrl, 'life_Jim.wav');
         const buf = await audioBlob.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });
