@@ -21,19 +21,20 @@ async function testBackend() {
     console.log('3. Testing Hub integration...');
     const { getParakeetModel } = await import('./src/hub.js');
     
-    const modelUrls = await getParakeetModel('istupakov/parakeet-tdt-0.6b-v2-onnx', { 
+    const result = await getParakeetModel('istupakov/parakeet-tdt-0.6b-v2-onnx', { 
       quantization: 'int8',
       preprocessor: 'nemo128'
     });
     
-    console.log('✓ Model URLs retrieved:', Object.keys(modelUrls));
+    console.log('✓ Model URLs retrieved:', Object.keys(result.urls));
     
     // Test 4: Try to create a model instance
     console.log('4. Testing model creation...');
     const { ParakeetModel } = await import('./src/parakeet.js');
     
     const model = await ParakeetModel.fromUrls({
-      ...modelUrls,
+      ...result.urls,
+      filenames: result.filenames,
       backend: 'webgpu'
     });
     
@@ -45,4 +46,4 @@ async function testBackend() {
   }
 }
 
-testBackend(); 
+testBackend();
