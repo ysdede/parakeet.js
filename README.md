@@ -11,23 +11,21 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 
 ---
 
-## What's New (v0.3.x)
+## What's New (v0.4.x)
+
+### 🎯 NeMo-Aligned TDT Decoding (Critical Accuracy Fix)
+- **100% Parity with NVIDIA NeMo**: Aligned the JavaScript TDT decoding loop with the original Python reference implementation.
+- **Fixed "Missing Words" Bug**: Resolved an issue where multi-token emissions from a single frame were being skipped due to incorrect frame advancement.
+- **Conditional State Updates**: Decoder state now correctly updates only upon non-blank token emission, matching the official transducer algorithm.
+- **Dynamic Vocabulary Mapping**: Replaced hardcoded blank IDs with dynamic lookup from the model's vocabulary.
 
 ### 🌐 Parakeet TDT v3 Multilingual Support
-- Added support for **Parakeet TDT 0.6B v3** with 13 languages: English, French, German, Spanish, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Japanese, Korean, Chinese
-- Both v2 (English-only) and v3 (Multilingual) models now work out of the box
-- Use model keys for easier loading: `'parakeet-tdt-0.6b-v2'` or `'parakeet-tdt-0.6b-v3'`
+- Added support for **Parakeet TDT 0.6B v3** with 13 languages: English, French, German, Spanish, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Japanese, Korean, Chinese.
+- Both v2 (English-only) and v3 (Multilingual) models now work out of the box.
 
-### 🎛️ Model Configuration API
-- New `MODELS` export with model metadata (supported languages, vocab size, etc.)
-- `getModelConfig()` for programmatic model introspection
-- `supportsLanguage()` helper to check language compatibility
-
-### 🧪 Demo App Improvements
-- **Model selector** dropdown to switch between v2 and v3
-- **Language selector** (context-aware, shows only supported languages)
-- **Quick Test** feature with HuggingFace speech datasets (People's Speech, MLS)
-- **Reference text** display for comparing transcription accuracy
+### 🌊 Incremental & Streaming Support
+- Added `incremental` transcription capabilities for real-time applications.
+- Optimized state snapshots for low-latency prefix caching.
 
 ---
 
@@ -307,12 +305,17 @@ The demo is also available locally at `examples/hf-spaces-demo` and can be deplo
 
 ## Changelog
 
-### v0.3.x (January 2026)
-- ✨ **Multilingual Support**: Added Parakeet TDT 0.6B v3 with 13 languages
-- 🎛️ **Model Config API**: New `MODELS`, `LANGUAGE_NAMES`, `getModelConfig()`, `supportsLanguage()` exports
-- 🧪 **Demo Enhancements**: Model/language selectors, HuggingFace dataset testing
-- 🔧 **TDT Decoding Fix**: Aligned decoding logic with NeMo framework for improved accuracy
-- 🌊 **Streaming Support**: Added incremental transcription capabilities
+### v0.4.x (January 2026)
+- 🎯 **Accuracy Alignment**: Critical fix for TDT decoding loop to match NVIDIA NeMo parity.
+- 🔧 **Multi-token Fix**: Resolved bug skipping tokens emitted from the same encoder frame.
+- 🔤 **Space Normalization**: Improved SentencePiece decoding regex for better punctuation spacing.
+- 🏷️ **Dynamic Blank ID**: Automatic detection of blank token index from model vocabulary.
+
+### v0.3.x
+- ✨ **Multilingual Support**: Added Parakeet TDT 0.6B v3 with 13 languages.
+- 🎛️ **Model Config API**: New `MODELS`, `LANGUAGE_NAMES`, `getModelConfig()`, `supportsLanguage()` exports.
+- 🧪 **Demo Enhancements**: Model/language selectors, HuggingFace dataset testing.
+- 🌊 **Streaming Support**: Added incremental transcription capabilities.
 
 ### v0.2.x
 - Initial WebGPU/WASM hybrid backend
