@@ -1,12 +1,14 @@
 # Parakeet.js  
 
+**[▶️ Try the Live Demo](https://ysdede.github.io/parakeet.js/)** | [NPM Package](https://www.npmjs.com/package/parakeet.js) | [GitHub](https://github.com/ysdede/parakeet.js)
+
 Client-side ONNX inference of NVIDIA *Parakeet* speech-to-text models.
 Runs entirely in the browser on **WebGPU** or **WASM** via
 [ONNX Runtime Web](https://onnxruntime.ai/).
 
 > **Parakeet.js** offers a high-performance, browser-first implementation for NVIDIA's Parakeet-TDT speech-to-text models, running entirely client-side via WebGPU and WASM. Powered by ONNX Runtime Web, this library makes it simple to integrate state-of-the-art transcription into any web application.
 
-> **Status:** Stable v1.0.0 release - Production ready
+> **Status:** Stable v1.0.1 release - Production ready
 > **Supported Models:** Parakeet-TDT v2 (English) and v3 (Multilingual - 13 languages)
 
 ---
@@ -263,22 +265,37 @@ console.log(LANGUAGE_NAMES['fr']); // 'French'
 
 ---
 
-## Using the React demo as a template
+## Using the React Demo
 
-The library includes three demo variants:
+The library includes a unified demo application:
 
-| Demo | Purpose | Dependency |
-|------|---------|------------|
-| `examples/react-demo` | Production demo | `parakeet.js` npm package |
-| `examples/react-demo-dev` | Development demo | Local library (`file:../../`) |
-| `examples/hf-spaces-demo` | HuggingFace Spaces deployment | `parakeet.js` npm package |
+```
+examples/demo/          # React demo with switchable source
+```
 
-Quick start:
+### Quick Start
 
 ```bash
-cd examples/react-demo-dev
-npm i
-npm run dev  # Vite => http://localhost:5173
+cd examples/demo
+npm install
+
+# Test with local source files (for library development)
+npm run dev:local
+
+# Test with npm package (simulates end-user experience)
+npm run dev
+```
+
+The demo runs at `http://localhost:3000/` with CORS headers enabled for SharedArrayBuffer support.
+
+### Deployment
+
+```bash
+# Deploy to HuggingFace Spaces
+npm run deploy-to-hf
+
+# Deploy to GitHub Pages (via GitHub Actions)
+gh workflow run deploy-gh-pages.yml
 ```
 
 ### Demo Features
@@ -326,39 +343,34 @@ Copy-paste the `loadModel()` and `transcribeFile()` functions into your app, adj
 
 ---
 
-## 🚀 Live Demos
+## 🚀 Live Demo
 
 Try the library instantly in your browser without any setup:
 
-| Demo | Features | Best For |
-|------|----------|----------|
-| **🦜 [GitHub Pages Demo](https://ysdede.github.io/parakeet.js/)** | WebGPU + fp32, full performance | Desktop browsers with WebGPU |
-| **🤗 [HuggingFace Spaces](https://huggingface.co/spaces/ysdede/parakeet.js-demo)** | WASM + int8, memory-efficient | All browsers, mobile |
+**[🦜 Parakeet.js Demo](https://ysdede.github.io/parakeet.js/)** | [🤗 HuggingFace Mirror](https://huggingface.co/spaces/ysdede/parakeet.js-demo)
 
-This demo showcases:
+Both links point to identical demos with the same features:
+
 - **WebGPU/WASM backend selection** - Choose the best performance for your device
+- **Multi-threaded WASM** - SharedArrayBuffer enabled for maximum CPU utilization
 - **Real-time transcription** - Upload audio files and see instant results
 - **Performance metrics** - View detailed timing information and RTF scores
-- **Multi-threaded WASM** - Optimized for maximum performance
-- **Complete feature set** - All library capabilities in one place
+- **Test samples** - Load random samples from HuggingFace speech datasets
 
 ### Deploy Your Own
 
-**GitHub Pages** (recommended for full performance):
 ```bash
-cd examples/react-demo
+cd examples/demo
 npm install
-npm run deploy-to-gh-pages  # Builds and pushes to gh-pages branch
+
+# HuggingFace Spaces
+npm run deploy-to-hf
+
+# GitHub Pages (via GitHub Actions)
+gh workflow run deploy-gh-pages.yml
 ```
 
-**HuggingFace Spaces** (memory-efficient, broader compatibility):
-```bash
-cd examples/hf-spaces-demo
-npm install
-npm run deploy-to-hf  # Builds and pushes to HuggingFace
-```
-
-Edit the respective `scripts/deploy-to-*.js` files to change target URLs.
+See `examples/demo/README.md` for detailed deployment instructions.
 
 ---
 
