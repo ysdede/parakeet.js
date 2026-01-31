@@ -3,6 +3,8 @@
  * Downloads models from HF and caches them in browser storage.
  */
 
+import { MODELS, getModelConfig } from './models.js';
+
 const DB_NAME = 'parakeet-cache-db';
 const STORE_NAME = 'file-store';
 let dbPromise = null;
@@ -164,17 +166,24 @@ export async function getModelText(repoId, filename, options = {}) {
 
 /**
  * Convenience function to get all Parakeet model files for a given architecture.
- * @param {string} repoId HF repo (e.g., 'nvidia/parakeet-tdt-1.1b')
+ * @param {string} repoIdOrModelKey HF repo (e.g., 'nvidia/parakeet-tdt-1.1b') or model key (e.g., 'parakeet-tdt-0.6b-v3')
  * @param {Object} [options]
  * @param {('int8'|'fp32')} [options.encoderQuant='int8'] Encoder quantization
  * @param {('int8'|'fp32')} [options.decoderQuant='int8'] Decoder quantization
- * @param {('nemo80'|'nemo128')} [options.preprocessor='nemo128'] Preprocessor variant
+ * @param {('nemo80'|'nemo128')} [options.preprocessor] Preprocessor variant (auto-detected from model config if not specified)
  * @param {('webgpu'|'wasm')} [options.backend='webgpu'] Backend to use
  * @param {Function} [options.progress] Progress callback
- * @returns {Promise<{urls: object, filenames: object}>}
+ * @returns {Promise<{urls: object, filenames: object, modelConfig: object|null}>}
  */
-export async function getParakeetModel(repoId, options = {}) {
-  const { encoderQuant = 'int8', decoderQuant = 'int8', preprocessor = 'nemo128', backend = 'webgpu', progress } = options;
+export async function getParakeetModel(repoIdOrModelKey, options = {}) {
+  // Resolve model key to repo ID and get config
+  const modelConfig = getModelConfig(repoIdOrModelKey);
+  const repoId = modelConfig?.repoId || repoIdOrModelKey;
+  
+  // Use model config defaults if available
+  const defaultPreprocessor = modelConfig?.preprocessor || 'nemo128';
+  
+  const { encoderQuant = 'int8', decoderQuant = 'int8', preprocessor = defaultPreprocessor, backend = 'webgpu', progress } = options;
   
   // Decide quantisation per component
   let encoderQ = encoderQuant;
@@ -215,7 +224,8 @@ export async function getParakeetModel(repoId, options = {}) {
           encoder: encoderName,
           decoder: decoderName
       },
-      quantisation: { encoder: encoderQ, decoder: decoderQ }
+      quantisation: { encoder: encoderQ, decoder: decoderQ },
+      modelConfig: modelConfig || null,  // Include model config for downstream use
   };
   
   for (const { key, name } of filesToGet) {

@@ -1,9 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ParakeetModel, getParakeetModel } from 'parakeet.js';
+import { ParakeetModel, getParakeetModel, MODELS } from 'parakeet.js';
 import './App.css';
 
+// Available models for selection
+const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
+  key,
+  repoId: config.repoId,
+  displayName: config.displayName,
+  languages: config.languages,
+}));
+
 export default function App() {
-  const repoId = 'istupakov/parakeet-tdt-0.6b-v2-onnx';
+  const [selectedModel, setSelectedModel] = useState('parakeet-tdt-0.6b-v2');
+  const modelConfig = MODELS[selectedModel];
+  const repoId = modelConfig?.repoId || selectedModel;
   const [backend, setBackend] = useState('webgpu-hybrid');
   const [encoderQuant, setEncoderQuant] = useState('fp32');
   const [decoderQuant, setDecoderQuant] = useState('int8');
@@ -50,7 +60,8 @@ export default function App() {
       };
 
       // 1. Download all model files from HuggingFace Hub
-      const modelUrls = await getParakeetModel(repoId, { 
+      // Use model key for known models (enables auto-config), or repo ID for custom
+      const modelUrls = await getParakeetModel(selectedModel, { 
         encoderQuant,
         decoderQuant,
         preprocessor,
@@ -175,9 +186,25 @@ export default function App() {
       <h2>Parakeet JS React Demo - Using npm package</h2>
 
       <div className="controls">
-        <p>
-          <strong>Model:</strong> {repoId}
-        </p>
+        <label>
+          <strong>Model:</strong>{' '}
+          <select 
+            value={selectedModel} 
+            onChange={e => setSelectedModel(e.target.value)}
+            disabled={status !== 'Idle' && !status.toLowerCase().includes('fail')}
+          >
+            {MODEL_OPTIONS.map(opt => (
+              <option key={opt.key} value={opt.key}>
+                {opt.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+        {modelConfig?.languages?.length > 1 && (
+          <span style={{ marginLeft: '1rem', fontSize: '0.9em', color: '#666' }}>
+            🌐 Supports: {modelConfig.languages.join(', ')}
+          </span>
+        )}
       </div>
 
       <div className="controls">
