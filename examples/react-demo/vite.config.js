@@ -24,6 +24,8 @@ try {
 
 export default defineConfig({
   plugins: [react()],
+  // GitHub Pages base path - set to repo name for https://username.github.io/repo-name/
+  base: process.env.GITHUB_PAGES ? '/parakeet.js/' : '/',
   server: {
     port: 5173,
     ...(httpsConfig && { https: httpsConfig }),

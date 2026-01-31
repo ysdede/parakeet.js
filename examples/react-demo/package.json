@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:gh-pages": "cross-env GITHUB_PAGES=true vite build",
+    "preview": "vite preview",
+    "deploy-to-gh-pages": "cross-env GITHUB_PAGES=true node scripts/deploy-to-gh-pages.js"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -20,6 +22,7 @@
     "postcss": "^8.4.0",
     "autoprefixer": "^10.4.0",
     "@tailwindcss/forms": "^0.5.0",
-    "@tailwindcss/typography": "^0.5.0"
+    "@tailwindcss/typography": "^0.5.0",
+    "cross-env": "^7.0.3"
   }
 }
