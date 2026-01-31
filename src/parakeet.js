@@ -17,8 +17,8 @@ export class ParakeetModel {
     this.preprocessor = preprocessor;
     this.ort = ort;
 
-    // Default IDs – may later be read from model metadata.
-    this.blankId = 1024;
+    // Read blank ID from tokenizer (dynamic instead of hardcoded)
+    this.blankId = tokenizer.blankId;
 
     // Combined model specific constants
     this.predHidden = 640;
@@ -404,7 +404,7 @@ export class ParakeetModel {
 
       const prevTok = ids.length ? ids[ids.length - 1] : this.blankId;
       const { tokenLogits, step, newState } = await this._runCombinedStep(this._encoderFrameTensor, prevTok, decoderState);
-      decoderState = newState;
+      // NOTE: State update moved below - only update on non-blank token (matching Python reference)
 
       // Temperature scaling & argmax
       let maxVal = -Infinity, maxId = 0;
@@ -426,6 +426,9 @@ export class ParakeetModel {
       }
 
       if (maxId !== this.blankId) {
+        // CRITICAL FIX: Only update decoder state on non-blank token emission
+        // This matches the Python reference in onnx-asr/src/onnx_asr/asr.py line 212
+        decoderState = newState;
         ids.push(maxId);
         if (returnTimestamps) {
           const durFrames = step > 0 ? step : 1;
