@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ParakeetModel, getParakeetModel, MODELS } from 'parakeet.js';
+import { ParakeetModel, getParakeetModel, MODELS, LANGUAGES, getFleursApiUrl } from 'parakeet.js';
 import './App.css';
 
 // Available models for selection
@@ -14,6 +14,7 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState('parakeet-tdt-0.6b-v2');
   const modelConfig = MODELS[selectedModel];
   const repoId = modelConfig?.repoId || selectedModel;
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [backend, setBackend] = useState('webgpu-hybrid');
   const [encoderQuant, setEncoderQuant] = useState('fp32');
   const [decoderQuant, setDecoderQuant] = useState('int8');
@@ -23,9 +24,11 @@ export default function App() {
   const [progressText, setProgressText] = useState('');
   const [progressPct, setProgressPct] = useState(null);
   const [text, setText] = useState('');
+  const [referenceText, setReferenceText] = useState('');
   const [latestMetrics, setLatestMetrics] = useState(null);
   const [transcriptions, setTranscriptions] = useState([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isLoadingSample, setIsLoadingSample] = useState(false);
   const [verboseLog, setVerboseLog] = useState(false);
   const [frameStride, setFrameStride] = useState(1);
   const [dumpDetail, setDumpDetail] = useState(false);
@@ -33,6 +36,13 @@ export default function App() {
   const [cpuThreads, setCpuThreads] = useState(Math.max(1, maxCores - 2));
   const modelRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Get available languages for selected model
+  const availableLanguages = modelConfig?.languages || ['en'];
+  const languageOptions = availableLanguages.map(lang => ({
+    code: lang,
+    ...LANGUAGES[lang]
+  }));
 
   // Auto-adjust quant presets when backend changes
   useEffect(() => {
@@ -44,6 +54,114 @@ export default function App() {
       setDecoderQuant('int8');
     }
   }, [backend]);
+
+  // Reset language to default when model changes (if current language not supported)
+  useEffect(() => {
+    const supportedLangs = MODELS[selectedModel]?.languages || ['en'];
+    if (!supportedLangs.includes(selectedLanguage)) {
+      setSelectedLanguage(MODELS[selectedModel]?.defaultLanguage || 'en');
+    }
+  }, [selectedModel]);
+
+  // Fetch random audio sample from FLEURS dataset
+  async function fetchSampleFromFLEURS() {
+    if (!modelRef.current) {
+      alert('Please load the model first');
+      return;
+    }
+
+    setIsLoadingSample(true);
+    setReferenceText('');
+    setText('');
+
+    try {
+      const fleursInfo = getFleursApiUrl(selectedLanguage);
+      if (!fleursInfo) {
+        throw new Error(`Language ${selectedLanguage} not supported in FLEURS`);
+      }
+
+      console.log(`[FLEURS] Fetching sample from: ${fleursInfo.url}`);
+      
+      // Fetch the dataset row
+      const response = await fetch(fleursInfo.url);
+      if (!response.ok) {
+        throw new Error(`FLEURS API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const row = data.rows?.[0]?.row;
+      
+      if (!row) {
+        throw new Error('No data returned from FLEURS API');
+      }
+
+      // Get the audio URL and transcription
+      const audioUrl = row.audio?.[0]?.src;
+      const transcription = row.transcription || row.raw_transcription || '';
+      
+      if (!audioUrl) {
+        throw new Error('No audio URL in FLEURS response');
+      }
+
+      setReferenceText(transcription);
+      console.log(`[FLEURS] Reference: "${transcription}"`);
+      console.log(`[FLEURS] Audio URL: ${audioUrl}`);
+
+      // Fetch and decode the audio
+      setStatus('Fetching audio…');
+      const audioRes = await fetch(audioUrl);
+      const buf = await audioRes.arrayBuffer();
+      
+      // Decode audio (FLEURS uses 16kHz)
+      const audioCtx = new AudioContext({ sampleRate: 16000 });
+      const decoded = await audioCtx.decodeAudioData(buf);
+      const pcm = decoded.getChannelData(0);
+      await audioCtx.close();
+
+      // Transcribe
+      setStatus('Transcribing FLEURS sample…');
+      setIsTranscribing(true);
+      
+      console.time('Transcribe-FLEURS');
+      const res = await modelRef.current.transcribe(pcm, 16000, {
+        returnTimestamps: true,
+        returnConfidences: true,
+        frameStride
+      });
+      console.timeEnd('Transcribe-FLEURS');
+
+      if (dumpDetail) {
+        console.log('[FLEURS] Transcription result:', res);
+      }
+
+      setText(res.utterance_text);
+      setLatestMetrics(res.metrics);
+
+      // Add to history
+      const langName = LANGUAGES[selectedLanguage]?.displayName || selectedLanguage;
+      const newTranscription = {
+        id: Date.now(),
+        filename: `FLEURS-${langName}-#${fleursInfo.offset}`,
+        text: res.utterance_text,
+        reference: transcription,
+        timestamp: new Date().toLocaleTimeString(),
+        duration: pcm.length / 16000,
+        wordCount: res.words?.length || 0,
+        confidence: res.confidence_scores?.token_avg ?? res.confidence_scores?.word_avg ?? null,
+        metrics: res.metrics,
+        language: selectedLanguage
+      };
+      setTranscriptions(prev => [newTranscription, ...prev]);
+      setStatus('Model ready ✔');
+
+    } catch (error) {
+      console.error('[FLEURS] Error:', error);
+      setStatus(`FLEURS error: ${error.message}`);
+    } finally {
+      setIsLoadingSample(false);
+      setIsTranscribing(false);
+    }
+  }
 
   async function loadModel() {
     setStatus('Loading model…');
@@ -201,9 +319,23 @@ export default function App() {
             ))}
           </select>
         </label>
-        {modelConfig?.languages?.length > 1 && (
-          <span style={{ marginLeft: '1rem', fontSize: '0.9em', color: '#666' }}>
-            🌐 Supports: {modelConfig.languages.join(', ')}
+        {' '}
+        <label>
+          <strong>Language:</strong>{' '}
+          <select 
+            value={selectedLanguage} 
+            onChange={e => setSelectedLanguage(e.target.value)}
+          >
+            {languageOptions.map(lang => (
+              <option key={lang.code} value={lang.code}>
+                {lang.displayName} ({lang.code})
+              </option>
+            ))}
+          </select>
+        </label>
+        {availableLanguages.length === 1 && (
+          <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#888' }}>
+            (v2 is English-only)
           </span>
         )}
       </div>
@@ -288,6 +420,47 @@ export default function App() {
         </div>
       )}
 
+      {/* FLEURS Quick Test Section */}
+      <div className="controls" style={{ 
+        backgroundColor: '#f0f7ff', 
+        padding: '1rem', 
+        borderRadius: '8px',
+        marginBottom: '1rem',
+        border: '1px solid #cce0ff'
+      }}>
+        <div style={{ marginBottom: '0.5rem' }}>
+          <strong>🎯 Quick Test with FLEURS Dataset</strong>
+          <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#666' }}>
+            (Google's multilingual speech dataset)
+          </span>
+        </div>
+        <button 
+          onClick={fetchSampleFromFLEURS}
+          disabled={status !== 'Model ready ✔' || isLoadingSample || isTranscribing}
+          className="primary"
+          style={{ marginRight: '1rem' }}
+        >
+          {isLoadingSample ? '⏳ Loading…' : `🎲 Load Random ${LANGUAGES[selectedLanguage]?.displayName || selectedLanguage} Sample`}
+        </button>
+        {referenceText && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 'bold', fontSize: '0.9em' }}>
+              📝 Reference Text (Ground Truth):
+            </label>
+            <div style={{ 
+              backgroundColor: '#e8f5e9', 
+              padding: '0.5rem 0.75rem', 
+              borderRadius: '4px',
+              border: '1px solid #c8e6c9',
+              fontFamily: 'inherit',
+              fontSize: '0.95em'
+            }}>
+              {referenceText}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="controls">
         <input 
           ref={fileInputRef}
@@ -340,8 +513,17 @@ export default function App() {
           <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
             {transcriptions.map((trans) => (
               <div className="history-item" key={trans.id}>
-                <div className="history-meta"><strong>{trans.filename}</strong><span>{trans.timestamp}</span></div>
+                <div className="history-meta">
+                  <strong>{trans.filename}</strong>
+                  {trans.language && <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#666' }}>({LANGUAGES[trans.language]?.displayName})</span>}
+                  <span>{trans.timestamp}</span>
+                </div>
                 <div className="history-stats">Duration: {trans.duration.toFixed(1)}s | Words: {trans.wordCount}{trans.confidence && ` | Confidence: ${trans.confidence.toFixed(2)}`}{trans.metrics && ` | RTF: ${trans.metrics.rtf?.toFixed(2)}x`}</div>
+                {trans.reference && (
+                  <div style={{ fontSize: '0.9em', color: '#2e7d32', marginBottom: '0.25rem' }}>
+                    <strong>Reference:</strong> {trans.reference}
+                  </div>
+                )}
                 <div className="history-text">{trans.text}</div>
               </div>
             ))}
