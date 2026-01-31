@@ -108,8 +108,10 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState('parakeet-tdt-0.6b-v2');
   const modelConfig = MODELS[selectedModel];
   const [selectedLanguage, setSelectedLanguage] = useState('en');
-  const [backend, setBackend] = useState('webgpu-hybrid');
-  const [encoderQuant, setEncoderQuant] = useState('fp32');
+  // GitHub Pages has memory limits - default to WASM with int8 (smaller models)
+  // Users can still select WebGPU + fp32 if their system supports it
+  const [backend, setBackend] = useState('wasm');
+  const [encoderQuant, setEncoderQuant] = useState('int8');
   const [decoderQuant, setDecoderQuant] = useState('int8');
   const [preprocessor, setPreprocessor] = useState('nemo128');
   const [status, setStatus] = useState('Idle');
