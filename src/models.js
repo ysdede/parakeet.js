@@ -4,6 +4,26 @@
  */
 
 /**
+ * Language configuration with display names and FLEURS dataset mapping.
+ * @type {Object.<string, {displayName: string, fleursConfig: string, sampleCount: number}>}
+ */
+export const LANGUAGES = {
+  en: { displayName: 'English', fleursConfig: 'en_us', sampleCount: 647 },
+  es: { displayName: 'Spanish', fleursConfig: 'es_419', sampleCount: 647 },
+  fr: { displayName: 'French', fleursConfig: 'fr_fr', sampleCount: 647 },
+  de: { displayName: 'German', fleursConfig: 'de_de', sampleCount: 647 },
+  it: { displayName: 'Italian', fleursConfig: 'it_it', sampleCount: 647 },
+  pt: { displayName: 'Portuguese', fleursConfig: 'pt_br', sampleCount: 647 },
+  nl: { displayName: 'Dutch', fleursConfig: 'nl_nl', sampleCount: 647 },
+  pl: { displayName: 'Polish', fleursConfig: 'pl_pl', sampleCount: 647 },
+  ru: { displayName: 'Russian', fleursConfig: 'ru_ru', sampleCount: 647 },
+  uk: { displayName: 'Ukrainian', fleursConfig: 'uk_ua', sampleCount: 647 },
+  ja: { displayName: 'Japanese', fleursConfig: 'ja_jp', sampleCount: 647 },
+  ko: { displayName: 'Korean', fleursConfig: 'ko_kr', sampleCount: 647 },
+  zh: { displayName: 'Chinese', fleursConfig: 'cmn_hans_cn', sampleCount: 647 },
+};
+
+/**
  * @typedef {Object} ModelConfig
  * @property {string} repoId - HuggingFace repository ID
  * @property {string} displayName - Human-readable name for UI
@@ -106,4 +126,29 @@ export function supportsLanguage(modelKeyOrRepoId, language) {
  */
 export function listModels() {
   return Object.keys(MODELS);
+}
+
+/**
+ * Get language configuration.
+ * @param {string} langCode - ISO 639-1 language code
+ * @returns {Object|null} Language config or null if not found
+ */
+export function getLanguageConfig(langCode) {
+  return LANGUAGES[langCode.toLowerCase()] || null;
+}
+
+/**
+ * Get FLEURS dataset API URL for a random sample.
+ * @param {string} langCode - ISO 639-1 language code
+ * @param {number} [offset] - Specific offset (random if not provided)
+ * @returns {{url: string, offset: number}|null} API URL and offset, or null if language not supported
+ */
+export function getFleursApiUrl(langCode, offset) {
+  const langConfig = LANGUAGES[langCode.toLowerCase()];
+  if (!langConfig) return null;
+  
+  const randomOffset = offset ?? Math.floor(Math.random() * langConfig.sampleCount);
+  const url = `https://datasets-server.huggingface.co/rows?dataset=google/fleurs&config=${langConfig.fleursConfig}&split=test&offset=${randomOffset}&length=1`;
+  
+  return { url, offset: randomOffset };
 }
