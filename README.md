@@ -7,7 +7,27 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 > **Parakeet.js** offers a high-performance, browser-first implementation for NVIDIA's Parakeet-TDT speech-to-text models, running entirely client-side via WebGPU and WASM. Powered by ONNX Runtime Web, this library makes it simple to integrate state-of-the-art transcription into any web application.
 
 > **Status:** Early preview – API is subject to change while things stabilise.
-> **Note:** Currently only supports the Parakeet-TDT model architecture.
+> **Note:** Currently supports Parakeet-TDT v2 (English) and v3 (Multilingual) model architectures.
+
+---
+
+## What's New (v0.3.x)
+
+### 🌐 Parakeet TDT v3 Multilingual Support
+- Added support for **Parakeet TDT 0.6B v3** with 13 languages: English, French, German, Spanish, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Japanese, Korean, Chinese
+- Both v2 (English-only) and v3 (Multilingual) models now work out of the box
+- Use model keys for easier loading: `'parakeet-tdt-0.6b-v2'` or `'parakeet-tdt-0.6b-v3'`
+
+### 🎛️ Model Configuration API
+- New `MODELS` export with model metadata (supported languages, vocab size, etc.)
+- `getModelConfig()` for programmatic model introspection
+- `supportsLanguage()` helper to check language compatibility
+
+### 🧪 Demo App Improvements
+- **Model selector** dropdown to switch between v2 and v3
+- **Language selector** (context-aware, shows only supported languages)
+- **Quick Test** feature with HuggingFace speech datasets (People's Speech, MLS)
+- **Reference text** display for comparing transcription accuracy
 
 ---
 
@@ -29,22 +49,28 @@ yarn add parakeet.js onnxruntime-web
 
 We host ready-to-use ONNX exports on the HuggingFace Hub:
 
-```
-istupakov/parakeet-tdt-0.6b-v2-onnx
-```
+| Model | Languages | Repo ID |
+|-------|-----------|---------|
+| Parakeet TDT 0.6B v2 | English | `istupakov/parakeet-tdt-0.6b-v2-onnx` |
+| Parakeet TDT 0.6B v3 | 13 languages | `istupakov/parakeet-tdt-0.6b-v3-onnx` |
 
 The helper `getParakeetModel()` downloads all required files and caches them in **IndexedDB**:
 
 ```js
-import { getParakeetModel } from 'parakeet.js';
+import { getParakeetModel, MODELS } from 'parakeet.js';
 
-const repoId = 'istupakov/parakeet-tdt-0.6b-v2-onnx';
-const { urls, filenames } = await getParakeetModel(repoId, {
-  backend: 'webgpu', // 'webgpu' or 'wasm'
-  encoderQuant: 'fp32',    // 'fp32' or 'int8'
-  decoderQuant: 'int8',    // 'fp32' or 'int8'
-  preprocessor: 'nemo128',
+// Option 1: Use model key (recommended)
+const { urls, filenames, modelConfig } = await getParakeetModel('parakeet-tdt-0.6b-v3', {
+  backend: 'webgpu',
   progress: ({file,loaded,total}) => console.log(file, loaded/total)
+});
+
+// Option 2: Use repo ID directly
+const { urls, filenames } = await getParakeetModel('istupakov/parakeet-tdt-0.6b-v2-onnx', {
+  backend: 'webgpu',
+  encoderQuant: 'fp32',
+  decoderQuant: 'int8',
+  preprocessor: 'nemo128',
 });
 ```
 
@@ -170,25 +196,83 @@ if (utterance_text.toLowerCase().includes(expected)) {
 
 ---
 
+## Model Configuration API
+
+Query model metadata programmatically:
+
+```js
+import { MODELS, LANGUAGE_NAMES, getModelConfig, supportsLanguage } from 'parakeet.js';
+
+// List all available models
+console.log(Object.keys(MODELS)); 
+// ['parakeet-tdt-0.6b-v2', 'parakeet-tdt-0.6b-v3']
+
+// Get model config
+const config = getModelConfig('parakeet-tdt-0.6b-v3');
+console.log(config.languages); // ['en', 'fr', 'de', 'es', ...]
+console.log(config.displayName); // 'Parakeet TDT 0.6B v3 (Multilingual)'
+
+// Check language support
+supportsLanguage('parakeet-tdt-0.6b-v3', 'fr'); // true
+supportsLanguage('parakeet-tdt-0.6b-v2', 'fr'); // false
+
+// Get language display names
+console.log(LANGUAGE_NAMES['fr']); // 'French'
+```
+
+---
+
 ## Using the React demo as a template
 
-Located at `examples/react-demo`.
+Located at `examples/react-demo` (production) and `examples/react-demo-dev` (development).
 
 Quick start:
 
 ```bash
-cd examples/react-demo
+cd examples/react-demo-dev
 npm i
 npm run dev  # Vite => http://localhost:5173
 ```
 
-Key components:
+### Demo Features
+
+The development demo (`react-demo-dev`) includes advanced features:
+
+- **Model Selector**: Switch between v2 (English) and v3 (Multilingual)
+- **Language Selector**: Context-aware dropdown showing only supported languages
+- **Quick Test**: Load random samples from HuggingFace speech datasets
+- **Reference Text**: Compare transcription against ground truth
+
+### Speech Dataset Utilities (Demo Only)
+
+The demo includes reusable utilities for testing with HuggingFace datasets:
+
+```js
+// Located in: examples/react-demo-dev/src/utils/speechDatasets.js
+import { fetchRandomSample, hasTestSamples, SPEECH_DATASETS } from './utils/speechDatasets';
+
+// Check if test samples are available for a language
+if (hasTestSamples('fr')) {
+  // Fetch a random French audio sample with transcription
+  const sample = await fetchRandomSample('fr', {
+    targetSampleRate: 16000,
+    onProgress: ({ message }) => console.log(message),
+  });
+  
+  console.log(sample.transcription); // Ground truth text
+  console.log(sample.pcm);           // Float32Array audio
+  console.log(sample.duration);      // Duration in seconds
+}
+```
+
+**Supported languages for testing:** English (People's Speech), French, German, Spanish, Italian, Portuguese, Dutch, Polish (Multilingual LibriSpeech)
+
+### Key Files
 
 | File | Purpose |
 |------|---------|
-| `App.jsx` | Complete end-to-end reference UI. Shows how to load a model with progress bars, perform a warm-up/verification step, display performance metrics (RTF, timings), and manage transcription history. |
-| `parakeet.js` | Library entry; houses the model wrapper and performance instrumentation. |
-| `hub.js` | Lightweight HuggingFace Hub helper – downloads and caches model binaries. |
+| `App.jsx` | Complete end-to-end reference UI with model/language selection, performance metrics, and transcription history |
+| `utils/speechDatasets.js` | Reusable utilities for fetching test samples from HuggingFace datasets |
 
 Copy-paste the `loadModel()` and `transcribeFile()` functions into your app, adjust UI bindings, and you are ready to go.
 
@@ -223,7 +307,19 @@ The demo is also available locally at `examples/hf-spaces-demo` and can be deplo
 
 ## Changelog
 
-See `OPTIMIZATION_PLAN.md` for a timeline of performance tweaks and planned features.
+### v0.3.x (January 2026)
+- ✨ **Multilingual Support**: Added Parakeet TDT 0.6B v3 with 13 languages
+- 🎛️ **Model Config API**: New `MODELS`, `LANGUAGE_NAMES`, `getModelConfig()`, `supportsLanguage()` exports
+- 🧪 **Demo Enhancements**: Model/language selectors, HuggingFace dataset testing
+- 🔧 **TDT Decoding Fix**: Aligned decoding logic with NeMo framework for improved accuracy
+- 🌊 **Streaming Support**: Added incremental transcription capabilities
+
+### v0.2.x
+- Initial WebGPU/WASM hybrid backend
+- IndexedDB model caching
+- Performance instrumentation (RTF, timing metrics)
+
+See `OPTIMIZATION_PLAN.md` for detailed performance notes.
 
 ---
 
@@ -232,9 +328,10 @@ See `OPTIMIZATION_PLAN.md` for a timeline of performance tweaks and planned feat
 This project builds upon the excellent work of:
 
 - **[istupakov](https://github.com/istupakov)** - For providing the [ONNX-ASR](https://github.com/istupakov/onnx-asr) repository, which served as the foundation and starting point for this JavaScript implementation
-- **[istupakov/parakeet-tdt-0.6b-v2-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v2-onnx)** - For the ONNX model exports and preprocessor implementations that made this library possible.
+- **[istupakov/parakeet-tdt-0.6b-v2-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v2-onnx)** - English model exports
+- **[istupakov/parakeet-tdt-0.6b-v3-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx)** - Multilingual model exports
 - **ONNX Runtime Web** - For powering the browser-based inference engine
-- **ONNX Runtime Node** - For enabling high-performance server-side inference
+- **HuggingFace Datasets** - People's Speech, Multilingual LibriSpeech for testing
 
 The Python-based ONNX-ASR project provided crucial insights into model handling, preprocessing pipelines, and served as a reference implementation during the development of this browser-compatible version.
 
