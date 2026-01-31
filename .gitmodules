@@ -1,3 +1,0 @@
-[submodule "examples/hf-spaces-demo"]
-	path = examples/hf-spaces-demo
-	url = https://huggingface.co/spaces/ysdede/parakeet.js-demo
