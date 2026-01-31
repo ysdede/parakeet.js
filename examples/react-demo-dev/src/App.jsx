@@ -11,6 +11,45 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
   languages: config.languages,
 }));
 
+// Convert Float32Array PCM to WAV blob for playback
+function pcmToWavBlob(pcm, sampleRate = 16000) {
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+  const blockAlign = numChannels * bitsPerSample / 8;
+  const dataSize = pcm.length * 2;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  // WAV header
+  const writeString = (offset, str) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  // PCM data
+  let offset = 44;
+  for (let i = 0; i < pcm.length; i++) {
+    const s = Math.max(-1, Math.min(1, pcm[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
 export default function App() {
   const [selectedModel, setSelectedModel] = useState('parakeet-tdt-0.6b-v2');
   const modelConfig = MODELS[selectedModel];
@@ -31,15 +70,18 @@ export default function App() {
   const [verboseLog, setVerboseLog] = useState(false);
   const [frameStride, setFrameStride] = useState(1);
   const [dumpDetail, setDumpDetail] = useState(false);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const maxCores = navigator.hardwareConcurrency || 8;
   const [cpuThreads, setCpuThreads] = useState(Math.max(1, maxCores - 2));
   const modelRef = useRef(null);
   const fileInputRef = useRef(null);
+  const audioRef = useRef(null);
 
   const isModelReady = status === 'Model ready ✔';
   const isLoading = status !== 'Idle' && !status.toLowerCase().includes('fail') && !isModelReady;
 
-  // Get available languages for test samples (not model languages)
+  // Get available languages for test samples
   const testLanguageOptions = Object.entries(SPEECH_DATASETS).map(([code, config]) => ({
     code,
     displayName: config.displayName,
@@ -56,6 +98,27 @@ export default function App() {
     }
   }, [backend]);
 
+  // Cleanup audio URL on unmount
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
+  function playAudio() {
+    if (audioRef.current) {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  }
+
+  function pauseAudio() {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  }
+
   // Fetch random audio sample from HuggingFace speech dataset
   async function loadRandomSample() {
     if (!modelRef.current) return;
@@ -68,12 +131,21 @@ export default function App() {
     setIsLoadingSample(true);
     setReferenceText('');
     setText('');
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
 
     try {
       const sample = await fetchRandomSample(selectedLanguage, {
         targetSampleRate: 16000,
         onProgress: ({ message }) => setStatus(message),
       });
+
+      // Create audio blob for playback
+      const wavBlob = pcmToWavBlob(sample.pcm, 16000);
+      const url = URL.createObjectURL(wavBlob);
+      setAudioUrl(url);
 
       setReferenceText(sample.transcription);
       console.log(`[Dataset] Reference: "${sample.transcription}"`);
@@ -249,18 +321,22 @@ export default function App() {
     setText('');
     setReferenceText('');
     setLatestMetrics(null);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
   }
 
   return (
     <div className="app">
-      <h2>Parakeet.js Demo</h2>
+      <h1 className="app-title">Parakeet.js Demo</h1>
 
       {/* Model Configuration Section */}
       <div className="section">
         <div className="section-header">Model Configuration</div>
         <div className="controls">
           <label>
-            Model:
+            Model
             <select 
               value={selectedModel} 
               onChange={e => setSelectedModel(e.target.value)}
@@ -274,21 +350,21 @@ export default function App() {
             </select>
           </label>
           <label>
-            Backend:
+            Backend
             <select value={backend} onChange={e=>setBackend(e.target.value)} disabled={isLoading || isModelReady}>
               <option value="webgpu-hybrid">WebGPU</option>
               <option value="wasm">WASM (CPU)</option>
             </select>
           </label>
           <label>
-            Encoder:
+            Encoder
             <select value={encoderQuant} onChange={e=>setEncoderQuant(e.target.value)} disabled={isLoading || isModelReady}>
               <option value="fp32">fp32</option>
               <option value="int8">int8</option>
             </select>
           </label>
           <label>
-            Decoder:
+            Decoder
             <select value={decoderQuant} onChange={e=>setDecoderQuant(e.target.value)} disabled={isLoading || isModelReady}>
               <option value="int8">int8</option>
               <option value="fp32">fp32</option>
@@ -298,7 +374,7 @@ export default function App() {
         
         <div className="controls">
           <label>
-            Threads:
+            Threads
             <input 
               type="number" 
               min="1" 
@@ -310,18 +386,18 @@ export default function App() {
             />
           </label>
           <label>
-            Stride:
+            Stride
             <select value={frameStride} onChange={e=>setFrameStride(Number(e.target.value))}>
               <option value={1}>1</option>
               <option value={2}>2</option>
               <option value={4}>4</option>
             </select>
           </label>
-          <label>
+          <label className="checkbox-label">
             <input type="checkbox" checked={verboseLog} onChange={e => setVerboseLog(e.target.checked)} disabled={isLoading || isModelReady} />
             Verbose
           </label>
-          <label>
+          <label className="checkbox-label">
             <input type="checkbox" checked={dumpDetail} onChange={e=>setDumpDetail(e.target.checked)} />
             Log results
           </label>
@@ -337,7 +413,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Progress indicator */}
         {progressPct !== null && (
           <div className="progress-wrapper">
             <div className="progress-bar"><div style={{ width: `${progressPct}%` }} /></div>
@@ -349,28 +424,27 @@ export default function App() {
         )}
       </div>
 
-      {/* SharedArrayBuffer warning */}
       {typeof SharedArrayBuffer === 'undefined' && backend === 'wasm' && (
         <div className="warning-box">
-          ⚠️ SharedArrayBuffer unavailable. WASM will run single-threaded.
+          SharedArrayBuffer unavailable. WASM will run single-threaded.
         </div>
       )}
 
-      {/* Status bar */}
       <div className="status-bar">
-        Status: <span className={isModelReady ? 'status-ready' : ''}>{status}</span>
+        <span className="status-label">Status:</span>
+        <span className={isModelReady ? 'status-ready' : ''}>{status}</span>
       </div>
 
-      {/* Quick Test Section - disabled until model loads */}
+      {/* Quick Test Section */}
       <div className={`test-section ${!isModelReady ? 'disabled' : ''}`}>
         <div className="test-section-header">
-          <span className="test-section-title">Quick Test with Sample Audio</span>
+          <span className="test-section-title">Quick Test</span>
           {!isModelReady && <span className="test-section-hint">Load model first</span>}
         </div>
         
         <div className="test-controls">
           <label>
-            Language:
+            Language
             <select 
               value={selectedLanguage} 
               onChange={e => setSelectedLanguage(e.target.value)}
@@ -393,35 +467,54 @@ export default function App() {
           </button>
         </div>
 
+        {/* Audio player */}
+        {audioUrl && (
+          <div className="audio-player">
+            <audio 
+              ref={audioRef} 
+              src={audioUrl} 
+              onEnded={() => setIsPlaying(false)}
+              onPause={() => setIsPlaying(false)}
+              onPlay={() => setIsPlaying(true)}
+            />
+            <button 
+              onClick={isPlaying ? pauseAudio : playAudio} 
+              className="btn-play"
+              title={isPlaying ? 'Pause' : 'Play sample'}
+            >
+              {isPlaying ? '⏸' : '▶'}
+            </button>
+            <span className="audio-label">Play loaded sample</span>
+          </div>
+        )}
+
         {referenceText && (
           <div className="reference-box">
-            <div className="reference-label">Reference (Ground Truth):</div>
+            <div className="reference-label">Reference (Ground Truth)</div>
             <div className="reference-text">{referenceText}</div>
           </div>
         )}
       </div>
 
       {/* File upload */}
-      <div className="controls">
-        <div className="file-input-wrapper">
-          <input 
-            ref={fileInputRef}
-            type="file" 
-            accept="audio/*" 
-            onChange={transcribeFile} 
-            disabled={!isModelReady || isTranscribing} 
-          />
-          {transcriptions.length > 0 && (
-            <button onClick={clearTranscriptions} className="btn-ghost">
-              Clear History
-            </button>
-          )}
-        </div>
+      <div className="controls file-controls">
+        <input 
+          ref={fileInputRef}
+          type="file" 
+          accept="audio/*" 
+          onChange={transcribeFile} 
+          disabled={!isModelReady || isTranscribing} 
+        />
+        {transcriptions.length > 0 && (
+          <button onClick={clearTranscriptions} className="btn-ghost">
+            Clear History
+          </button>
+        )}
       </div>
 
       {/* Latest transcription */}
-      <div style={{ marginBottom: '1rem' }}>
-        <h3 style={{ marginBottom: '0.5rem', fontSize: '1rem' }}>Transcription Result</h3>
+      <div className="result-section">
+        <h2 className="result-title">Transcription Result</h2>
         <textarea 
           value={text} 
           readOnly 
@@ -433,10 +526,10 @@ export default function App() {
       {/* Performance metrics */}
       {latestMetrics && (
         <div className="performance">
-          <strong>RTF:</strong> {latestMetrics.rtf?.toFixed(2)}x &nbsp;|&nbsp; 
-          <strong>Total:</strong> {latestMetrics.total_ms?.toFixed(0)}ms &nbsp;|&nbsp;
-          Encode {latestMetrics.encode_ms?.toFixed(0)}ms · 
-          Decode {latestMetrics.decode_ms?.toFixed(0)}ms
+          <span><strong>RTF:</strong> {latestMetrics.rtf?.toFixed(2)}x</span>
+          <span><strong>Total:</strong> {latestMetrics.total_ms?.toFixed(0)}ms</span>
+          <span>Encode {latestMetrics.encode_ms?.toFixed(0)}ms</span>
+          <span>Decode {latestMetrics.decode_ms?.toFixed(0)}ms</span>
         </div>
       )}
 
@@ -451,7 +544,7 @@ export default function App() {
                     <strong>{trans.filename}</strong>
                     {trans.language && <span className="history-lang">({LANGUAGE_NAMES[trans.language]})</span>}
                   </span>
-                  <span>{trans.timestamp}</span>
+                  <span className="history-time">{trans.timestamp}</span>
                 </div>
                 <div className="history-stats">
                   {trans.duration.toFixed(1)}s · {trans.wordCount} words
