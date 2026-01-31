@@ -184,7 +184,6 @@ export async function fetchRandomSample(langCode, options = {}) {
 
   return {
     audioBuffer,
-    audioUrl,
     pcm,
     transcription,
     duration,
