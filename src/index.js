@@ -32,6 +32,6 @@ export async function fromHub(repoIdOrModelKey, options = {}) {
   // Resolve model key to repo ID if needed
   const repoId = MODELS[repoIdOrModelKey]?.repoId || repoIdOrModelKey;
   
-  const urls = await getParakeetModel(repoId, options);
-  return ParakeetModel.fromUrls({ ...urls, ...options });
-} 
+  const result = await getParakeetModel(repoId, options);
+  return ParakeetModel.fromUrls({ ...result.urls, filenames: result.filenames, ...options });
+}
