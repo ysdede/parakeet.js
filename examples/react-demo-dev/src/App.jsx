@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ParakeetModel, getParakeetModel, MODELS, LANGUAGES, getSpeechDatasetUrl } from 'parakeet.js';
+import { ParakeetModel, getParakeetModel, MODELS, LANGUAGE_NAMES } from 'parakeet.js';
+import { fetchRandomSample, hasTestSamples, SPEECH_DATASETS } from './utils/speechDatasets';
 import './App.css';
 
 // Available models for selection
@@ -41,7 +42,8 @@ export default function App() {
   const availableLanguages = modelConfig?.languages || ['en'];
   const languageOptions = availableLanguages.map(lang => ({
     code: lang,
-    ...LANGUAGES[lang]
+    displayName: LANGUAGE_NAMES[lang] || lang,
+    hasTestData: hasTestSamples(lang),
   }));
 
   // Auto-adjust quant presets when backend changes
@@ -64,15 +66,14 @@ export default function App() {
   }, [selectedModel]);
 
   // Fetch random audio sample from HuggingFace speech dataset
-  async function fetchRandomSample() {
+  async function loadRandomSample() {
     if (!modelRef.current) {
       alert('Please load the model first');
       return;
     }
 
-    const datasetInfo = getSpeechDatasetUrl(selectedLanguage);
-    if (!datasetInfo) {
-      alert(`No test dataset available for ${LANGUAGES[selectedLanguage]?.displayName || selectedLanguage}. Try English, French, German, Spanish, Italian, Portuguese, Dutch, or Polish.`);
+    if (!hasTestSamples(selectedLanguage)) {
+      alert(`No test dataset available for ${LANGUAGE_NAMES[selectedLanguage] || selectedLanguage}. Try English, French, German, Spanish, Italian, Portuguese, Dutch, or Polish.`);
       return;
     }
 
@@ -81,55 +82,21 @@ export default function App() {
     setText('');
 
     try {
-      console.log(`[Dataset] Fetching from: ${datasetInfo.url}`);
-      
-      // Fetch the dataset rows
-      const response = await fetch(datasetInfo.url);
-      if (!response.ok) {
-        throw new Error(`Dataset API error: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      const rows = data.rows || [];
-      
-      if (rows.length === 0) {
-        throw new Error('No data returned from dataset API');
-      }
+      // Use the utility function to fetch sample
+      const sample = await fetchRandomSample(selectedLanguage, {
+        targetSampleRate: 16000,
+        onProgress: ({ message }) => setStatus(message),
+      });
 
-      // Pick a random row
-      const randomIndex = Math.floor(Math.random() * rows.length);
-      const row = rows[randomIndex].row || rows[randomIndex];
-
-      // Get the audio URL and transcription
-      const audio = row.audio;
-      const audioUrl = Array.isArray(audio) ? audio[0]?.src : audio?.src;
-      const transcription = row[datasetInfo.textField] || '';
-      
-      if (!audioUrl) {
-        throw new Error('No audio URL in dataset response');
-      }
-
-      setReferenceText(transcription);
-      console.log(`[Dataset] Reference: "${transcription}"`);
-      console.log(`[Dataset] Audio URL: ${audioUrl.substring(0, 80)}...`);
-
-      // Fetch and decode the audio
-      setStatus('Fetching audio…');
-      const audioRes = await fetch(audioUrl);
-      const buf = await audioRes.arrayBuffer();
-      
-      // Decode audio (resampling to 16kHz)
-      const audioCtx = new AudioContext({ sampleRate: 16000 });
-      const decoded = await audioCtx.decodeAudioData(buf);
-      const pcm = decoded.getChannelData(0);
-      await audioCtx.close();
+      setReferenceText(sample.transcription);
+      console.log(`[Dataset] Reference: "${sample.transcription}"`);
 
       // Transcribe
       setStatus('Transcribing sample…');
       setIsTranscribing(true);
       
       console.time('Transcribe-Sample');
-      const res = await modelRef.current.transcribe(pcm, 16000, {
+      const res = await modelRef.current.transcribe(sample.pcm, 16000, {
         returnTimestamps: true,
         returnConfidences: true,
         frameStride
@@ -144,15 +111,15 @@ export default function App() {
       setLatestMetrics(res.metrics);
 
       // Add to history
-      const langName = LANGUAGES[selectedLanguage]?.displayName || selectedLanguage;
-      const datasetName = datasetInfo.dataset.split('/').pop();
+      const langName = LANGUAGE_NAMES[selectedLanguage] || selectedLanguage;
+      const datasetName = sample.dataset.split('/').pop();
       const newTranscription = {
         id: Date.now(),
-        filename: `${datasetName}-${langName}-#${randomIndex}`,
+        filename: `${datasetName}-${langName}-#${sample.sampleIndex}`,
         text: res.utterance_text,
-        reference: transcription,
+        reference: sample.transcription,
         timestamp: new Date().toLocaleTimeString(),
-        duration: pcm.length / 16000,
+        duration: sample.duration,
         wordCount: res.words?.length || 0,
         confidence: res.confidence_scores?.token_avg ?? res.confidence_scores?.word_avg ?? null,
         metrics: res.metrics,
@@ -442,14 +409,14 @@ export default function App() {
           </span>
         </div>
         <button 
-          onClick={fetchRandomSample}
-          disabled={status !== 'Model ready ✔' || isLoadingSample || isTranscribing || !LANGUAGES[selectedLanguage]?.dataset}
+          onClick={loadRandomSample}
+          disabled={status !== 'Model ready ✔' || isLoadingSample || isTranscribing || !hasTestSamples(selectedLanguage)}
           className="primary"
           style={{ marginRight: '1rem' }}
         >
-          {isLoadingSample ? '⏳ Loading…' : `🎲 Load Random ${LANGUAGES[selectedLanguage]?.displayName || selectedLanguage} Sample`}
+          {isLoadingSample ? '⏳ Loading…' : `🎲 Load Random ${LANGUAGE_NAMES[selectedLanguage] || selectedLanguage} Sample`}
         </button>
-        {!LANGUAGES[selectedLanguage]?.dataset && (
+        {!hasTestSamples(selectedLanguage) && (
           <span style={{ fontSize: '0.85em', color: '#d32f2f' }}>
             ⚠️ No test dataset available for this language
           </span>
@@ -527,7 +494,7 @@ export default function App() {
               <div className="history-item" key={trans.id}>
                 <div className="history-meta">
                   <strong>{trans.filename}</strong>
-                  {trans.language && <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#666' }}>({LANGUAGES[trans.language]?.displayName})</span>}
+                  {trans.language && <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#666' }}>({LANGUAGE_NAMES[trans.language]})</span>}
                   <span>{trans.timestamp}</span>
                 </div>
                 <div className="history-stats">Duration: {trans.duration.toFixed(1)}s | Words: {trans.wordCount}{trans.confidence && ` | Confidence: ${trans.confidence.toFixed(2)}`}{trans.metrics && ` | RTF: ${trans.metrics.rtf?.toFixed(2)}x`}</div>

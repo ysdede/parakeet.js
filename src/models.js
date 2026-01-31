@@ -4,82 +4,23 @@
  */
 
 /**
- * Language configuration with display names and HuggingFace dataset mapping.
- * Uses datasets that have API streaming support (datasets-server).
- * 
- * @type {Object.<string, {displayName: string, dataset: string, config: string, split: string, textField: string, sampleCount: number}>}
+ * Language display names for supported languages.
+ * @type {Object.<string, string>}
  */
-export const LANGUAGES = {
-  en: { 
-    displayName: 'English', 
-    dataset: 'MLCommons/peoples_speech',
-    config: 'clean',
-    split: 'test',
-    textField: 'text',
-    sampleCount: 100  // API returns up to 100 rows
-  },
-  fr: { 
-    displayName: 'French', 
-    dataset: 'facebook/multilingual_librispeech',
-    config: 'french',
-    split: 'test',
-    textField: 'transcript',
-    sampleCount: 100
-  },
-  de: { 
-    displayName: 'German', 
-    dataset: 'facebook/multilingual_librispeech',
-    config: 'german',
-    split: 'test',
-    textField: 'transcript',
-    sampleCount: 100
-  },
-  es: { 
-    displayName: 'Spanish', 
-    dataset: 'facebook/multilingual_librispeech',
-    config: 'spanish',
-    split: 'test',
-    textField: 'transcript',
-    sampleCount: 100
-  },
-  it: { 
-    displayName: 'Italian', 
-    dataset: 'facebook/multilingual_librispeech',
-    config: 'italian',
-    split: 'test',
-    textField: 'transcript',
-    sampleCount: 100
-  },
-  pt: { 
-    displayName: 'Portuguese', 
-    dataset: 'facebook/multilingual_librispeech',
-    config: 'portuguese',
-    split: 'test',
-    textField: 'transcript',
-    sampleCount: 100
-  },
-  nl: { 
-    displayName: 'Dutch', 
-    dataset: 'facebook/multilingual_librispeech',
-    config: 'dutch',
-    split: 'test',
-    textField: 'transcript',
-    sampleCount: 100
-  },
-  pl: { 
-    displayName: 'Polish', 
-    dataset: 'facebook/multilingual_librispeech',
-    config: 'polish',
-    split: 'test',
-    textField: 'transcript',
-    sampleCount: 100
-  },
-  // Note: MLS doesn't have ru, uk, ja, ko, zh - these languages won't have test samples
-  ru: { displayName: 'Russian', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
-  uk: { displayName: 'Ukrainian', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
-  ja: { displayName: 'Japanese', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
-  ko: { displayName: 'Korean', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
-  zh: { displayName: 'Chinese', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
+export const LANGUAGE_NAMES = {
+  en: 'English',
+  fr: 'French',
+  de: 'German',
+  es: 'Spanish',
+  it: 'Italian',
+  pt: 'Portuguese',
+  nl: 'Dutch',
+  pl: 'Polish',
+  ru: 'Russian',
+  uk: 'Ukrainian',
+  ja: 'Japanese',
+  ko: 'Korean',
+  zh: 'Chinese',
 };
 
 /**
@@ -188,32 +129,10 @@ export function listModels() {
 }
 
 /**
- * Get language configuration.
+ * Get language display name.
  * @param {string} langCode - ISO 639-1 language code
- * @returns {Object|null} Language config or null if not found
+ * @returns {string} Language display name or the code itself if not found
  */
-export function getLanguageConfig(langCode) {
-  return LANGUAGES[langCode.toLowerCase()] || null;
+export function getLanguageName(langCode) {
+  return LANGUAGE_NAMES[langCode.toLowerCase()] || langCode;
 }
-
-/**
- * Get HuggingFace dataset API URL for speech samples.
- * @param {string} langCode - ISO 639-1 language code
- * @returns {{url: string, textField: string, dataset: string}|null} API URL and metadata, or null if not available
- */
-export function getSpeechDatasetUrl(langCode) {
-  const langConfig = LANGUAGES[langCode.toLowerCase()];
-  if (!langConfig || !langConfig.dataset) return null;
-  
-  const url = `https://datasets-server.huggingface.co/first-rows?dataset=${langConfig.dataset}&config=${langConfig.config}&split=${langConfig.split}`;
-  
-  return { 
-    url, 
-    textField: langConfig.textField,
-    dataset: langConfig.dataset,
-    sampleCount: langConfig.sampleCount
-  };
-}
-
-// Keep old function name as alias for backward compatibility
-export const getFleursApiUrl = getSpeechDatasetUrl;

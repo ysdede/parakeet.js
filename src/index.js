@@ -1,6 +1,6 @@
 export { ParakeetModel } from './parakeet.js';
 export { getModelFile, getModelText, getParakeetModel } from './hub.js';
-export { MODELS, LANGUAGES, DEFAULT_MODEL, getModelConfig, getModelKeyFromRepoId, supportsLanguage, listModels, getLanguageConfig, getSpeechDatasetUrl, getFleursApiUrl } from './models.js';
+export { MODELS, LANGUAGE_NAMES, DEFAULT_MODEL, getModelConfig, getModelKeyFromRepoId, supportsLanguage, listModels, getLanguageName } from './models.js';
 
 /**
  * Convenience factory to load from a local path.

@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-01-31T14:46:39.285Z",
+  "reference_text": "With Canvid, every recording becomes smarter and easier to work with. It automatically generates a full transcript of your video, complete with time-accurate word timestamps. You can simply click any word to jump straight into that exact moment. Perfect for precise edits and effortless navigation. Canvid's noise cancellation cleans up your audio by removing background noise and enhancing your voice in real time. You can also use AI background blur or full background removal to stay focused and fully immersed in your presentation. And if you make a small mistake, no problem. With AI audio retakes, just highlight the part you want to fix, then record or type your correction. No need to re-record the entire video. Best of all, even without a live webcam, Canvid can create a realistic synthetic camera feed from your best previous recording, giving your videos a professional, personal touch every time.",
+  "reference_token_count": 331,
+  "blank_idx": 1024,
+  "vocab_size": 1025,
+  "fixes_applied": [
+    "Decoder state update only on non-blank token",
+    "Dynamic blank ID from tokenizer",
+    "Improved tokenizer space handling"
+  ],
+  "validation_pending": true
+}
