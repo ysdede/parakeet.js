@@ -1,6 +1,6 @@
 # Parakeet.js  
 
-**[▶️ Try the Live Demo](https://ysdede.github.io/parakeet.js/)** | [NPM Package](https://www.npmjs.com/package/parakeet.js) | [GitHub](https://github.com/ysdede/parakeet.js)
+**[▶️ Try the Live Demo](https://ysdede.github.io/parakeet.js/)** | [NPM Package](https://www.npmjs.com/package/parakeet.js)
 
 Client-side ONNX inference of NVIDIA *Parakeet* speech-to-text models.
 Runs entirely in the browser on **WebGPU** or **WASM** via
