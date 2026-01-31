@@ -6,26 +6,36 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 
 > **Parakeet.js** offers a high-performance, browser-first implementation for NVIDIA's Parakeet-TDT speech-to-text models, running entirely client-side via WebGPU and WASM. Powered by ONNX Runtime Web, this library makes it simple to integrate state-of-the-art transcription into any web application.
 
-> **Status:** Early preview – API is subject to change while things stabilise.
-> **Note:** Currently supports Parakeet-TDT v2 (English) and v3 (Multilingual) model architectures.
+> **Status:** Stable v1.0.0 release - Production ready
+> **Supported Models:** Parakeet-TDT v2 (English) and v3 (Multilingual - 13 languages)
 
 ---
 
-## What's New (v0.4.x)
+## What's New in v1.0.0
 
-### 🎯 NeMo-Aligned TDT Decoding (Critical Accuracy Fix)
+**First stable release with production-ready accuracy and multilingual support.**
+
+### NeMo-Aligned TDT Decoding (Critical Accuracy Fix)
 - **100% Parity with NVIDIA NeMo**: Aligned the JavaScript TDT decoding loop with the original Python reference implementation.
 - **Fixed "Missing Words" Bug**: Resolved an issue where multi-token emissions from a single frame were being skipped due to incorrect frame advancement.
 - **Conditional State Updates**: Decoder state now correctly updates only upon non-blank token emission, matching the official transducer algorithm.
 - **Dynamic Vocabulary Mapping**: Replaced hardcoded blank IDs with dynamic lookup from the model's vocabulary.
 
-### 🌐 Parakeet TDT v3 Multilingual Support
+### Parakeet TDT v3 Multilingual Support
 - Added support for **Parakeet TDT 0.6B v3** with 13 languages: English, French, German, Spanish, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Japanese, Korean, Chinese.
 - Both v2 (English-only) and v3 (Multilingual) models now work out of the box.
+- New Model Configuration API for programmatic access to model metadata and language support.
 
-### 🌊 Incremental & Streaming Support
-- Added `incremental` transcription capabilities for real-time applications.
+### Enhanced Developer Experience
+- **Model Configuration API**: Query supported languages and model metadata programmatically.
+- **Improved Demo UI**: Modern design with automatic dark mode support.
+- **Speech Dataset Testing**: Integration with HuggingFace datasets for quick validation.
+- **Audio Playback**: Listen to loaded test samples directly in the demo.
+
+### Performance and Stability
+- Incremental transcription capabilities for real-time applications.
 - Optimized state snapshots for low-latency prefix caching.
+- Stable API suitable for production use.
 
 ---
 
@@ -102,6 +112,39 @@ const model = await ParakeetModel.fromUrls({
   cpuThreads: 6,           // For WASM backend
   verbose: false,          // ORT verbose logging
 });
+```
+
+### Quick Start: English Model (v2)
+
+```js
+import { fromHub } from 'parakeet.js';
+
+// Load English-only model
+const model = await fromHub('parakeet-tdt-0.6b-v2', {
+  backend: 'webgpu',
+  progress: ({ file, loaded, total }) => {
+    console.log(`${file}: ${Math.round(loaded/total*100)}%`);
+  }
+});
+
+// Transcribe audio
+const result = await model.transcribe(pcmFloat32, 16000);
+console.log(result.utterance_text);
+```
+
+### Quick Start: Multilingual Model (v3)
+
+```js
+import { fromHub } from 'parakeet.js';
+
+// Load multilingual model (supports 13 languages)
+const model = await fromHub('parakeet-tdt-0.6b-v3', {
+  backend: 'webgpu'
+});
+
+// Works with any supported language automatically
+const frenchResult = await model.transcribe(frenchAudio, 16000);
+const germanResult = await model.transcribe(germanAudio, 16000);
 ```
 
 ### Back-end presets
@@ -305,17 +348,23 @@ The demo is also available locally at `examples/hf-spaces-demo` and can be deplo
 
 ## Changelog
 
-### v0.4.x (January 2026)
-- 🎯 **Accuracy Alignment**: Critical fix for TDT decoding loop to match NVIDIA NeMo parity.
-- 🔧 **Multi-token Fix**: Resolved bug skipping tokens emitted from the same encoder frame.
-- 🔤 **Space Normalization**: Improved SentencePiece decoding regex for better punctuation spacing.
-- 🏷️ **Dynamic Blank ID**: Automatic detection of blank token index from model vocabulary.
+### v1.0.0 (January 2026)
+**First stable release**
+
+- **Accuracy Alignment**: Critical fix for TDT decoding loop to match NVIDIA NeMo parity.
+- **Multi-token Fix**: Resolved bug skipping tokens emitted from the same encoder frame.
+- **Space Normalization**: Improved SentencePiece decoding regex for better punctuation spacing.
+- **Dynamic Blank ID**: Automatic detection of blank token index from model vocabulary.
+- **Multilingual Support**: Added Parakeet TDT 0.6B v3 with 13 languages.
+- **Model Config API**: New `MODELS`, `LANGUAGE_NAMES`, `getModelConfig()`, `supportsLanguage()` exports.
+- **Demo Enhancements**: Modern UI with dark mode, model/language selectors, HuggingFace dataset testing.
+- **Streaming Support**: Incremental transcription capabilities for real-time applications.
+
+### v0.4.x
+- Accuracy improvements and multilingual foundation
 
 ### v0.3.x
-- ✨ **Multilingual Support**: Added Parakeet TDT 0.6B v3 with 13 languages.
-- 🎛️ **Model Config API**: New `MODELS`, `LANGUAGE_NAMES`, `getModelConfig()`, `supportsLanguage()` exports.
-- 🧪 **Demo Enhancements**: Model/language selectors, HuggingFace dataset testing.
-- 🌊 **Streaming Support**: Added incremental transcription capabilities.
+- Initial multilingual experiments
 
 ### v0.2.x
 - Initial WebGPU/WASM hybrid backend
