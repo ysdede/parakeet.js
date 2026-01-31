@@ -1,98 +1,145 @@
-# 🦜 Parakeet.js - HuggingFace Spaces Demo
+# Parakeet.js Demo
 
-> **NVIDIA Parakeet speech recognition for the browser using WebGPU/WASM**
+This is the unified demo application for parakeet.js. It can be used for:
+- **Development**: Testing local source code changes
+- **NPM Testing**: Testing the published npm package
+- **Deployment**: Deploying to HuggingFace Spaces and GitHub Pages
 
-This is the source code for the [Parakeet.js Demo on HuggingFace Spaces](https://huggingface.co/spaces/ysdede/parakeet.js-demo).
-
-## 📁 Project Structure
-
-```
-hf-spaces-demo/
-├── src/                    # React source code
-│   ├── App.jsx             # Main application component
-│   ├── App.css             # Tailwind CSS styles
-│   └── utils/
-│       └── speechDatasets.js   # HF dataset utilities
-├── scripts/
-│   └── deploy-to-hf.js     # Deployment script
-├── space_template/
-│   └── README.md           # HF Space metadata
-└── dist/                   # Built files (gitignored)
-```
-
-## 🚀 Development
+## Quick Start
 
 ```bash
-# Install dependencies
+cd examples/hf-spaces-demo
 npm install
+```
 
-# Start dev server
+## Development Modes
+
+### 🔧 Local Development (Test Local Changes)
+
+Use this when modifying the parakeet.js library source code:
+
+```bash
+npm run dev:local
+```
+
+This runs Vite with the `PARAKEET_LOCAL=true` environment variable, which aliases `parakeet.js` imports to `/src/index.js` instead of the npm package.
+
+**When to use:**
+- Developing new features in `/src/`
+- Debugging issues in the library
+- Testing before publishing to npm
+
+### 📦 NPM Package Testing
+
+Use this to test the published npm package (simulates end-user experience):
+
+```bash
 npm run dev
 ```
 
-## 📦 Deployment to HuggingFace Spaces
+This uses the `parakeet.js` package from npm (version specified in `package.json`).
 
-This project uses a **static build deployment** strategy. The source code stays on GitHub, and only the built `dist/` files are pushed to HuggingFace Spaces.
+**When to use:**
+- Verifying the published package works correctly
+- Testing after `npm publish`
+- Before deploying to production
 
-### Deploy Command
+## Building
+
+### Local Source Build
+```bash
+npm run build:local
+```
+
+### NPM Package Build (for deployment)
+```bash
+npm run build
+```
+
+## Deployment
+
+### 🤗 HuggingFace Spaces
+
+Deploy to HuggingFace Spaces (uses npm package build):
 
 ```bash
 npm run deploy-to-hf
 ```
 
-This script:
-1. Builds the project (`npm run build`)
-2. Creates a temporary directory
-3. Clones the HF Space repo
-4. Copies `dist/` contents + `space_template/README.md`
-5. Force pushes to HuggingFace
+This will:
+1. Build the app with `npm run build`
+2. Clone the HF Space repository
+3. Copy build files and space template
+4. Push to HuggingFace
 
-### Manual Deployment
+**Requirements:**
+- HuggingFace CLI logged in (`huggingface-cli login`)
+- Write access to the Space repository
 
-If you prefer manual deployment:
+### 🐙 GitHub Pages
 
+GitHub Pages deployment is automated via GitHub Actions.
+
+**Automatic Deployment:**
+Pushing changes to `examples/hf-spaces-demo/**` on the `master` branch triggers the workflow.
+
+**Manual Trigger:**
 ```bash
-# Build
-npm run build
-
-# The dist/ folder contains the static files
-# Push these to your HF Space along with space_template/README.md
+gh workflow run deploy-gh-pages.yml
 ```
 
-## 🔧 Configuration
+**Check Status:**
+```bash
+gh run list --workflow="deploy-gh-pages.yml"
+```
 
-### HF Space Settings
+## Cross-Origin Isolation
 
-The `space_template/README.md` contains HuggingFace Space metadata:
+Both deployment targets require Cross-Origin Isolation headers for `SharedArrayBuffer` support (multi-threaded WASM):
 
+### HuggingFace Spaces
+Headers are configured in `space_template/README.md`:
 ```yaml
----
-title: Parakeet.js Demo
-emoji: 🦜
-colorFrom: green
-colorTo: blue
-sdk: static
-pinned: false
----
+custom_headers:
+  cross-origin-embedder-policy: credentialless
+  cross-origin-opener-policy: same-origin
 ```
 
-### Changing the HF Space URL
+### GitHub Pages
+Since GitHub Pages doesn't support custom headers, we use `coi-serviceworker.js` which is included in the build.
 
-Edit `scripts/deploy-to-hf.js`:
+## Directory Structure
 
-```javascript
-const HF_SPACE_REPO = 'https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE';
+```
+hf-spaces-demo/
+├── src/
+│   ├── App.jsx          # Main React component
+│   ├── App.css          # Styles
+│   └── utils/           # Utility functions
+├── public/
+│   ├── assets/          # Static assets (test audio)
+│   └── coi-serviceworker.js  # Cross-origin isolation workaround
+├── scripts/
+│   └── deploy-to-hf.js  # HF deployment script
+├── space_template/
+│   └── README.md        # HF Space configuration
+├── vite.config.js       # Vite config with local/npm switching
+└── package.json         # Scripts and dependencies
 ```
 
-## 🔗 Related
+## Troubleshooting
 
-- **[parakeet.js](https://www.npmjs.com/package/parakeet.js)** - npm package
-- **[GitHub Repository](https://github.com/ysdede/parakeet.js)** - Full source code
-- **[react-demo](../react-demo)** - Production demo (same codebase)
-- **[react-demo-dev](../react-demo-dev)** - Development demo (links to local library)
+### "SharedArrayBuffer unavailable" warning
+- **Local dev**: Should work automatically (Vite sets COOP/COEP headers)
+- **HF Spaces**: Check `space_template/README.md` has `custom_headers`
+- **GitHub Pages**: Ensure `coi-serviceworker.js` is in the build
 
-## 📝 Notes
+### Model loading fails with memory error
+- Check browser DevTools isn't pausing on potential OOM
+- Try closing other browser tabs to free memory
+- Use int8 quantization for smaller models
 
-- This demo uses the same UI codebase as `react-demo`
-- The only difference is the `deploy-to-hf` script and HF-specific metadata
-- Uses `parakeet.js` npm package (not local link like `react-demo-dev`)
+### Changes not reflected after deployment
+- GitHub Pages: Wait 1-2 minutes for CDN cache
+- HF Spaces: Wait for Space rebuild (~1 minute)
+- Clear browser cache or use incognito window

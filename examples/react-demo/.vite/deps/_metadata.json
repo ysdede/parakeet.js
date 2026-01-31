@@ -1,0 +1,32 @@
+{
+  "hash": "57d1ff8e",
+  "browserHash": "c526b9ed",
+  "optimized": {
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "a1cab3f7",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "342a4084",
+      "needsInterop": true
+    },
+    "onnxruntime-web": {
+      "src": "../../../../node_modules/onnxruntime-web/dist/ort.min.js",
+      "file": "onnxruntime-web.js",
+      "fileHash": "4187dc99",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "chunk-THUQMMON": {
+      "file": "chunk-THUQMMON.js"
+    },
+    "chunk-CQXHTUV2": {
+      "file": "chunk-CQXHTUV2.js"
+    }
+  }
+}

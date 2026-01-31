@@ -13,25 +13,25 @@
 export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}) {
   // Dynamic import to handle Vite bundling issues
   let ort;
-  
+
   try {
     const ortModule = await import('onnxruntime-web');
     ort = ortModule.default || ortModule;
-    
+
     // Debug: Check the structure of ort
-    console.log('[Parakeet.js] ORT structure:', { 
-      hasDefault: !!ortModule.default, 
-      hasEnv: !!ort.env, 
+    console.log('[Parakeet.js] ORT structure:', {
+      hasDefault: !!ortModule.default,
+      hasEnv: !!ort.env,
       hasWasm: !!ort.env?.wasm,
       hasWebgpu: !!ort.env?.webgpu,
       keys: Object.keys(ort).slice(0, 10) // Show first 10 keys
     });
-    
+
     // If still no env, try accessing it differently
     if (!ort.env) {
       console.log('[Parakeet.js] Trying alternative access patterns...');
       console.log('[Parakeet.js] ortModule keys:', Object.keys(ortModule));
-      
+
       // Sometimes the module structure is nested
       if (ortModule.ort) {
         ort = ortModule.ort;
@@ -42,11 +42,11 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
     console.error('[Parakeet.js] Failed to import onnxruntime-web:', e);
     throw new Error('Failed to load ONNX Runtime Web. Please check your network connection.');
   }
-  
+
   if (!ort || !ort.env) {
     throw new Error('ONNX Runtime Web loaded but env is not available. This might be a bundling issue.');
   }
-  
+
   // Set up WASM paths first (needed for all backends)
   if (!ort.env.wasm.wasmPaths) {
     // Use the same version as in package.json
@@ -65,7 +65,7 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
       console.warn('[Parakeet.js] SharedArrayBuffer not available - using single-threaded WASM');
       ort.env.wasm.numThreads = 1;
     }
-    
+
     // Enable other WASM optimizations
     ort.env.wasm.proxy = false; // Direct execution for better performance
   }
@@ -74,7 +74,7 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
     // Check WebGPU support properly
     const webgpuSupported = 'gpu' in navigator;
     console.log(`[Parakeet.js] WebGPU supported: ${webgpuSupported}`);
-    
+
     if (webgpuSupported) {
       try {
         // In newer versions of ONNX Runtime Web, WebGPU initialization is automatic
@@ -92,7 +92,8 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
   }
 
   // Store the final backend choice for use in model selection
-  ort._selectedBackend = backend;
+  // Store the final backend choice for use in model selection
+  // ort._selectedBackend = backend; // Removed: ort object is not extensible in newer versions
 
   // Expose ort globally so other modules (like SileroVAD) can use the same configured instance
   if (typeof globalThis !== 'undefined') {
