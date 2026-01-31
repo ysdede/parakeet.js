@@ -1,134 +1,88 @@
-:root {
-  font-family: Inter, system-ui, sans-serif;
-  line-height: 1.4;
-  color: #222;
-  background: #f3f6f8;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========================================
+   Parakeet.js Demo - Custom Styles
+   ======================================== */
+
+/* Toggle switch styles */
+.toggle-checkbox:checked {
+  right: 0;
+  border-color: #10b981;
 }
 
-.app {
-  max-width: 760px;
-  margin: 2rem auto;
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 1.5rem 2rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+.toggle-checkbox:checked + .toggle-label {
+  background-color: #10b981;
 }
 
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  margin-bottom: 1rem;
+/* Smooth transitions */
+input,
+select,
+textarea {
+  transition: all 0.2s ease-in-out;
 }
 
-.controls label {
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+body {
+  transition: background-color 0.3s, color 0.3s;
 }
 
-.controls select,
-.controls input[type="number"] {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #fff;
-}
-
-button.primary {
-  padding: 0.4rem 0.9rem;
-  background: #3b82f6;
-  color: #ffffff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-button.primary:hover {
-  background: #2563eb;
-}
-
-.status {
-  margin-top: 0.5rem;
-  font-weight: 500;
-}
-
-.progress-wrapper {
-  margin: 0.5rem 0;
-}
-
-.progress-bar {
+/* Custom scrollbar for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
   height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
 }
 
-.progress-bar > div {
-  height: 100%;
+.dark ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Waveform animation */
+@keyframes pulse-wave {
+  0%, 100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.wave-bar {
+  animation: pulse-wave 1s ease-in-out infinite;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* File input styling */
+input[type="file"]::file-selector-button {
+  padding: 0.5rem 1rem;
   background: #10b981;
-  transition: width 0.2s;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-.progress-text {
-  font-size: 0.8rem;
-  color: #555;
-  margin-top: 0.25rem;
+input[type="file"]::file-selector-button:hover {
+  background: #059669;
 }
-
-.textarea {
-  width: 100%;
-  height: 6rem;
-  resize: vertical;
-}
-
-.performance {
-  font-size: 0.85rem;
-  background: #ecfdf5;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid #d1fae5;
-  margin-bottom: 1rem;
-}
-
-.history {
-  max-height: 400px;
-  overflow-y: auto;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  background: #ffffff;
-}
-
-.history-item {
-  padding: 1rem;
-  border-bottom: 1px solid #f1f5f9;
-  background: #ffffff;
-}
-
-.history-item:last-child {
-  border-bottom: none;
-}
-
-.history-meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.9rem;
-  color: #666;
-  margin-bottom: 0.5rem;
-}
-
-.history-stats {
-  font-size: 0.75rem;
-  color: #666;
-  margin-bottom: 0.5rem;
-}
-
-.history-text {
-  background: #f9fafb;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  border: 1px solid #e5e7eb;
-  font-size: 0.9rem;
-} 
