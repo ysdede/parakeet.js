@@ -14,14 +14,12 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
 export default function App() {
   const [selectedModel, setSelectedModel] = useState('parakeet-tdt-0.6b-v2');
   const modelConfig = MODELS[selectedModel];
-  const repoId = modelConfig?.repoId || selectedModel;
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [backend, setBackend] = useState('webgpu-hybrid');
   const [encoderQuant, setEncoderQuant] = useState('fp32');
   const [decoderQuant, setDecoderQuant] = useState('int8');
   const [preprocessor, setPreprocessor] = useState('nemo128');
   const [status, setStatus] = useState('Idle');
-  const [progress, setProgress] = useState('');
   const [progressText, setProgressText] = useState('');
   const [progressPct, setProgressPct] = useState(null);
   const [text, setText] = useState('');
@@ -38,12 +36,13 @@ export default function App() {
   const modelRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Get available languages for selected model
-  const availableLanguages = modelConfig?.languages || ['en'];
-  const languageOptions = availableLanguages.map(lang => ({
-    code: lang,
-    displayName: LANGUAGE_NAMES[lang] || lang,
-    hasTestData: hasTestSamples(lang),
+  const isModelReady = status === 'Model ready ✔';
+  const isLoading = status !== 'Idle' && !status.toLowerCase().includes('fail') && !isModelReady;
+
+  // Get available languages for test samples (not model languages)
+  const testLanguageOptions = Object.entries(SPEECH_DATASETS).map(([code, config]) => ({
+    code,
+    displayName: config.displayName,
   }));
 
   // Auto-adjust quant presets when backend changes
@@ -57,23 +56,12 @@ export default function App() {
     }
   }, [backend]);
 
-  // Reset language to default when model changes (if current language not supported)
-  useEffect(() => {
-    const supportedLangs = MODELS[selectedModel]?.languages || ['en'];
-    if (!supportedLangs.includes(selectedLanguage)) {
-      setSelectedLanguage(MODELS[selectedModel]?.defaultLanguage || 'en');
-    }
-  }, [selectedModel]);
-
   // Fetch random audio sample from HuggingFace speech dataset
   async function loadRandomSample() {
-    if (!modelRef.current) {
-      alert('Please load the model first');
-      return;
-    }
+    if (!modelRef.current) return;
 
     if (!hasTestSamples(selectedLanguage)) {
-      alert(`No test dataset available for ${LANGUAGE_NAMES[selectedLanguage] || selectedLanguage}. Try English, French, German, Spanish, Italian, Portuguese, Dutch, or Polish.`);
+      alert(`No test dataset available for ${LANGUAGE_NAMES[selectedLanguage] || selectedLanguage}.`);
       return;
     }
 
@@ -82,7 +70,6 @@ export default function App() {
     setText('');
 
     try {
-      // Use the utility function to fetch sample
       const sample = await fetchRandomSample(selectedLanguage, {
         targetSampleRate: 16000,
         onProgress: ({ message }) => setStatus(message),
@@ -91,8 +78,7 @@ export default function App() {
       setReferenceText(sample.transcription);
       console.log(`[Dataset] Reference: "${sample.transcription}"`);
 
-      // Transcribe
-      setStatus('Transcribing sample…');
+      setStatus('Transcribing…');
       setIsTranscribing(true);
       
       console.time('Transcribe-Sample');
@@ -110,7 +96,6 @@ export default function App() {
       setText(res.utterance_text);
       setLatestMetrics(res.metrics);
 
-      // Add to history
       const langName = LANGUAGE_NAMES[selectedLanguage] || selectedLanguage;
       const datasetName = sample.dataset.split('/').pop();
       const newTranscription = {
@@ -130,7 +115,7 @@ export default function App() {
 
     } catch (error) {
       console.error('[Dataset] Error:', error);
-      setStatus(`Dataset error: ${error.message}`);
+      setStatus(`Error: ${error.message}`);
     } finally {
       setIsLoadingSample(false);
       setIsTranscribing(false);
@@ -138,8 +123,7 @@ export default function App() {
   }
 
   async function loadModel() {
-    setStatus('Loading model…');
-    setProgress('');
+    setStatus('Downloading model…');
     setProgressText('');
     setProgressPct(0);
     console.time('LoadModel');
@@ -151,8 +135,6 @@ export default function App() {
         setProgressPct(pct);
       };
 
-      // 1. Download all model files from HuggingFace Hub
-      // Use model key for known models (enables auto-config), or repo ID for custom
       const modelUrls = await getParakeetModel(selectedModel, { 
         encoderQuant,
         decoderQuant,
@@ -161,12 +143,10 @@ export default function App() {
         progress: progressCallback 
       });
 
-      // Show compiling sessions stage
-      setStatus('Creating sessions…');
-      setProgressText('Compiling model (this may take ~10 s)…');
+      setStatus('Compiling model…');
+      setProgressText('This may take ~10s on first load');
       setProgressPct(null);
 
-      // 2. Create the model instance with all file URLs
       modelRef.current = await ParakeetModel.fromUrls({ 
         ...modelUrls.urls,
         filenames: modelUrls.filenames,
@@ -175,9 +155,8 @@ export default function App() {
         cpuThreads,
       });
 
-      // 3. Warm-up and verify
-      setStatus('Warming up & verifying…');
-      setProgressText('Running a test transcription…');
+      setStatus('Verifying…');
+      setProgressText('Running test transcription');
       const expectedText = 'it is not life as we know or understand it';
       
       try {
@@ -188,30 +167,26 @@ export default function App() {
         const pcm = decoded.getChannelData(0);
         
         const { utterance_text } = await modelRef.current.transcribe(pcm, 16000);
-
-        // Normalize both texts: lowercase and remove punctuation
         const normalize = (str) => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
 
         if (normalize(utterance_text).includes(normalize(expectedText))) {
           console.log('[App] Model verification successful.');
           setStatus('Model ready ✔');
         } else {
-          console.error(`[App] Model verification failed! Expected: "${expectedText}", Got: "${utterance_text}"`);
-          setStatus('Model verification failed!');
+          console.error(`[App] Verification failed! Expected: "${expectedText}", Got: "${utterance_text}"`);
+          setStatus('Verification failed');
         }
       } catch (err) {
-        console.error('[App] Warm-up transcription failed', err);
-        setStatus('Warm-up failed!');
+        console.error('[App] Warm-up failed', err);
+        setStatus('Warm-up failed');
       }
 
       console.timeEnd('LoadModel');
-      // setStatus('Model ready ✔'); // Status is now set by verification
       setProgressText('');
       setProgressPct(null);
     } catch (e) {
       console.error(e);
       setStatus(`Failed: ${e.message}`);
-      setProgress('');
     }
   }
 
@@ -232,37 +207,37 @@ export default function App() {
       console.time(`Transcribe-${file.name}`);
       const res = await modelRef.current.transcribe(pcm, 16_000, { 
         returnTimestamps: true, 
-        returnConfidences: true , frameStride
+        returnConfidences: true,
+        frameStride
       });
       console.timeEnd(`Transcribe-${file.name}`);
 
       if (dumpDetail) {
-        console.log('[Parakeet] Detailed transcription output', res);
+        console.log('[Parakeet] Result:', res);
       }
       setLatestMetrics(res.metrics);
-      // Add to transcriptions list
+      
       const newTranscription = {
         id: Date.now(),
         filename: file.name,
         text: res.utterance_text,
         timestamp: new Date().toLocaleTimeString(),
-        duration: pcm.length / 16000, // duration in seconds
+        duration: pcm.length / 16000,
         wordCount: res.words?.length || 0,
         confidence: res.confidence_scores?.token_avg ?? res.confidence_scores?.word_avg ?? null,
         metrics: res.metrics
       };
 
       setTranscriptions(prev => [newTranscription, ...prev]);
-      setText(res.utterance_text); // Show latest transcription
-      setStatus('Model ready ✔'); // Ready for next file
+      setText(res.utterance_text);
+      setStatus('Model ready ✔');
       
     } catch (error) {
       console.error('Transcription failed:', error);
       setStatus('Transcription failed');
-      alert(`Failed to transcribe "${file.name}": ${error.message}`);
+      alert(`Failed: ${error.message}`);
     } finally {
       setIsTranscribing(false);
-      // Clear the file input so the same file can be selected again
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -272,203 +247,181 @@ export default function App() {
   function clearTranscriptions() {
     setTranscriptions([]);
     setText('');
+    setReferenceText('');
+    setLatestMetrics(null);
   }
 
   return (
     <div className="app">
-      <h2>Parakeet JS React Demo (Dev)</h2>
+      <h2>Parakeet.js Demo</h2>
 
-      <div className="controls">
-        <label>
-          <strong>Model:</strong>{' '}
-          <select 
-            value={selectedModel} 
-            onChange={e => setSelectedModel(e.target.value)}
-            disabled={status !== 'Idle' && !status.toLowerCase().includes('fail')}
-          >
-            {MODEL_OPTIONS.map(opt => (
-              <option key={opt.key} value={opt.key}>
-                {opt.displayName}
-              </option>
-            ))}
-          </select>
-        </label>
-        {' '}
-        <label>
-          <strong>Language:</strong>{' '}
-          <select 
-            value={selectedLanguage} 
-            onChange={e => setSelectedLanguage(e.target.value)}
-          >
-            {languageOptions.map(lang => (
-              <option key={lang.code} value={lang.code}>
-                {lang.displayName} ({lang.code})
-              </option>
-            ))}
-          </select>
-        </label>
-        {availableLanguages.length === 1 && (
-          <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#888' }}>
-            (v2 is English-only)
-          </span>
-        )}
-      </div>
-
-      <div className="controls">
-        <label>
-          Backend:
-          <select value={backend} onChange={e=>setBackend(e.target.value)}>
-            <option value="webgpu-hybrid">WebGPU</option>
-            <option value="wasm">WASM (CPU)</option>
-          </select>
-        </label>
-        {' '}
-        <label>
-          Encoder Quant:
-          <select value={encoderQuant} onChange={e=>setEncoderQuant(e.target.value)}>
-            <option value="int8">int8 (faster)</option>
-            <option value="fp32">fp32 (higher quality)</option>
-          </select>
-        </label>
-        {' '}
-        <label>
-          Decoder Quant:
-          <select value={decoderQuant} onChange={e=>setDecoderQuant(e.target.value)}>
-            <option value="int8">int8 (faster)</option>
-            <option value="fp32">fp32 (higher quality)</option>
-          </select>
-        </label>
-        {' '}
-        <label>
-          Preprocessor:
-          <select value={preprocessor} onChange={e=>setPreprocessor(e.target.value)}>
-            <option value="nemo128">nemo128 (default)</option>
-          </select>
-        </label>
-        {' '}
-        <label>
-          Stride:
-          <select value={frameStride} onChange={e=>setFrameStride(Number(e.target.value))}>
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-            <option value={4}>4</option>
-          </select>
-        </label>
-        {' '}
-        <label>
-          <input type="checkbox" checked={verboseLog} onChange={e => setVerboseLog(e.target.checked)} />
-          Verbose Log
-        </label>
-        {' '}
-        <label style={{fontSize:'0.9em'}}>
-          <input type="checkbox" checked={dumpDetail} onChange={e=>setDumpDetail(e.target.checked)} />
-          Dump result to console
-        </label>
-        {(backend === 'wasm' || backend.startsWith('webgpu')) && (
-          <label style={{fontSize:'0.9em'}}>
-            Threads:
-            <input type="number" min="1" max={maxCores} value={cpuThreads} onChange={e=>setCpuThreads(Number(e.target.value))} style={{width:'4rem'}} />
+      {/* Model Configuration Section */}
+      <div className="section">
+        <div className="section-header">Model Configuration</div>
+        <div className="controls">
+          <label>
+            Model:
+            <select 
+              value={selectedModel} 
+              onChange={e => setSelectedModel(e.target.value)}
+              disabled={isLoading || isModelReady}
+            >
+              {MODEL_OPTIONS.map(opt => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.displayName}
+                </option>
+              ))}
+            </select>
           </label>
+          <label>
+            Backend:
+            <select value={backend} onChange={e=>setBackend(e.target.value)} disabled={isLoading || isModelReady}>
+              <option value="webgpu-hybrid">WebGPU</option>
+              <option value="wasm">WASM (CPU)</option>
+            </select>
+          </label>
+          <label>
+            Encoder:
+            <select value={encoderQuant} onChange={e=>setEncoderQuant(e.target.value)} disabled={isLoading || isModelReady}>
+              <option value="fp32">fp32</option>
+              <option value="int8">int8</option>
+            </select>
+          </label>
+          <label>
+            Decoder:
+            <select value={decoderQuant} onChange={e=>setDecoderQuant(e.target.value)} disabled={isLoading || isModelReady}>
+              <option value="int8">int8</option>
+              <option value="fp32">fp32</option>
+            </select>
+          </label>
+        </div>
+        
+        <div className="controls">
+          <label>
+            Threads:
+            <input 
+              type="number" 
+              min="1" 
+              max={maxCores} 
+              value={cpuThreads} 
+              onChange={e=>setCpuThreads(Number(e.target.value))} 
+              style={{width:'3.5rem'}} 
+              disabled={isLoading || isModelReady}
+            />
+          </label>
+          <label>
+            Stride:
+            <select value={frameStride} onChange={e=>setFrameStride(Number(e.target.value))}>
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={4}>4</option>
+            </select>
+          </label>
+          <label>
+            <input type="checkbox" checked={verboseLog} onChange={e => setVerboseLog(e.target.checked)} disabled={isLoading || isModelReady} />
+            Verbose
+          </label>
+          <label>
+            <input type="checkbox" checked={dumpDetail} onChange={e=>setDumpDetail(e.target.checked)} />
+            Log results
+          </label>
+        </div>
+
+        <div className="controls">
+          <button 
+            onClick={loadModel} 
+            disabled={isLoading || isModelReady}
+            className={isModelReady ? 'btn-primary btn-loaded' : 'btn-primary'}
+          >
+            {isModelReady ? '✓ Model Loaded' : isLoading ? 'Loading…' : 'Load Model'}
+          </button>
+        </div>
+
+        {/* Progress indicator */}
+        {progressPct !== null && (
+          <div className="progress-wrapper">
+            <div className="progress-bar"><div style={{ width: `${progressPct}%` }} /></div>
+            <p className="progress-text">{progressText}</p>
+          </div>
         )}
-        <button 
-          onClick={loadModel} 
-          disabled={!status.toLowerCase().includes('fail') && status !== 'Idle'}
-          className="primary"
-        >
-          {status === 'Model ready ✔' ? 'Model Loaded' : 'Load Model'}
-        </button>
+        {progressPct === null && progressText && (
+          <p className="progress-text">{progressText}</p>
+        )}
       </div>
 
+      {/* SharedArrayBuffer warning */}
       {typeof SharedArrayBuffer === 'undefined' && backend === 'wasm' && (
-        <div style={{ 
-          marginBottom: '1rem', 
-          padding: '0.5rem', 
-          backgroundColor: '#fff3cd', 
-          border: '1px solid #ffeaa7',
-          borderRadius: '4px',
-          fontSize: '0.9em'
-        }}>
-          ⚠️ <strong>Performance Note:</strong> SharedArrayBuffer is not available. 
-          WASM will run single-threaded. For better performance, serve over HTTPS 
-          with proper headers or use WebGPU.
+        <div className="warning-box">
+          ⚠️ SharedArrayBuffer unavailable. WASM will run single-threaded.
         </div>
       )}
 
-      {/* Quick Test Section */}
-      <div className="controls" style={{ 
-        backgroundColor: '#f0f7ff', 
-        padding: '1rem', 
-        borderRadius: '8px',
-        marginBottom: '1rem',
-        border: '1px solid #cce0ff'
-      }}>
-        <div style={{ marginBottom: '0.5rem' }}>
-          <strong>🎯 Quick Test with HuggingFace Speech Datasets</strong>
-          <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#666' }}>
-            (People's Speech, MLS)
-          </span>
+      {/* Status bar */}
+      <div className="status-bar">
+        Status: <span className={isModelReady ? 'status-ready' : ''}>{status}</span>
+      </div>
+
+      {/* Quick Test Section - disabled until model loads */}
+      <div className={`test-section ${!isModelReady ? 'disabled' : ''}`}>
+        <div className="test-section-header">
+          <span className="test-section-title">Quick Test with Sample Audio</span>
+          {!isModelReady && <span className="test-section-hint">Load model first</span>}
         </div>
-        <button 
-          onClick={loadRandomSample}
-          disabled={status !== 'Model ready ✔' || isLoadingSample || isTranscribing || !hasTestSamples(selectedLanguage)}
-          className="primary"
-          style={{ marginRight: '1rem' }}
-        >
-          {isLoadingSample ? '⏳ Loading…' : `🎲 Load Random ${LANGUAGE_NAMES[selectedLanguage] || selectedLanguage} Sample`}
-        </button>
-        {!hasTestSamples(selectedLanguage) && (
-          <span style={{ fontSize: '0.85em', color: '#d32f2f' }}>
-            ⚠️ No test dataset available for this language
-          </span>
-        )}
+        
+        <div className="test-controls">
+          <label>
+            Language:
+            <select 
+              value={selectedLanguage} 
+              onChange={e => setSelectedLanguage(e.target.value)}
+              disabled={!isModelReady}
+            >
+              {testLanguageOptions.map(lang => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          
+          <button 
+            onClick={loadRandomSample}
+            disabled={!isModelReady || isLoadingSample || isTranscribing}
+            className="btn-secondary"
+          >
+            {isLoadingSample ? 'Loading…' : `Load ${LANGUAGE_NAMES[selectedLanguage]} Sample`}
+          </button>
+        </div>
+
         {referenceText && (
-          <div style={{ marginTop: '0.75rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 'bold', fontSize: '0.9em' }}>
-              📝 Reference Text (Ground Truth):
-            </label>
-            <div style={{ 
-              backgroundColor: '#e8f5e9', 
-              padding: '0.5rem 0.75rem', 
-              borderRadius: '4px',
-              border: '1px solid #c8e6c9',
-              fontFamily: 'inherit',
-              fontSize: '0.95em'
-            }}>
-              {referenceText}
-            </div>
+          <div className="reference-box">
+            <div className="reference-label">Reference (Ground Truth):</div>
+            <div className="reference-text">{referenceText}</div>
           </div>
         )}
       </div>
 
+      {/* File upload */}
       <div className="controls">
-        <input 
-          ref={fileInputRef}
-          type="file" 
-          accept="audio/*" 
-          onChange={transcribeFile} 
-          disabled={status !== 'Model ready ✔' || isTranscribing} 
-        />
-        {transcriptions.length > 0 && (
-          <button 
-            onClick={clearTranscriptions} 
-            style={{ marginLeft: '1rem', padding: '0.25rem 0.5rem' }}
-          >
-            Clear History
-          </button>
-        )}
+        <div className="file-input-wrapper">
+          <input 
+            ref={fileInputRef}
+            type="file" 
+            accept="audio/*" 
+            onChange={transcribeFile} 
+            disabled={!isModelReady || isTranscribing} 
+          />
+          {transcriptions.length > 0 && (
+            <button onClick={clearTranscriptions} className="btn-ghost">
+              Clear History
+            </button>
+          )}
+        </div>
       </div>
 
-      <p>Status: {status}</p>
-      {progressPct!==null && (
-        <div className="progress-wrapper">
-          <div className="progress-bar"><div style={{ width: `${progressPct}%` }} /></div>
-          <p className="progress-text">{progressText}</p>
-        </div>
-      )}
-
       {/* Latest transcription */}
-      <div className="controls">
-        <h3>Latest Transcription:</h3>
+      <div style={{ marginBottom: '1rem' }}>
+        <h3 style={{ marginBottom: '0.5rem', fontSize: '1rem' }}>Transcription Result</h3>
         <textarea 
           value={text} 
           readOnly 
@@ -477,30 +430,37 @@ export default function App() {
         />
       </div>
 
-      {/* Latest transcription performace info */}
+      {/* Performance metrics */}
       {latestMetrics && (
         <div className="performance">
-          <strong>RTF:</strong> {latestMetrics.rtf?.toFixed(2)}x &nbsp;|&nbsp; Total: {latestMetrics.total_ms} ms<br/>
-          Preprocess {latestMetrics.preprocess_ms} ms · Encode {latestMetrics.encode_ms} ms · Decode {latestMetrics.decode_ms} ms · Tokenize {latestMetrics.tokenize_ms} ms
+          <strong>RTF:</strong> {latestMetrics.rtf?.toFixed(2)}x &nbsp;|&nbsp; 
+          <strong>Total:</strong> {latestMetrics.total_ms?.toFixed(0)}ms &nbsp;|&nbsp;
+          Encode {latestMetrics.encode_ms?.toFixed(0)}ms · 
+          Decode {latestMetrics.decode_ms?.toFixed(0)}ms
         </div>
       )}
 
       {/* Transcription history */}
       {transcriptions.length > 0 && (
         <div className="history">
-          <h3>Transcription History ({transcriptions.length} files):</h3>
-          <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
+          <div className="history-scroll">
             {transcriptions.map((trans) => (
               <div className="history-item" key={trans.id}>
                 <div className="history-meta">
-                  <strong>{trans.filename}</strong>
-                  {trans.language && <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#666' }}>({LANGUAGE_NAMES[trans.language]})</span>}
+                  <span>
+                    <strong>{trans.filename}</strong>
+                    {trans.language && <span className="history-lang">({LANGUAGE_NAMES[trans.language]})</span>}
+                  </span>
                   <span>{trans.timestamp}</span>
                 </div>
-                <div className="history-stats">Duration: {trans.duration.toFixed(1)}s | Words: {trans.wordCount}{trans.confidence && ` | Confidence: ${trans.confidence.toFixed(2)}`}{trans.metrics && ` | RTF: ${trans.metrics.rtf?.toFixed(2)}x`}</div>
+                <div className="history-stats">
+                  {trans.duration.toFixed(1)}s · {trans.wordCount} words
+                  {trans.confidence && ` · ${(trans.confidence * 100).toFixed(0)}% conf`}
+                  {trans.metrics && ` · RTF ${trans.metrics.rtf?.toFixed(2)}x`}
+                </div>
                 {trans.reference && (
-                  <div style={{ fontSize: '0.9em', color: '#2e7d32', marginBottom: '0.25rem' }}>
-                    <strong>Reference:</strong> {trans.reference}
+                  <div className="history-reference">
+                    <strong>Ref:</strong> {trans.reference}
                   </div>
                 )}
                 <div className="history-text">{trans.text}</div>
@@ -511,4 +471,4 @@ export default function App() {
       )}
     </div>
   );
-} 
+}
