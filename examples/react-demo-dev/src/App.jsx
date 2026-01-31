@@ -80,6 +80,7 @@ export default function App() {
   const modelRef = useRef(null);
   const fileInputRef = useRef(null);
   const audioRef = useRef(null);
+  const [threadingStatus, setThreadingStatus] = useState({ sab: false, threads: 1 });
 
   const isModelReady = modelLoaded;
   const isLoading = !modelLoaded && status !== 'Idle' && !status.toLowerCase().includes('fail');
@@ -100,6 +101,13 @@ export default function App() {
       setDecoderQuant('int8');
     }
   }, [backend]);
+
+  // Detect SharedArrayBuffer and threading capabilities
+  useEffect(() => {
+    const sabAvailable = typeof SharedArrayBuffer !== 'undefined';
+    const threads = sabAvailable ? (navigator.hardwareConcurrency || 1) : 1;
+    setThreadingStatus({ sab: sabAvailable, threads });
+  }, []);
 
   // Cleanup audio URL on unmount
   useEffect(() => {
@@ -164,7 +172,7 @@ export default function App() {
 
       setStatus('Transcribing…');
       setIsTranscribing(true);
-      
+
       console.time('Transcribe-Sample');
       const res = await modelRef.current.transcribe(sample.pcm, 16000, {
         returnTimestamps: true,
@@ -219,22 +227,22 @@ export default function App() {
         setProgressPct(pct);
       };
 
-      const modelUrls = await getParakeetModel(selectedModel, { 
+      const modelUrls = await getParakeetModel(selectedModel, {
         encoderQuant,
         decoderQuant,
         preprocessor,
         backend,
-        progress: progressCallback 
+        progress: progressCallback
       });
 
       setStatus('Compiling model…');
       setProgressText('This may take ~10s on first load');
       setProgressPct(null);
 
-      modelRef.current = await ParakeetModel.fromUrls({ 
+      modelRef.current = await ParakeetModel.fromUrls({
         ...modelUrls.urls,
         filenames: modelUrls.filenames,
-        backend, 
+        backend,
         verbose: verboseLog,
         cpuThreads,
       });
@@ -242,16 +250,16 @@ export default function App() {
       setStatus('Verifying…');
       setProgressText('Running test transcription');
       const expectedText = 'it is not life as we know or understand it';
-      
+
       try {
         const audioRes = await fetch('/assets/life_Jim.wav');
         const buf = await audioRes.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });
         const decoded = await audioCtx.decodeAudioData(buf);
         const pcm = decoded.getChannelData(0);
-        
+
         const { utterance_text } = await modelRef.current.transcribe(pcm, 16000);
-        const normalize = (str) => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+        const normalize = (str) => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
 
         if (normalize(utterance_text).includes(normalize(expectedText))) {
           console.log('[App] Model verification successful.');
@@ -290,8 +298,8 @@ export default function App() {
       const pcm = decoded.getChannelData(0);
 
       console.time(`Transcribe-${file.name}`);
-      const res = await modelRef.current.transcribe(pcm, 16_000, { 
-        returnTimestamps: true, 
+      const res = await modelRef.current.transcribe(pcm, 16_000, {
+        returnTimestamps: true,
         returnConfidences: true,
         frameStride
       });
@@ -301,7 +309,7 @@ export default function App() {
         console.log('[Parakeet] Result:', res);
       }
       setLatestMetrics(res.metrics);
-      
+
       const newTranscription = {
         id: Date.now(),
         filename: file.name,
@@ -316,7 +324,7 @@ export default function App() {
       setTranscriptions(prev => [newTranscription, ...prev]);
       setText(res.utterance_text);
       setStatus('Model ready ✔');
-      
+
     } catch (error) {
       console.error('Transcription failed:', error);
       setStatus('Transcription failed');
@@ -352,7 +360,7 @@ export default function App() {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
             Parakeet.js Demo
           </h1>
-          <button 
+          <button
             className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             onClick={() => setDarkMode(!darkMode)}
           >
@@ -376,7 +384,7 @@ export default function App() {
                     Model
                   </label>
                   <div className="relative">
-                    <select 
+                    <select
                       value={selectedModel}
                       onChange={e => setSelectedModel(e.target.value)}
                       disabled={isLoading || isModelReady}
@@ -401,7 +409,7 @@ export default function App() {
                       Backend
                     </label>
                     <div className="relative">
-                      <select 
+                      <select
                         value={backend}
                         onChange={e => setBackend(e.target.value)}
                         disabled={isLoading || isModelReady}
@@ -420,7 +428,7 @@ export default function App() {
                     <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                       Threads
                     </label>
-                    <input 
+                    <input
                       type="number"
                       min="1"
                       max={maxCores}
@@ -435,7 +443,7 @@ export default function App() {
                     <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                       Stride
                     </label>
-                    <input 
+                    <input
                       type="number"
                       value={frameStride}
                       onChange={e => setFrameStride(Number(e.target.value))}
@@ -450,7 +458,7 @@ export default function App() {
                     Encoder
                   </label>
                   <div className="relative">
-                    <select 
+                    <select
                       value={encoderQuant}
                       onChange={e => setEncoderQuant(e.target.value)}
                       disabled={isLoading || isModelReady}
@@ -471,7 +479,7 @@ export default function App() {
                     Decoder
                   </label>
                   <div className="relative">
-                    <select 
+                    <select
                       value={decoderQuant}
                       onChange={e => setDecoderQuant(e.target.value)}
                       disabled={isLoading || isModelReady}
@@ -491,7 +499,7 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-700 dark:text-gray-300">Verbose</span>
                     <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                      <input 
+                      <input
                         type="checkbox"
                         checked={verboseLog}
                         onChange={e => setVerboseLog(e.target.checked)}
@@ -499,7 +507,7 @@ export default function App() {
                         className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 dark:border-gray-600 checked:right-0"
                         id="verbose"
                       />
-                      <label 
+                      <label
                         htmlFor="verbose"
                         className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 dark:bg-gray-700 cursor-pointer"
                       ></label>
@@ -509,14 +517,14 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-700 dark:text-gray-300">Log results</span>
                     <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                      <input 
+                      <input
                         type="checkbox"
                         checked={dumpDetail}
                         onChange={e => setDumpDetail(e.target.checked)}
                         className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 dark:border-gray-600 checked:right-0"
                         id="log"
                       />
-                      <label 
+                      <label
                         htmlFor="log"
                         className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 dark:bg-gray-700 cursor-pointer"
                       ></label>
@@ -525,7 +533,7 @@ export default function App() {
                 </div>
 
                 {/* Load Model Button */}
-                <button 
+                <button
                   onClick={loadModel}
                   disabled={isLoading || isModelReady}
                   className="w-full bg-primary hover:bg-opacity-90 text-white font-medium py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
@@ -538,7 +546,7 @@ export default function App() {
                 {progressPct !== null && (
                   <div className="space-y-1">
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 overflow-hidden">
-                      <div 
+                      <div
                         className="bg-primary h-full transition-all duration-300"
                         style={{ width: `${progressPct}%` }}
                       ></div>
@@ -559,6 +567,21 @@ export default function App() {
                 {status}
               </span>
             </div>
+
+            {/* Threading Status Indicator */}
+            <div className="flex items-center gap-2 px-1 mt-2">
+              <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${threadingStatus.sab
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                }`}>
+                <span className="material-icons-outlined text-xs">
+                  {threadingStatus.sab ? 'check_circle' : 'warning'}
+                </span>
+                {threadingStatus.sab
+                  ? `Multi-threaded (${threadingStatus.threads} cores)`
+                  : 'Single-threaded'}
+              </span>
+            </div>
           </div>
 
           {/* Right Column - Test & Transcribe */}
@@ -576,7 +599,7 @@ export default function App() {
                     Language
                   </label>
                   <div className="relative">
-                    <select 
+                    <select
                       value={selectedLanguage}
                       onChange={e => setSelectedLanguage(e.target.value)}
                       disabled={!isModelReady}
@@ -597,14 +620,14 @@ export default function App() {
                 <div className="flex gap-2">
                   {audioUrl && (
                     <>
-                      <audio 
+                      <audio
                         ref={audioRef}
                         src={audioUrl}
                         onEnded={() => setIsPlaying(false)}
                         onPause={() => setIsPlaying(false)}
                         onPlay={() => setIsPlaying(true)}
                       />
-                      <button 
+                      <button
                         onClick={isPlaying ? pauseAudio : playAudio}
                         className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-white rounded-full w-[38px] h-[38px] flex items-center justify-center shadow-sm transition-all flex-shrink-0 group border border-gray-300 dark:border-gray-600"
                         title={isPlaying ? 'Pause' : 'Play Sample'}
@@ -615,7 +638,7 @@ export default function App() {
                       </button>
                     </>
                   )}
-                  <button 
+                  <button
                     onClick={loadRandomSample}
                     disabled={!isModelReady || isLoadingSample || isTranscribing}
                     className="bg-primary hover:bg-opacity-90 text-white font-medium py-2 px-4 rounded-lg whitespace-nowrap shadow-sm transition-all text-sm h-[38px] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -627,7 +650,7 @@ export default function App() {
 
               {/* File Upload Area */}
               <div className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group">
-                <input 
+                <input
                   ref={fileInputRef}
                   type="file"
                   accept="audio/*"
@@ -659,7 +682,7 @@ export default function App() {
                       Transcription
                     </label>
                     {text && (
-                      <button 
+                      <button
                         onClick={() => copyToClipboard(text)}
                         className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 transition-colors"
                       >
@@ -682,7 +705,7 @@ export default function App() {
                       Reference Text
                     </label>
                     {referenceText && (
-                      <button 
+                      <button
                         onClick={() => copyToClipboard(referenceText)}
                         className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 transition-colors"
                       >
@@ -691,7 +714,7 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                  <textarea 
+                  <textarea
                     value={referenceText}
                     onChange={e => setReferenceText(e.target.value)}
                     className="w-full min-h-[160px] bg-white dark:bg-gray-900/50 rounded-lg p-4 border border-primary dark:border-primary/50 text-lg leading-relaxed text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary focus:border-primary placeholder-gray-400 dark:placeholder-gray-600 resize-y"
@@ -720,7 +743,7 @@ export default function App() {
                   <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Transcription History
                   </h2>
-                  <button 
+                  <button
                     onClick={clearTranscriptions}
                     className="text-xs font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
                   >

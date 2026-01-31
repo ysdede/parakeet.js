@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "cross-env PARAKEET_LOCAL=true vite",
     "build": "vite build",
+    "build:local": "cross-env PARAKEET_LOCAL=true vite build",
     "preview": "vite preview",
-    "deploy-to-hf": "node scripts/deploy-to-hf.js"
+    "deploy-to-hf": "node scripts/deploy-to-hf.js",
+    "deploy-to-gh": "node scripts/deploy-to-gh.js"
   },
   "dependencies": {
     "parakeet.js": "^1.0.1",
@@ -22,6 +25,7 @@
     "postcss": "^8.4.0",
     "autoprefixer": "^10.4.0",
     "@tailwindcss/forms": "^0.5.0",
-    "@tailwindcss/typography": "^0.5.0"
+    "@tailwindcss/typography": "^0.5.0",
+    "cross-env": "^7.0.3"
   }
 }
