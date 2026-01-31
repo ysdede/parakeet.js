@@ -6,6 +6,11 @@
   "exports": {
     ".": "./src/index.js"
   },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "parakeet",
     "speech",

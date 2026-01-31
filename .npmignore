@@ -1,28 +1,21 @@
-# Test files
-test_*.js
-
-# Large example assets
-examples/react-demo/public/assets/
-examples/react-demo/package-lock.json
-
-# Development dependencies
-node_modules/
-examples/react-demo/node_modules/
-
-# Development files
-examples/react-demo/scripts/
-*.log
-.DS_Store
-.vscode/
-.idea/
-
-# Git files
-.git/
-.gitignore
-
-# Documentation that's not essential
-OPTIMIZATION_PLAN.md 
+_bmad/
+_bmad-output/
+audio/
 docs/
+examples/
+scripts/
+tests/
+publish.ps1
 test_webgpu_fix.js
 test_webgpu_simple.js
-scripts/
+OPTIMIZATION_PLAN.md
+P0_OPTIMIZATIONS_SUMMARY.md
+P1_DATA_MOVEMENT_OPTIMIZATIONS.md
+.agent/
+.cursor/
+.serena/
+.antigravityignore
+.cursorignore
+.gitmodules
+package-lock.json
+node_modules/
