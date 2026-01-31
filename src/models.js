@@ -4,23 +4,82 @@
  */
 
 /**
- * Language configuration with display names and FLEURS dataset mapping.
- * @type {Object.<string, {displayName: string, fleursConfig: string, sampleCount: number}>}
+ * Language configuration with display names and HuggingFace dataset mapping.
+ * Uses datasets that have API streaming support (datasets-server).
+ * 
+ * @type {Object.<string, {displayName: string, dataset: string, config: string, split: string, textField: string, sampleCount: number}>}
  */
 export const LANGUAGES = {
-  en: { displayName: 'English', fleursConfig: 'en_us', sampleCount: 647 },
-  es: { displayName: 'Spanish', fleursConfig: 'es_419', sampleCount: 647 },
-  fr: { displayName: 'French', fleursConfig: 'fr_fr', sampleCount: 647 },
-  de: { displayName: 'German', fleursConfig: 'de_de', sampleCount: 647 },
-  it: { displayName: 'Italian', fleursConfig: 'it_it', sampleCount: 647 },
-  pt: { displayName: 'Portuguese', fleursConfig: 'pt_br', sampleCount: 647 },
-  nl: { displayName: 'Dutch', fleursConfig: 'nl_nl', sampleCount: 647 },
-  pl: { displayName: 'Polish', fleursConfig: 'pl_pl', sampleCount: 647 },
-  ru: { displayName: 'Russian', fleursConfig: 'ru_ru', sampleCount: 647 },
-  uk: { displayName: 'Ukrainian', fleursConfig: 'uk_ua', sampleCount: 647 },
-  ja: { displayName: 'Japanese', fleursConfig: 'ja_jp', sampleCount: 647 },
-  ko: { displayName: 'Korean', fleursConfig: 'ko_kr', sampleCount: 647 },
-  zh: { displayName: 'Chinese', fleursConfig: 'cmn_hans_cn', sampleCount: 647 },
+  en: { 
+    displayName: 'English', 
+    dataset: 'MLCommons/peoples_speech',
+    config: 'clean',
+    split: 'test',
+    textField: 'text',
+    sampleCount: 100  // API returns up to 100 rows
+  },
+  fr: { 
+    displayName: 'French', 
+    dataset: 'facebook/multilingual_librispeech',
+    config: 'french',
+    split: 'test',
+    textField: 'transcript',
+    sampleCount: 100
+  },
+  de: { 
+    displayName: 'German', 
+    dataset: 'facebook/multilingual_librispeech',
+    config: 'german',
+    split: 'test',
+    textField: 'transcript',
+    sampleCount: 100
+  },
+  es: { 
+    displayName: 'Spanish', 
+    dataset: 'facebook/multilingual_librispeech',
+    config: 'spanish',
+    split: 'test',
+    textField: 'transcript',
+    sampleCount: 100
+  },
+  it: { 
+    displayName: 'Italian', 
+    dataset: 'facebook/multilingual_librispeech',
+    config: 'italian',
+    split: 'test',
+    textField: 'transcript',
+    sampleCount: 100
+  },
+  pt: { 
+    displayName: 'Portuguese', 
+    dataset: 'facebook/multilingual_librispeech',
+    config: 'portuguese',
+    split: 'test',
+    textField: 'transcript',
+    sampleCount: 100
+  },
+  nl: { 
+    displayName: 'Dutch', 
+    dataset: 'facebook/multilingual_librispeech',
+    config: 'dutch',
+    split: 'test',
+    textField: 'transcript',
+    sampleCount: 100
+  },
+  pl: { 
+    displayName: 'Polish', 
+    dataset: 'facebook/multilingual_librispeech',
+    config: 'polish',
+    split: 'test',
+    textField: 'transcript',
+    sampleCount: 100
+  },
+  // Note: MLS doesn't have ru, uk, ja, ko, zh - these languages won't have test samples
+  ru: { displayName: 'Russian', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
+  uk: { displayName: 'Ukrainian', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
+  ja: { displayName: 'Japanese', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
+  ko: { displayName: 'Korean', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
+  zh: { displayName: 'Chinese', dataset: null, config: null, split: null, textField: null, sampleCount: 0 },
 };
 
 /**
@@ -138,17 +197,23 @@ export function getLanguageConfig(langCode) {
 }
 
 /**
- * Get FLEURS dataset API URL for a random sample.
+ * Get HuggingFace dataset API URL for speech samples.
  * @param {string} langCode - ISO 639-1 language code
- * @param {number} [offset] - Specific offset (random if not provided)
- * @returns {{url: string, offset: number}|null} API URL and offset, or null if language not supported
+ * @returns {{url: string, textField: string, dataset: string}|null} API URL and metadata, or null if not available
  */
-export function getFleursApiUrl(langCode, offset) {
+export function getSpeechDatasetUrl(langCode) {
   const langConfig = LANGUAGES[langCode.toLowerCase()];
-  if (!langConfig) return null;
+  if (!langConfig || !langConfig.dataset) return null;
   
-  const randomOffset = offset ?? Math.floor(Math.random() * langConfig.sampleCount);
-  const url = `https://datasets-server.huggingface.co/rows?dataset=google/fleurs&config=${langConfig.fleursConfig}&split=test&offset=${randomOffset}&length=1`;
+  const url = `https://datasets-server.huggingface.co/first-rows?dataset=${langConfig.dataset}&config=${langConfig.config}&split=${langConfig.split}`;
   
-  return { url, offset: randomOffset };
+  return { 
+    url, 
+    textField: langConfig.textField,
+    dataset: langConfig.dataset,
+    sampleCount: langConfig.sampleCount
+  };
 }
+
+// Keep old function name as alias for backward compatibility
+export const getFleursApiUrl = getSpeechDatasetUrl;

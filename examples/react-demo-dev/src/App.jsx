@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ParakeetModel, getParakeetModel, MODELS, LANGUAGES, getFleursApiUrl } from 'parakeet.js';
+import { ParakeetModel, getParakeetModel, MODELS, LANGUAGES, getSpeechDatasetUrl } from 'parakeet.js';
 import './App.css';
 
 // Available models for selection
@@ -63,10 +63,16 @@ export default function App() {
     }
   }, [selectedModel]);
 
-  // Fetch random audio sample from FLEURS dataset
-  async function fetchSampleFromFLEURS() {
+  // Fetch random audio sample from HuggingFace speech dataset
+  async function fetchRandomSample() {
     if (!modelRef.current) {
       alert('Please load the model first');
+      return;
+    }
+
+    const datasetInfo = getSpeechDatasetUrl(selectedLanguage);
+    if (!datasetInfo) {
+      alert(`No test dataset available for ${LANGUAGES[selectedLanguage]?.displayName || selectedLanguage}. Try English, French, German, Spanish, Italian, Portuguese, Dutch, or Polish.`);
       return;
     }
 
@@ -75,63 +81,63 @@ export default function App() {
     setText('');
 
     try {
-      const fleursInfo = getFleursApiUrl(selectedLanguage);
-      if (!fleursInfo) {
-        throw new Error(`Language ${selectedLanguage} not supported in FLEURS`);
-      }
-
-      console.log(`[FLEURS] Fetching sample from: ${fleursInfo.url}`);
+      console.log(`[Dataset] Fetching from: ${datasetInfo.url}`);
       
-      // Fetch the dataset row
-      const response = await fetch(fleursInfo.url);
+      // Fetch the dataset rows
+      const response = await fetch(datasetInfo.url);
       if (!response.ok) {
-        throw new Error(`FLEURS API error: ${response.status}`);
+        throw new Error(`Dataset API error: ${response.status}`);
       }
       
       const data = await response.json();
-      const row = data.rows?.[0]?.row;
+      const rows = data.rows || [];
       
-      if (!row) {
-        throw new Error('No data returned from FLEURS API');
+      if (rows.length === 0) {
+        throw new Error('No data returned from dataset API');
       }
 
+      // Pick a random row
+      const randomIndex = Math.floor(Math.random() * rows.length);
+      const row = rows[randomIndex].row || rows[randomIndex];
+
       // Get the audio URL and transcription
-      const audioUrl = row.audio?.[0]?.src;
-      const transcription = row.transcription || row.raw_transcription || '';
+      const audio = row.audio;
+      const audioUrl = Array.isArray(audio) ? audio[0]?.src : audio?.src;
+      const transcription = row[datasetInfo.textField] || '';
       
       if (!audioUrl) {
-        throw new Error('No audio URL in FLEURS response');
+        throw new Error('No audio URL in dataset response');
       }
 
       setReferenceText(transcription);
-      console.log(`[FLEURS] Reference: "${transcription}"`);
-      console.log(`[FLEURS] Audio URL: ${audioUrl}`);
+      console.log(`[Dataset] Reference: "${transcription}"`);
+      console.log(`[Dataset] Audio URL: ${audioUrl.substring(0, 80)}...`);
 
       // Fetch and decode the audio
       setStatus('Fetching audio…');
       const audioRes = await fetch(audioUrl);
       const buf = await audioRes.arrayBuffer();
       
-      // Decode audio (FLEURS uses 16kHz)
+      // Decode audio (resampling to 16kHz)
       const audioCtx = new AudioContext({ sampleRate: 16000 });
       const decoded = await audioCtx.decodeAudioData(buf);
       const pcm = decoded.getChannelData(0);
       await audioCtx.close();
 
       // Transcribe
-      setStatus('Transcribing FLEURS sample…');
+      setStatus('Transcribing sample…');
       setIsTranscribing(true);
       
-      console.time('Transcribe-FLEURS');
+      console.time('Transcribe-Sample');
       const res = await modelRef.current.transcribe(pcm, 16000, {
         returnTimestamps: true,
         returnConfidences: true,
         frameStride
       });
-      console.timeEnd('Transcribe-FLEURS');
+      console.timeEnd('Transcribe-Sample');
 
       if (dumpDetail) {
-        console.log('[FLEURS] Transcription result:', res);
+        console.log('[Dataset] Transcription result:', res);
       }
 
       setText(res.utterance_text);
@@ -139,9 +145,10 @@ export default function App() {
 
       // Add to history
       const langName = LANGUAGES[selectedLanguage]?.displayName || selectedLanguage;
+      const datasetName = datasetInfo.dataset.split('/').pop();
       const newTranscription = {
         id: Date.now(),
-        filename: `FLEURS-${langName}-#${fleursInfo.offset}`,
+        filename: `${datasetName}-${langName}-#${randomIndex}`,
         text: res.utterance_text,
         reference: transcription,
         timestamp: new Date().toLocaleTimeString(),
@@ -155,8 +162,8 @@ export default function App() {
       setStatus('Model ready ✔');
 
     } catch (error) {
-      console.error('[FLEURS] Error:', error);
-      setStatus(`FLEURS error: ${error.message}`);
+      console.error('[Dataset] Error:', error);
+      setStatus(`Dataset error: ${error.message}`);
     } finally {
       setIsLoadingSample(false);
       setIsTranscribing(false);
@@ -420,7 +427,7 @@ export default function App() {
         </div>
       )}
 
-      {/* FLEURS Quick Test Section */}
+      {/* Quick Test Section */}
       <div className="controls" style={{ 
         backgroundColor: '#f0f7ff', 
         padding: '1rem', 
@@ -429,19 +436,24 @@ export default function App() {
         border: '1px solid #cce0ff'
       }}>
         <div style={{ marginBottom: '0.5rem' }}>
-          <strong>🎯 Quick Test with FLEURS Dataset</strong>
+          <strong>🎯 Quick Test with HuggingFace Speech Datasets</strong>
           <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#666' }}>
-            (Google's multilingual speech dataset)
+            (People's Speech, MLS)
           </span>
         </div>
         <button 
-          onClick={fetchSampleFromFLEURS}
-          disabled={status !== 'Model ready ✔' || isLoadingSample || isTranscribing}
+          onClick={fetchRandomSample}
+          disabled={status !== 'Model ready ✔' || isLoadingSample || isTranscribing || !LANGUAGES[selectedLanguage]?.dataset}
           className="primary"
           style={{ marginRight: '1rem' }}
         >
           {isLoadingSample ? '⏳ Loading…' : `🎲 Load Random ${LANGUAGES[selectedLanguage]?.displayName || selectedLanguage} Sample`}
         </button>
+        {!LANGUAGES[selectedLanguage]?.dataset && (
+          <span style={{ fontSize: '0.85em', color: '#d32f2f' }}>
+            ⚠️ No test dataset available for this language
+          </span>
+        )}
         {referenceText && (
           <div style={{ marginTop: '0.75rem' }}>
             <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 'bold', fontSize: '0.9em' }}>
