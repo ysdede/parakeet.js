@@ -1,13 +1,20 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build and Distribution
+dist/
+
+# Environment and Local Config
 .env
-.env.local
 .env.development.local
-.env.test.local
+.env.local
 .env.production.local
+.env.test.local
 *.pem
+
+# Documentation and Scripts
 docs/
 scripts/
 
-# Internal planning notes
+# Internal
 *OPTIMIZATION*.md
