@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
     paths:
-      - 'examples/hf-spaces-demo/**'
+      - 'examples/demo/**'
       - '.github/workflows/deploy-gh-pages.yml'
   workflow_dispatch:  # Allow manual trigger
 
@@ -26,14 +26,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: examples/hf-spaces-demo/package-lock.json
+          cache-dependency-path: examples/demo/package-lock.json
           
       - name: Install dependencies
-        working-directory: examples/hf-spaces-demo
+        working-directory: examples/demo
         run: npm ci
         
       - name: Build
-        working-directory: examples/hf-spaces-demo
+        working-directory: examples/demo
         run: npm run build
         
       - name: Prepare deployment files
@@ -42,7 +42,7 @@ jobs:
           mkdir -p deploy_temp
           
           # Copy built assets
-          cp -r examples/hf-spaces-demo/dist/* deploy_temp/
+          cp -r examples/demo/dist/* deploy_temp/
           
           # Add .nojekyll to prevent Jekyll processing
           touch deploy_temp/.nojekyll

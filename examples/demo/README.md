@@ -8,7 +8,7 @@ This is the unified demo application for parakeet.js. It can be used for:
 ## Quick Start
 
 ```bash
-cd examples/hf-spaces-demo
+cd examples/demo
 npm install
 ```
 
@@ -81,7 +81,7 @@ This will:
 GitHub Pages deployment is automated via GitHub Actions.
 
 **Automatic Deployment:**
-Pushing changes to `examples/hf-spaces-demo/**` on the `master` branch triggers the workflow.
+Pushing changes to `examples/demo/**` on the `master` branch triggers the workflow.
 
 **Manual Trigger:**
 ```bash
@@ -111,7 +111,7 @@ Since GitHub Pages doesn't support custom headers, we use `coi-serviceworker.js`
 ## Directory Structure
 
 ```
-hf-spaces-demo/
+demo/
 ├── src/
 │   ├── App.jsx          # Main React component
 │   ├── App.css          # Styles
