@@ -10,7 +10,7 @@ import { OnnxPreprocessor } from './preprocessor.js';
  * NOTE: This is an *early* scaffold – the `transcribe` method is TODO.
  */
 export class ParakeetModel {
-  constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s)=>s }) {
+  constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s) => s }) {
     this.tokenizer = tokenizer;
     this.encoderSession = encoderSession;
     this.joinerSession = joinerSession;
@@ -86,7 +86,7 @@ export class ParakeetModel {
     // 1. Init ONNX Runtime
     let ortBackend = backend;
     if (backend.startsWith('webgpu')) {
-        ortBackend = 'webgpu';
+      ortBackend = 'webgpu';
     }
     const ort = await initOrt({ backend: ortBackend, wasmPaths, numThreads: cpuThreads });
 
@@ -137,24 +137,24 @@ export class ParakeetModel {
 
     console.log(`[Parakeet.js] Creating ONNX sessions with execution mode '${backend}'. Providers:`, baseSessionOptions.executionProviders);
     if (verbose) {
-        console.log('[Parakeet.js] Verbose logging enabled for ONNX Runtime.');
+      console.log('[Parakeet.js] Verbose logging enabled for ONNX Runtime.');
     }
 
     // Create separate options for sessions that might have external data
     const encoderSessionOptions = { ...baseSessionOptions };
     if (encoderDataUrl && filenames?.encoder) {
-        encoderSessionOptions.externalData = [{
-            data: encoderDataUrl,
-            path: filenames.encoder + '.data',
-        }];
+      encoderSessionOptions.externalData = [{
+        data: encoderDataUrl,
+        path: filenames.encoder + '.data',
+      }];
     }
 
     const decoderSessionOptions = { ...baseSessionOptions };
     if (decoderDataUrl && filenames?.decoder) {
-        decoderSessionOptions.externalData = [{
-            data: decoderDataUrl,
-            path: filenames.decoder + '.data',
-        }];
+      decoderSessionOptions.externalData = [{
+        data: decoderDataUrl,
+        path: filenames.decoder + '.data',
+      }];
     }
 
     // In hybrid mode, the decoder is always run on WASM to avoid per-step
@@ -182,12 +182,12 @@ export class ParakeetModel {
 
     const tokenizerPromise = ParakeetTokenizer.fromUrl(tokenizerUrl);
     // Force preprocessor to always use WASM with optimal threading/SIMD settings
-    const preprocPromise = Promise.resolve(new OnnxPreprocessor(preprocessorUrl, { 
+    const preprocPromise = Promise.resolve(new OnnxPreprocessor(preprocessorUrl, {
       backend: 'wasm', // Always use WASM for preprocessor regardless of main backend
-      wasmPaths, 
-      enableProfiling, 
+      wasmPaths,
+      enableProfiling,
       enableGraphCapture: false, // WASM doesn't need graph capture
-      numThreads: cpuThreads 
+      numThreads: cpuThreads
     }));
 
     let encoderSession, joinerSession;
@@ -332,7 +332,7 @@ export class ParakeetModel {
         tokens: [],
         confidence_scores: { overall_log_prob: null, frame: null, frame_avg: null },
         metrics: perfEnabled ? {
-          preprocess_ms: +tPreproc.toFixed(1), encode_ms: 0, decode_ms: 0, tokenize_ms: 0, total_ms: +( (performance.now() - t0).toFixed(1) ), rtf: 0
+          preprocess_ms: +tPreproc.toFixed(1), encode_ms: 0, decode_ms: 0, tokenize_ms: 0, total_ms: +((performance.now() - t0).toFixed(1)), rtf: 0
         } : null,
         is_final: !opts?.incremental,
       };
@@ -352,19 +352,19 @@ export class ParakeetModel {
     }
 
     // Transpose encoder output [B, D, T] ➔ [T, D] for B=1
-    const [ , D, Tenc ] = enc.dims;
-    
+    const [, D, Tenc] = enc.dims;
+
     // Fast-path check: if already in [T, D] format, skip transpose
     let transposed;
     if (enc.dims.length === 3 && enc.dims[0] === 1 && enc.dims[1] === D && enc.dims[2] === Tenc) {
       // Need to transpose from [1, D, T] to [T, D]
       transposed = new Float32Array(Tenc * D);
       const encData = enc.data;
-      
+
       // Optimized transpose with tight loops and better cache locality
       // Process in blocks to improve cache performance
       const blockSize = Math.min(64, D); // Tune block size for cache efficiency
-      
+
       for (let dBlock = 0; dBlock < D; dBlock += blockSize) {
         const dEnd = Math.min(dBlock + blockSize, D);
         for (let t = 0; t < Tenc; t++) {
@@ -397,7 +397,7 @@ export class ParakeetModel {
     const TIME_STRIDE = this.subsampling * this.windowStride;
     let startFrame = 0;
     let effectiveTimeOffset = timeOffset;  // Use the passed-in timeOffset
-    
+
     // NEW: Initialize decoder state from previous chunk if provided (streaming mode)
     let decoderState = null;
     if (previousDecoderState) {
@@ -405,7 +405,7 @@ export class ParakeetModel {
       decoderState = this._restoreDecoderState(previousDecoderState);
       if (debug) console.log('[Parakeet] Restored decoder state from previous chunk');
     }
-    
+
     let prefixFrames = 0;
     const inc = opts.incremental;
     if (inc && inc.cacheKey) {
@@ -413,17 +413,18 @@ export class ParakeetModel {
       const cached = this._incrementalCache.get(inc.cacheKey);
       if (cached && cached.prefixFrames === prefixFrames && cached.D === D) {
         startFrame = prefixFrames;
-        timeOffset = prefixFrames * TIME_STRIDE;
+        effectiveTimeOffset = prefixFrames * TIME_STRIDE;  // FIXED: use mutable variable
         decoderState = this._restoreDecoderState(cached.state);
       }
     }
     let emittedTokens = 0;
 
+
     const decStartTime = perfEnabled ? performance.now() : 0;
 
     // When not using cache, we will capture decoder state at prefixFrames once
     let prefixStateCaptured = startFrame > 0 || prefixFrames === 0;
-    for (let t = startFrame; t < Tenc; ) {
+    for (let t = startFrame; t < Tenc;) {
       // Copy frame data to reusable buffer
       const frameStart = t * D;
       for (let i = 0; i < D; i++) {
@@ -509,20 +510,20 @@ export class ParakeetModel {
         const total = performance.now() - t0;
         const audioDur = audio.length / sampleRate;
         const rtf = audioDur / (total / 1000);
-        console.log(`[Perf] RTF: ${rtf.toFixed(2)}x (audio ${audioDur.toFixed(2)} s, time ${(total/1000).toFixed(2)} s)`);
-        console.table({Preprocess:`${tPreproc.toFixed(1)} ms`, Encode:`${tEncode.toFixed(1)} ms`, Decode:`${tDecode.toFixed(1)} ms`, Tokenize:`${tToken.toFixed(1)} ms`, Total:`${total.toFixed(1)} ms`});
+        console.log(`[Perf] RTF: ${rtf.toFixed(2)}x (audio ${audioDur.toFixed(2)} s, time ${(total / 1000).toFixed(2)} s)`);
+        console.table({ Preprocess: `${tPreproc.toFixed(1)} ms`, Encode: `${tEncode.toFixed(1)} ms`, Decode: `${tDecode.toFixed(1)} ms`, Tokenize: `${tToken.toFixed(1)} ms`, Total: `${total.toFixed(1)} ms` });
       }
       const metrics = perfEnabled ? {
         preprocess_ms: +tPreproc.toFixed(1),
         encode_ms: +tEncode.toFixed(1),
         decode_ms: +tDecode.toFixed(1),
         tokenize_ms: +tToken.toFixed(1),
-        total_ms: +( (performance.now() - t0).toFixed(1) ),
+        total_ms: +((performance.now() - t0).toFixed(1)),
         rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2)
       } : null;
-      
+
       const result = { utterance_text: text, words: [], metrics, is_final: !previousDecoderState };
-      
+
       // NEW: Include decoder state for streaming continuation
       if (returnDecoderState) {
         result.decoderState = this._snapshotDecoderState(decoderState);
@@ -531,7 +532,7 @@ export class ParakeetModel {
       if (returnTokenIds) {
         result.tokenIds = ids.slice();
       }
-      
+
       return result;
     }
 
@@ -559,7 +560,7 @@ export class ParakeetModel {
       // accumulate into words
       if (isWordStart) {
         if (currentWord) {
-          const avg = wordConfs.length ? wordConfs.reduce((a,b)=>a+b,0)/wordConfs.length : 0;
+          const avg = wordConfs.length ? wordConfs.reduce((a, b) => a + b, 0) / wordConfs.length : 0;
           words.push({ text: currentWord, start_time: +wordStart.toFixed(3), end_time: +wordEnd.toFixed(3), confidence: +avg.toFixed(4) });
         }
         currentWord = cleanTok;
@@ -573,19 +574,19 @@ export class ParakeetModel {
     });
 
     if (currentWord) {
-      const avg = wordConfs.length ? wordConfs.reduce((a,b)=>a+b,0)/wordConfs.length : 0;
+      const avg = wordConfs.length ? wordConfs.reduce((a, b) => a + b, 0) / wordConfs.length : 0;
       words.push({ text: currentWord, start_time: +wordStart.toFixed(3), end_time: +wordEnd.toFixed(3), confidence: +avg.toFixed(4) });
     }
 
-    const avgWordConf = words.length && returnConfidences ? words.reduce((a,b)=>a+b.confidence,0)/words.length : null;
-    const avgTokenConf = tokensDetailed.length && returnConfidences ? tokensDetailed.reduce((a,b)=>a+(b.confidence||0),0)/tokensDetailed.length : null;
+    const avgWordConf = words.length && returnConfidences ? words.reduce((a, b) => a + b.confidence, 0) / words.length : null;
+    const avgTokenConf = tokensDetailed.length && returnConfidences ? tokensDetailed.reduce((a, b) => a + (b.confidence || 0), 0) / tokensDetailed.length : null;
 
     if (perfEnabled) {
       const total = performance.now() - t0;
       const audioDur = audio.length / sampleRate;
       const rtf = audioDur / (total / 1000);
-      console.log(`[Perf] RTF: ${rtf.toFixed(2)}x (audio ${audioDur.toFixed(2)} s, time ${(total/1000).toFixed(2)} s)`);
-      console.table({Preprocess:`${tPreproc.toFixed(1)} ms`, Encode:`${tEncode.toFixed(1)} ms`, Decode:`${tDecode.toFixed(1)} ms`, Tokenize:`${tToken.toFixed(1)} ms`, Total:`${total.toFixed(1)} ms`});
+      console.log(`[Perf] RTF: ${rtf.toFixed(2)}x (audio ${audioDur.toFixed(2)} s, time ${(total / 1000).toFixed(2)} s)`);
+      console.table({ Preprocess: `${tPreproc.toFixed(1)} ms`, Encode: `${tEncode.toFixed(1)} ms`, Decode: `${tDecode.toFixed(1)} ms`, Tokenize: `${tToken.toFixed(1)} ms`, Total: `${total.toFixed(1)} ms` });
     }
 
     const result = {
@@ -593,12 +594,12 @@ export class ParakeetModel {
       words,
       tokens: tokensDetailed,
       confidence_scores: returnConfidences ? {
-        token: tokenConfs.map(c=>+c.toFixed(4)),
+        token: tokenConfs.map(c => +c.toFixed(4)),
         token_avg: +avgTokenConf?.toFixed(4),
-        word: words.map(w=>w.confidence),
+        word: words.map(w => w.confidence),
         word_avg: +avgWordConf?.toFixed(4),
-        frame: frameConfs.map(f=>+f.toFixed(4)),
-        frame_avg: frameConfs.length ? +(frameConfs.reduce((a,b)=>a+b,0)/frameConfs.length).toFixed(4) : null,
+        frame: frameConfs.map(f => +f.toFixed(4)),
+        frame_avg: frameConfs.length ? +(frameConfs.reduce((a, b) => a + b, 0) / frameConfs.length).toFixed(4) : null,
         overall_log_prob: +overallLogProb.toFixed(6)
       } : { overall_log_prob: null, frame: null, frame_avg: null },
       metrics: perfEnabled ? {
@@ -606,12 +607,12 @@ export class ParakeetModel {
         encode_ms: +tEncode.toFixed(1),
         decode_ms: +tDecode.toFixed(1),
         tokenize_ms: +tToken.toFixed(1),
-        total_ms: +( (performance.now() - t0).toFixed(1) ),
+        total_ms: +((performance.now() - t0).toFixed(1)),
         rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2)
       } : null,
       is_final: !inc && !previousDecoderState, // mark non-final when incremental or streaming mode
     };
-    
+
     // NEW: Include decoder state for streaming continuation
     if (returnDecoderState) {
       result.decoderState = this._snapshotDecoderState(decoderState);
@@ -620,7 +621,7 @@ export class ParakeetModel {
     if (returnTokenIds) {
       result.tokenIds = ids.slice();
     }
-    
+
     return result;
   }
 
@@ -645,8 +646,8 @@ export class ParakeetModel {
    * summary object for further inspection.
    */
   endProfiling() {
-    try { this.encoderSession?.endProfiling(); } catch(e) { /* ignore */ }
-    try { this.joinerSession?.endProfiling(); } catch(e) { /* ignore */ }
+    try { this.encoderSession?.endProfiling(); } catch (e) { /* ignore */ }
+    try { this.joinerSession?.endProfiling(); } catch (e) { /* ignore */ }
 
     const FS = this.ort?.env?.wasm?.FS;
     if (!FS) {
@@ -724,7 +725,7 @@ export class StatefulStreamingTranscriber {
       sampleRate: opts.sampleRate ?? 16000,
       debug: opts.debug ?? false,
     };
-    
+
     // Internal state
     this._decoderState = null;
     this._currentOffset = 0;
@@ -733,7 +734,7 @@ export class StatefulStreamingTranscriber {
     this._chunkCount = 0;
     this._isFinalized = false;
   }
-  
+
   /**
    * Process an audio chunk and return the cumulative transcription.
    * 
@@ -744,9 +745,9 @@ export class StatefulStreamingTranscriber {
     if (this._isFinalized) {
       throw new Error('Streamer is finalized. Create a new instance to process more audio.');
     }
-    
+
     const chunkDuration = audio.length / this.opts.sampleRate;
-    
+
     // Transcribe with state continuation
     const result = await this.model.transcribe(audio, this.opts.sampleRate, {
       returnTimestamps: this.opts.returnTimestamps,
@@ -756,48 +757,48 @@ export class StatefulStreamingTranscriber {
       returnDecoderState: true,
       timeOffset: this._currentOffset,
     });
-    
+
     // Update internal state
     this._decoderState = result.decoderState;
     this._currentOffset += chunkDuration;
     this._chunkCount++;
-    
+
     // Append new words to cumulative list
     if (result.words && result.words.length > 0) {
       this._totalWords.push(...result.words);
     }
-    
+
     // Append token IDs if tracking
     if (this.opts.returnTokenIds && result.tokenIds) {
       this._totalTokenIds.push(...result.tokenIds);
     }
-    
+
     if (this.opts.debug) {
       console.log(`[Streamer] Chunk ${this._chunkCount}: "${result.utterance_text}" (${result.words?.length || 0} words, offset: ${this._currentOffset.toFixed(2)}s)`);
     }
-    
+
     // Return cumulative result
     return {
       // Current chunk text
       chunkText: result.utterance_text,
       chunkWords: result.words || [],
-      
+
       // Cumulative transcript (NO MERGING - just concatenation!)
       text: this._totalWords.map(w => w.text).join(' '),
       words: this._totalWords.slice(),
-      
+
       // Metadata
       totalDuration: this._currentOffset,
       chunkCount: this._chunkCount,
       is_final: false,
-      
+
       // Optional data
       ...(this.opts.returnTokenIds ? { tokenIds: this._totalTokenIds.slice() } : {}),
       ...(this.opts.returnConfidences && result.confidence_scores ? { confidence_scores: result.confidence_scores } : {}),
       metrics: result.metrics,
     };
   }
-  
+
   /**
    * Finalize the streaming session and return the complete transcript.
    * After calling finalize(), no more chunks can be processed.
@@ -806,7 +807,7 @@ export class StatefulStreamingTranscriber {
    */
   finalize() {
     this._isFinalized = true;
-    
+
     return {
       text: this._totalWords.map(w => w.text).join(' '),
       words: this._totalWords.slice(),
@@ -816,7 +817,7 @@ export class StatefulStreamingTranscriber {
       ...(this.opts.returnTokenIds ? { tokenIds: this._totalTokenIds.slice() } : {}),
     };
   }
-  
+
   /**
    * Reset the streamer to process a new audio stream.
    */
@@ -828,7 +829,7 @@ export class StatefulStreamingTranscriber {
     this._chunkCount = 0;
     this._isFinalized = false;
   }
-  
+
   /**
    * Get current state for inspection/debugging.
    */
