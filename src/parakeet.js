@@ -277,6 +277,22 @@ export class ParakeetModel {
 
   /**
    * Transcribe 16-kHz mono PCM. Returns full rich output (timestamps/confidences opt-in).
+   * 
+   * Streaming Mode (NEW):
+   * Pass `previousDecoderState` from a prior call to continue decoding from that state.
+   * Set `returnDecoderState: true` to receive the decoder state for the next chunk.
+   * Use `timeOffset` to adjust all timestamps by a fixed offset (for absolute timeline).
+   * 
+   * @param {Float32Array} audio - 16-kHz mono PCM audio samples
+   * @param {number} sampleRate - Sample rate (default 16000)
+   * @param {Object} opts - Transcription options
+   * @param {boolean} opts.returnTimestamps - Include word/token timestamps
+   * @param {boolean} opts.returnConfidences - Include confidence scores
+   * @param {number} opts.temperature - Decoding temperature (default 1.0 for greedy)
+   * @param {Object} opts.previousDecoderState - Decoder state from previous chunk (for streaming)
+   * @param {boolean} opts.returnDecoderState - Return decoder state for next chunk
+   * @param {number} opts.timeOffset - Add this offset to all timestamps (seconds)
+   * @param {boolean} opts.returnTokenIds - Include raw token IDs in output
    */
   async transcribe(audio, sampleRate = 16000, opts = {}) {
     const {
@@ -286,6 +302,11 @@ export class ParakeetModel {
       debug = false,
       skipCMVN = false,
       frameStride = 1,
+      // NEW: Streaming options
+      previousDecoderState = null,  // Accept state from previous chunk
+      returnDecoderState = false,   // Return state for next chunk
+      timeOffset = 0,               // Offset to add to all timestamps
+      returnTokenIds = false,       // Include raw token IDs
     } = opts;
 
     const perfEnabled = true; // always collect and log timings
@@ -375,8 +396,16 @@ export class ParakeetModel {
     // Incremental decode settings
     const TIME_STRIDE = this.subsampling * this.windowStride;
     let startFrame = 0;
-    let timeOffset = 0;
+    let effectiveTimeOffset = timeOffset;  // Use the passed-in timeOffset
+    
+    // NEW: Initialize decoder state from previous chunk if provided (streaming mode)
     let decoderState = null;
+    if (previousDecoderState) {
+      // Restore state from the snapshot format
+      decoderState = this._restoreDecoderState(previousDecoderState);
+      if (debug) console.log('[Parakeet] Restored decoder state from previous chunk');
+    }
+    
     let prefixFrames = 0;
     const inc = opts.incremental;
     if (inc && inc.cacheKey) {
@@ -432,8 +461,9 @@ export class ParakeetModel {
         ids.push(maxId);
         if (returnTimestamps) {
           const durFrames = step > 0 ? step : 1;
-          const start = timeOffset + (t * TIME_STRIDE);
-          const end = timeOffset + ((t + durFrames) * TIME_STRIDE);
+          // Use effectiveTimeOffset for streaming mode
+          const start = effectiveTimeOffset + (t * TIME_STRIDE);
+          const end = effectiveTimeOffset + ((t + durFrames) * TIME_STRIDE);
           tokenTimes.push([start, end]);
         }
         if (returnConfidences) tokenConfs.push(confVal);
@@ -490,7 +520,19 @@ export class ParakeetModel {
         total_ms: +( (performance.now() - t0).toFixed(1) ),
         rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2)
       } : null;
-      return { utterance_text: text, words: [], metrics, is_final: true };
+      
+      const result = { utterance_text: text, words: [], metrics, is_final: !previousDecoderState };
+      
+      // NEW: Include decoder state for streaming continuation
+      if (returnDecoderState) {
+        result.decoderState = this._snapshotDecoderState(decoderState);
+      }
+      // NEW: Include raw token IDs
+      if (returnTokenIds) {
+        result.tokenIds = ids.slice();
+      }
+      
+      return result;
     }
 
     // --- Build words & detailed token arrays ---------------------------
@@ -546,7 +588,7 @@ export class ParakeetModel {
       console.table({Preprocess:`${tPreproc.toFixed(1)} ms`, Encode:`${tEncode.toFixed(1)} ms`, Decode:`${tDecode.toFixed(1)} ms`, Tokenize:`${tToken.toFixed(1)} ms`, Total:`${total.toFixed(1)} ms`});
     }
 
-    return {
+    const result = {
       utterance_text: text,
       words,
       tokens: tokensDetailed,
@@ -567,8 +609,34 @@ export class ParakeetModel {
         total_ms: +( (performance.now() - t0).toFixed(1) ),
         rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2)
       } : null,
-      is_final: !inc, // mark non-final when incremental mode is used
+      is_final: !inc && !previousDecoderState, // mark non-final when incremental or streaming mode
     };
+    
+    // NEW: Include decoder state for streaming continuation
+    if (returnDecoderState) {
+      result.decoderState = this._snapshotDecoderState(decoderState);
+    }
+    // NEW: Include raw token IDs for advanced merging
+    if (returnTokenIds) {
+      result.tokenIds = ids.slice();
+    }
+    
+    return result;
+  }
+
+  /**
+   * Create a stateful streaming transcriber for this model.
+   * This provides a convenient API for processing sequential audio chunks
+   * without needing complex merging logic.
+   * 
+   * @param {Object} opts - Streaming options
+   * @param {number} opts.chunkDuration - Expected chunk duration in seconds (for timestamp calculation)
+   * @param {boolean} opts.returnTimestamps - Include timestamps in output
+   * @param {boolean} opts.returnConfidences - Include confidence scores
+   * @returns {StatefulStreamingTranscriber}
+   */
+  createStreamingTranscriber(opts = {}) {
+    return new StatefulStreamingTranscriber(this, opts);
   }
 
   /**
@@ -613,4 +681,164 @@ export class ParakeetModel {
     console.table(summary);
     return summary;
   }
-} 
+}
+
+/**
+ * StatefulStreamingTranscriber - High-level API for streaming transcription.
+ * 
+ * This class wraps a ParakeetModel and provides a simple interface for processing
+ * sequential audio chunks without complex merging logic. It maintains decoder state
+ * between chunks, allowing for seamless continuation of transcription.
+ * 
+ * Usage:
+ * ```javascript
+ * const model = await fromHub('parakeet-tdt-0.6b-v3');
+ * const streamer = model.createStreamingTranscriber({ returnTimestamps: true });
+ * 
+ * // Process audio chunks sequentially
+ * const result1 = await streamer.processChunk(audioChunk1);  // "Hello"
+ * const result2 = await streamer.processChunk(audioChunk2);  // "Hello world"
+ * const result3 = await streamer.processChunk(audioChunk3);  // "Hello world how are you"
+ * 
+ * // Get final result
+ * const final = streamer.finalize();
+ * ```
+ */
+export class StatefulStreamingTranscriber {
+  /**
+   * Create a streaming transcriber.
+   * @param {ParakeetModel} model - The Parakeet model to use
+   * @param {Object} opts - Options
+   * @param {boolean} opts.returnTimestamps - Include timestamps (default: true)
+   * @param {boolean} opts.returnConfidences - Include confidence scores (default: false)
+   * @param {boolean} opts.returnTokenIds - Include raw token IDs (default: false)
+   * @param {number} opts.sampleRate - Audio sample rate (default: 16000)
+   * @param {boolean} opts.debug - Enable debug logging (default: false)
+   */
+  constructor(model, opts = {}) {
+    this.model = model;
+    this.opts = {
+      returnTimestamps: opts.returnTimestamps ?? true,
+      returnConfidences: opts.returnConfidences ?? false,
+      returnTokenIds: opts.returnTokenIds ?? false,
+      sampleRate: opts.sampleRate ?? 16000,
+      debug: opts.debug ?? false,
+    };
+    
+    // Internal state
+    this._decoderState = null;
+    this._currentOffset = 0;
+    this._totalWords = [];
+    this._totalTokenIds = [];
+    this._chunkCount = 0;
+    this._isFinalized = false;
+  }
+  
+  /**
+   * Process an audio chunk and return the cumulative transcription.
+   * 
+   * @param {Float32Array} audio - Audio samples (16kHz mono PCM)
+   * @returns {Promise<Object>} Transcription result with cumulative text and words
+   */
+  async processChunk(audio) {
+    if (this._isFinalized) {
+      throw new Error('Streamer is finalized. Create a new instance to process more audio.');
+    }
+    
+    const chunkDuration = audio.length / this.opts.sampleRate;
+    
+    // Transcribe with state continuation
+    const result = await this.model.transcribe(audio, this.opts.sampleRate, {
+      returnTimestamps: this.opts.returnTimestamps,
+      returnConfidences: this.opts.returnConfidences,
+      returnTokenIds: this.opts.returnTokenIds,
+      previousDecoderState: this._decoderState,
+      returnDecoderState: true,
+      timeOffset: this._currentOffset,
+    });
+    
+    // Update internal state
+    this._decoderState = result.decoderState;
+    this._currentOffset += chunkDuration;
+    this._chunkCount++;
+    
+    // Append new words to cumulative list
+    if (result.words && result.words.length > 0) {
+      this._totalWords.push(...result.words);
+    }
+    
+    // Append token IDs if tracking
+    if (this.opts.returnTokenIds && result.tokenIds) {
+      this._totalTokenIds.push(...result.tokenIds);
+    }
+    
+    if (this.opts.debug) {
+      console.log(`[Streamer] Chunk ${this._chunkCount}: "${result.utterance_text}" (${result.words?.length || 0} words, offset: ${this._currentOffset.toFixed(2)}s)`);
+    }
+    
+    // Return cumulative result
+    return {
+      // Current chunk text
+      chunkText: result.utterance_text,
+      chunkWords: result.words || [],
+      
+      // Cumulative transcript (NO MERGING - just concatenation!)
+      text: this._totalWords.map(w => w.text).join(' '),
+      words: this._totalWords.slice(),
+      
+      // Metadata
+      totalDuration: this._currentOffset,
+      chunkCount: this._chunkCount,
+      is_final: false,
+      
+      // Optional data
+      ...(this.opts.returnTokenIds ? { tokenIds: this._totalTokenIds.slice() } : {}),
+      ...(this.opts.returnConfidences && result.confidence_scores ? { confidence_scores: result.confidence_scores } : {}),
+      metrics: result.metrics,
+    };
+  }
+  
+  /**
+   * Finalize the streaming session and return the complete transcript.
+   * After calling finalize(), no more chunks can be processed.
+   * 
+   * @returns {Object} Final transcription result
+   */
+  finalize() {
+    this._isFinalized = true;
+    
+    return {
+      text: this._totalWords.map(w => w.text).join(' '),
+      words: this._totalWords.slice(),
+      totalDuration: this._currentOffset,
+      chunkCount: this._chunkCount,
+      is_final: true,
+      ...(this.opts.returnTokenIds ? { tokenIds: this._totalTokenIds.slice() } : {}),
+    };
+  }
+  
+  /**
+   * Reset the streamer to process a new audio stream.
+   */
+  reset() {
+    this._decoderState = null;
+    this._currentOffset = 0;
+    this._totalWords = [];
+    this._totalTokenIds = [];
+    this._chunkCount = 0;
+    this._isFinalized = false;
+  }
+  
+  /**
+   * Get current state for inspection/debugging.
+   */
+  getState() {
+    return {
+      hasDecoderState: this._decoderState !== null,
+      currentOffset: this._currentOffset,
+      wordCount: this._totalWords.length,
+      chunkCount: this._chunkCount,
+      isFinalized: this._isFinalized,
+    };
+  }
+}

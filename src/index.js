@@ -1,4 +1,4 @@
-export { ParakeetModel } from './parakeet.js';
+export { ParakeetModel, StatefulStreamingTranscriber } from './parakeet.js';
 export { getModelFile, getModelText, getParakeetModel } from './hub.js';
 export { MODELS, LANGUAGE_NAMES, DEFAULT_MODEL, getModelConfig, getModelKeyFromRepoId, supportsLanguage, listModels, getLanguageName } from './models.js';
 
