@@ -4,16 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="BoncukJS - Privacy-first real-time transcription. Your audio stays on your device." />
+  <meta name="theme-color" content="#3b82f6" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>BoncukJS - Real-time Transcription</title>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
   
   <!-- Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
   
-  <!-- Favicon -->
+  <!-- Favicon & Apple Touch Icon -->
   <link rel="icon" type="image/x-icon" href="/src/assets/favicon.ico" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 </head>
 <body>
   <div id="root"></div>
   <script type="module" src="/src/index.tsx"></script>
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('[App] SW registered:', reg.scope))
+          .catch((err) => console.warn('[App] SW registration failed:', err));
+      });
+    }
+  </script>
 </body>
 </html>

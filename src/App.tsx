@@ -229,13 +229,21 @@ const StatusBar: Component = () => {
         {/* Backend indicator */}
         <Show when={appStore.modelState() === 'ready'}>
           <span class={`px-1.5 py-0.5 rounded text-[10px] font-medium ${isCompatibilityMode()
-              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
             }`}>
             {appStore.backend().toUpperCase()}
           </span>
         </Show>
       </div>
+
+      {/* Offline indicator - Story 3.2 */}
+      <Show when={!appStore.isOnline()}>
+        <div class="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full text-xs text-red-700 dark:text-red-400 animate-pulse">
+          <span class="material-icons-round text-sm">wifi_off</span>
+          <span>Offline</span>
+        </div>
+      </Show>
 
       {/* Compatibility mode tooltip */}
       <Show when={isCompatibilityMode() && appStore.modelState() === 'ready'}>
@@ -246,7 +254,7 @@ const StatusBar: Component = () => {
       </Show>
 
       {/* Offline ready indicator */}
-      <Show when={appStore.isOfflineReady() && appStore.modelState() === 'ready'}>
+      <Show when={appStore.isOfflineReady() && appStore.modelState() === 'ready' && appStore.isOnline()}>
         <div class="flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full text-xs text-green-700 dark:text-green-400">
           <span class="material-icons-round text-sm">cloud_off</span>
           <span>Offline Ready</span>
@@ -255,6 +263,7 @@ const StatusBar: Component = () => {
     </div>
   );
 };
+
 
 
 // Privacy badge component with tooltip

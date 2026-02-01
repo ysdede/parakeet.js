@@ -5,7 +5,7 @@
  * Manages recording state, model status, and transcript.
  */
 
-import { createSignal, createRoot } from 'solid-js';
+import { createSignal, createRoot, onCleanup } from 'solid-js';
 import type { RecordingState, ModelState, BackendType } from '../types';
 
 function createAppStore() {
@@ -29,6 +29,16 @@ function createAppStore() {
 
   // Offline state
   const [isOfflineReady, setIsOfflineReady] = createSignal(false);
+  const [isOnline, setIsOnline] = createSignal(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  // Network status listeners
+  if (typeof window !== 'undefined') {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+  }
 
   // Actions
   const startRecording = () => {
@@ -72,6 +82,7 @@ function createAppStore() {
     audioLevel,
     isSpeechDetected,
     isOfflineReady,
+    isOnline,
 
     // Setters (for internal use)
     setRecordingState,
@@ -97,3 +108,4 @@ function createAppStore() {
 
 // Create singleton store
 export const appStore = createRoot(createAppStore);
+
