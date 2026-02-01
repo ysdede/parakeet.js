@@ -5,12 +5,67 @@
  * Uses state-preserving streaming (NVIDIA approach) via parakeet.js.
  */
 
-import { Component, Show } from 'solid-js';
+import { Component, Show, onMount, onCleanup } from 'solid-js';
 import { appStore } from './stores/appStore';
+import { CompactWaveform, EnergyMeter } from './components';
+import { AudioEngine } from './lib/audio';
 
-// Placeholder components - to be implemented in subsequent stories
+// Audio engine instance (singleton)
+let audioEngine: AudioEngine | null = null;
+let energyPollInterval: number | undefined;
+
 const Header: Component = () => {
   const isRecording = () => appStore.recordingState() === 'recording';
+  
+  // Handle recording toggle
+  const toggleRecording = async () => {
+    if (isRecording()) {
+      // Stop recording
+      if (energyPollInterval) {
+        clearInterval(energyPollInterval);
+        energyPollInterval = undefined;
+      }
+      if (audioEngine) {
+        audioEngine.stop();
+      }
+      appStore.setAudioLevel(0);
+      appStore.stopRecording();
+    } else {
+      // Start recording
+      try {
+        if (!audioEngine) {
+          audioEngine = new AudioEngine({
+            sampleRate: 16000,
+            bufferDuration: 30,
+            energyThreshold: 0.02,
+            minSpeechDuration: 100,
+            minSilenceDuration: 300,
+          });
+          
+          // Subscribe to speech segments
+          audioEngine.onSpeechSegment((segment) => {
+            console.log('Speech segment:', segment);
+            appStore.setIsSpeechDetected(true);
+            // TODO: Send to transcription engine
+          });
+        }
+        
+        await audioEngine.start();
+        appStore.startRecording();
+        
+        // Poll energy level for visualization
+        energyPollInterval = window.setInterval(() => {
+          if (audioEngine) {
+            appStore.setAudioLevel(audioEngine.getCurrentEnergy());
+            appStore.setIsSpeechDetected(audioEngine.isSpeechActive());
+          }
+        }, 50);
+        
+      } catch (err) {
+        console.error('Failed to start recording:', err);
+      }
+    }
+  };
   
   return (
     <header class="flex-none p-4 pb-0">
@@ -24,7 +79,7 @@ const Header: Component = () => {
         {/* Record button */}
         <div class="flex items-center gap-3">
           <button
-            onClick={() => isRecording() ? appStore.stopRecording() : appStore.startRecording()}
+            onClick={toggleRecording}
             class={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-95 ${
               isRecording() 
                 ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20' 
@@ -37,11 +92,12 @@ const Header: Component = () => {
           </button>
         </div>
         
-        {/* Waveform placeholder */}
-        <div class="flex-1 h-10 flex items-center justify-end gap-1 opacity-80">
-          <Show when={isRecording()}>
-            <span class="text-sm text-gray-500">Recording...</span>
-          </Show>
+        {/* Waveform visualization */}
+        <div class="flex-1 h-10">
+          <CompactWaveform 
+            audioLevel={appStore.audioLevel()} 
+            isRecording={isRecording()} 
+          />
         </div>
       </div>
     </header>

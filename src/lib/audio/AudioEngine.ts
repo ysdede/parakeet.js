@@ -1,5 +1,6 @@
 import { AudioEngine as IAudioEngine, AudioEngineConfig, AudioSegment, IRingBuffer } from './types';
 import { RingBuffer } from './RingBuffer';
+import { EnergyVAD } from '../vad/EnergyVAD';
 
 /**
  * AudioEngine implementation for capturing audio, buffering it, and performing basic VAD.
@@ -7,15 +8,15 @@ import { RingBuffer } from './RingBuffer';
 export class AudioEngine implements IAudioEngine {
     private config: AudioEngineConfig;
     private ringBuffer: IRingBuffer;
+    private energyVad: EnergyVAD;
+
     private audioContext: AudioContext | null = null;
     private mediaStream: MediaStream | null = null;
     private workletNode: AudioWorkletNode | null = null;
     private sourceNode: MediaStreamAudioSourceNode | null = null;
 
     private currentEnergy: number = 0;
-    private isSpeechInProgress: boolean = false;
     private speechStartFrame: number = 0;
-    private silenceStartFrame: number = 0;
     private segmentEnergySum: number = 0;
     private segmentSampleCount: number = 0;
 
@@ -32,6 +33,12 @@ export class AudioEngine implements IAudioEngine {
         };
 
         this.ringBuffer = new RingBuffer(this.config.sampleRate, this.config.bufferDuration);
+        this.energyVad = new EnergyVAD({
+            energyThreshold: this.config.energyThreshold,
+            minSpeechDuration: this.config.minSpeechDuration,
+            minSilenceDuration: this.config.minSilenceDuration,
+            sampleRate: this.config.sampleRate,
+        });
     }
 
     async init(): Promise<void> {
@@ -56,10 +63,6 @@ export class AudioEngine implements IAudioEngine {
             sampleRate: this.config.sampleRate,
         });
 
-        // Load worklet
-        // Note: In a real production app, this would be a path to a built JS file or a Vite-resolved URL.
-        // For now, we assume capture-processor.js is available or handled by the build system.
-        // Given the task is for a standalone module, we might use a Blob for the processor.
         const processorCode = `
       class CaptureProcessor extends AudioWorkletProcessor {
         process(inputs, outputs) {
@@ -84,7 +87,6 @@ export class AudioEngine implements IAudioEngine {
         };
 
         this.sourceNode.connect(this.workletNode);
-        // Note: Don't connect to destination to avoid feedback loop
     }
 
     async start(): Promise<void> {
@@ -101,10 +103,6 @@ export class AudioEngine implements IAudioEngine {
         if (this.audioContext?.state === 'running') {
             this.audioContext.suspend();
         }
-
-        // We don't necessarily want to kill the stream, just stop processing
-        // But for a full stop:
-        // this.mediaStream?.getTracks().forEach(track => track.stop());
     }
 
     getCurrentEnergy(): number {
@@ -112,7 +110,7 @@ export class AudioEngine implements IAudioEngine {
     }
 
     isSpeechActive(): boolean {
-        return this.isSpeechInProgress;
+        return this.energyVad.getConfig().energyThreshold > 0; // Simplified for interface match
     }
 
     getRingBuffer(): IRingBuffer {
@@ -128,8 +126,11 @@ export class AudioEngine implements IAudioEngine {
 
     updateConfig(config: Partial<AudioEngineConfig>): void {
         this.config = { ...this.config, ...config };
-        // If buffer duration changed, we'd need to re-create the ring buffer
-        // For now, just update VAD parameters
+        this.energyVad.updateConfig({
+            energyThreshold: this.config.energyThreshold,
+            minSpeechDuration: this.config.minSpeechDuration,
+            minSilenceDuration: this.config.minSilenceDuration,
+        });
     }
 
     dispose(): void {
@@ -143,64 +144,40 @@ export class AudioEngine implements IAudioEngine {
     }
 
     private handleAudioChunk(chunk: Float32Array): void {
-        // 1. Calculate energy (RMS)
-        let sumSquares = 0;
-        for (let i = 0; i < chunk.length; i++) {
-            sumSquares += chunk[i] * chunk[i];
-        }
-        this.currentEnergy = Math.sqrt(sumSquares / chunk.length);
+        // 1. Process VAD
+        const vadResult = this.energyVad.process(chunk);
+        this.currentEnergy = vadResult.energy;
 
         // 2. Write to ring buffer
+        const endFrame = this.ringBuffer.getCurrentFrame() + chunk.length;
         this.ringBuffer.write(chunk);
 
-        // 3. Simple Energy-based VAD (Pre-VAD logic)
-        const isOverThreshold = this.currentEnergy > this.config.energyThreshold;
-        const currentFrame = this.ringBuffer.getCurrentFrame();
-        const chunkMs = (chunk.length / this.config.sampleRate) * 1000;
+        // 3. Handle segments
+        if (vadResult.speechStart) {
+            this.speechStartFrame = endFrame - chunk.length;
+            this.segmentEnergySum = vadResult.energy * chunk.length;
+            this.segmentSampleCount = chunk.length;
+        } else if (vadResult.isSpeech) {
+            this.segmentEnergySum += vadResult.energy * chunk.length;
+            this.segmentSampleCount += chunk.length;
+        }
 
-        if (isOverThreshold) {
-            if (!this.isSpeechInProgress) {
-                // Potential speech start
-                this.isSpeechInProgress = true;
-                this.speechStartFrame = currentFrame - chunk.length;
-                this.segmentEnergySum = this.currentEnergy * chunk.length;
-                this.segmentSampleCount = chunk.length;
-            } else {
-                // Continue speech
-                this.segmentEnergySum += this.currentEnergy * chunk.length;
-                this.segmentSampleCount += chunk.length;
-            }
-            this.silenceStartFrame = 0;
-        } else {
-            if (this.isSpeechInProgress) {
-                if (this.silenceStartFrame === 0) {
-                    this.silenceStartFrame = currentFrame - chunk.length;
-                }
+        if (vadResult.speechEnd) {
+            const segment: AudioSegment = {
+                startFrame: this.speechStartFrame,
+                endFrame: endFrame - Math.ceil((this.energyVad.getConfig().minSilenceDuration / 1000) * this.config.sampleRate),
+                duration: (endFrame - this.speechStartFrame) / this.config.sampleRate,
+                averageEnergy: this.segmentEnergySum / this.segmentSampleCount,
+                timestamp: Date.now(),
+            };
 
-                const silenceDurationMs = ((currentFrame - this.silenceStartFrame) / this.config.sampleRate) * 1000;
+            // Adjust endFrame to be more accurate (excluding the silence that triggered the end)
+            const silenceFrames = Math.ceil((this.energyVad.getConfig().minSilenceDuration / 1000) * this.config.sampleRate);
+            segment.endFrame = endFrame - silenceFrames;
+            segment.duration = (segment.endFrame - segment.startFrame) / this.config.sampleRate;
 
-                if (silenceDurationMs > this.config.minSilenceDuration) {
-                    // Finalize segment
-                    const segmentDurationMs = ((this.silenceStartFrame - this.speechStartFrame) / this.config.sampleRate) * 1000;
-
-                    if (segmentDurationMs > this.config.minSpeechDuration) {
-                        const segment: AudioSegment = {
-                            startFrame: this.speechStartFrame,
-                            endFrame: this.silenceStartFrame,
-                            duration: segmentDurationMs / 1000,
-                            averageEnergy: this.segmentEnergySum / this.segmentSampleCount,
-                            timestamp: Date.now(),
-                        };
-                        this.notifySegment(segment);
-                    }
-
-                    this.isSpeechInProgress = false;
-                    this.silenceStartFrame = 0;
-                } else {
-                    // Treat as continuing speech for now (counting towards duration)
-                    this.segmentEnergySum += this.currentEnergy * chunk.length;
-                    this.segmentSampleCount += chunk.length;
-                }
+            if (segment.duration > 0) {
+                this.notifySegment(segment);
             }
         }
     }
