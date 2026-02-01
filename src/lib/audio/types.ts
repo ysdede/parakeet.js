@@ -12,6 +12,8 @@ export interface AudioEngineConfig {
     minSpeechDuration: number;
     /** Minimum silence duration to end segment (default: 300ms) */
     minSilenceDuration: number;
+    /** Preferred device ID (optional) */
+    deviceId?: string;
 }
 
 /**
@@ -57,6 +59,9 @@ export interface AudioEngine {
 
     /** Update configuration at runtime */
     updateConfig(config: Partial<AudioEngineConfig>): void;
+
+    /** Change active microphone */
+    setDevice(deviceId: string): Promise<void>;
 
     /** Dispose resources */
     dispose(): void;

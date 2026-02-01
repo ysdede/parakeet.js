@@ -12,6 +12,10 @@ function createAppStore() {
   // Recording state
   const [recordingState, setRecordingState] = createSignal<RecordingState>('idle');
   const [sessionDuration, setSessionDuration] = createSignal(0);
+  const [availableDevices, setAvailableDevices] = createSignal<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = createSignal('');
+
+  let timerInterval: number | undefined;
 
   // Model state
   const [modelState, setModelState] = createSignal<ModelState>('unloaded');
@@ -46,10 +50,32 @@ function createAppStore() {
   const startRecording = () => {
     setRecordingState('recording');
     setSessionDuration(0);
+
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = window.setInterval(() => {
+      setSessionDuration(prev => prev + 1);
+    }, 1000);
   };
 
   const stopRecording = () => {
     setRecordingState('idle');
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = undefined;
+    }
+  };
+
+  const refreshDevices = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mics = devices.filter(d => d.kind === 'audioinput');
+      setAvailableDevices(mics);
+      if (mics.length > 0 && !selectedDeviceId()) {
+        setSelectedDeviceId(mics[0].deviceId);
+      }
+    } catch (e) {
+      console.error('Failed to enum devices:', e);
+    }
   };
 
   const appendTranscript = (text: string) => {
@@ -74,6 +100,8 @@ function createAppStore() {
   return {
     // State (readonly)
     recordingState,
+    availableDevices,
+    selectedDeviceId,
     sessionDuration,
     modelState,
     selectedModelId,
@@ -90,6 +118,8 @@ function createAppStore() {
     // Setters (for internal use)
     setRecordingState,
     setSessionDuration,
+    setAvailableDevices,
+    setSelectedDeviceId,
     setModelState,
     setSelectedModelId,
     setModelProgress,
@@ -105,6 +135,7 @@ function createAppStore() {
     // Actions
     startRecording,
     stopRecording,
+    refreshDevices,
     appendTranscript,
     clearTranscript,
     copyTranscript,

@@ -5,7 +5,7 @@
  * Uses state-preserving streaming (NVIDIA approach) via parakeet.js.
  */
 
-import { Component, Show, createSignal, onMount, onCleanup } from 'solid-js';
+import { Component, Show, For, Switch, Match, createSignal, onMount, onCleanup } from 'solid-js';
 import { appStore } from './stores/appStore';
 import { CompactWaveform, ModelLoadingOverlay, Sidebar, DebugPanel } from './components';
 import { AudioEngine } from './lib/audio';
@@ -18,7 +18,7 @@ let modelManager: ModelManager | null = null;
 let transcriptionService: TranscriptionService | null = null;
 let energyPollInterval: number | undefined;
 
-const Header: Component = () => {
+const Header: Component<{ onTabChange: (tab: string) => void }> = (props) => {
   const isRecording = () => appStore.recordingState() === 'recording';
   const isModelReady = () => appStore.modelState() === 'ready';
 
@@ -107,9 +107,26 @@ const Header: Component = () => {
   return (
     <header class="flex-none p-4 pb-0">
       <div class="bg-white dark:bg-card-dark rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-3 flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-900/50 rounded-xl px-4 py-2 border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors w-64">
+        <div class="relative flex items-center gap-3 bg-gray-100 dark:bg-gray-900/50 rounded-xl px-4 py-2 border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors w-64 overflow-hidden">
           <span class="material-icons-round text-gray-500 dark:text-gray-400">mic</span>
-          <span class="text-sm font-medium flex-1 truncate">Stereo Mix (Realtek Audio)</span>
+          <select
+            class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+            value={appStore.selectedDeviceId()}
+            onChange={(e) => {
+              const id = e.currentTarget.value;
+              appStore.setSelectedDeviceId(id);
+              audioEngine?.setDevice(id);
+            }}
+          >
+            <For each={appStore.availableDevices()}>
+              {(device) => (
+                <option value={device.deviceId}>{device.label || `Mic ${device.deviceId.slice(0, 5)}...`}</option>
+              )}
+            </For>
+          </select>
+          <span class="text-sm font-medium flex-1 truncate">
+            {appStore.availableDevices().find(d => d.deviceId === appStore.selectedDeviceId())?.label || 'Select Microphone'}
+          </span>
           <span class="material-icons-round text-gray-500 text-sm">expand_more</span>
         </div>
 
@@ -129,9 +146,9 @@ const Header: Component = () => {
               <div class="w-4 h-4 bg-white rounded-sm group-hover:scale-110 transition-transform"></div>
             </Show>
           </button>
-          
+
           <Show when={isRecording()}>
-            <button 
+            <button
               onClick={toggleRecording}
               class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
             >
@@ -139,7 +156,10 @@ const Header: Component = () => {
             </button>
           </Show>
 
-          <button class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors">
+          <button
+            onClick={() => props.onTabChange('ai')}
+            class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
+          >
             <span class="material-icons-round text-xl">settings</span>
           </button>
         </div>
@@ -177,6 +197,17 @@ const TranscriptPanel: Component = () => {
             <span class="text-[10px] font-medium">Copy</span>
           </button>
           <button
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({
+                  title: 'BoncukJS Transcript',
+                  text: appStore.transcript(),
+                });
+              } else {
+                appStore.copyTranscript();
+                alert('Transcript copied to clipboard!');
+              }
+            }}
             class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-primary transition-all"
           >
             <span class="material-icons-round text-xl">ios_share</span>
@@ -414,6 +445,9 @@ const App: Component = () => {
         appStore.setModelMessage(error.message);
       },
     });
+
+    // Refresh devices on mount
+    appStore.refreshDevices();
   });
 
 
@@ -440,10 +474,22 @@ const App: Component = () => {
       />
 
 
-      <Header />
+      <Header onTabChange={setActiveTab} />
 
       <main class="flex-1 flex overflow-hidden p-4 gap-4 relative">
-        <TranscriptPanel />
+        <Switch>
+          <Match when={activeTab() === 'transcript'}>
+            <TranscriptPanel />
+          </Match>
+          <Match when={activeTab() === 'ai'}>
+            <div class="flex-1 bg-white dark:bg-card-dark rounded-3xl p-8 shadow-xl">
+              <h2 class="text-2xl font-bold">AI Engine Status</h2>
+              <p class="mt-4 text-gray-500">Model: {appStore.selectedModelId()}</p>
+              <p class="text-gray-500">Backend: {appStore.backend().toUpperCase()}</p>
+              <p class="text-gray-500">Offline Ready: {appStore.isOfflineReady() ? 'Yes' : 'No'}</p>
+            </div>
+          </Match>
+        </Switch>
         <Sidebar
           activeTab={activeTab()}
           onTabChange={setActiveTab}

@@ -9,6 +9,7 @@ export class AudioEngine implements IAudioEngine {
     private config: AudioEngineConfig;
     private ringBuffer: IRingBuffer;
     private energyVad: EnergyVAD;
+    private deviceId: string | null = null;
 
     private audioContext: AudioContext | null = null;
     private mediaStream: MediaStream | null = null;
@@ -32,6 +33,7 @@ export class AudioEngine implements IAudioEngine {
             ...config,
         };
 
+        this.deviceId = this.config.deviceId || null;
         this.ringBuffer = new RingBuffer(this.config.sampleRate, this.config.bufferDuration);
         this.energyVad = new EnergyVAD({
             energyThreshold: this.config.energyThreshold,
@@ -42,26 +44,34 @@ export class AudioEngine implements IAudioEngine {
     }
 
     async init(): Promise<void> {
-        if (this.audioContext) return;
+        if (this.audioContext) {
+            // If already initialized but changing device, stop tracks first
+            this.mediaStream?.getTracks().forEach(t => t.stop());
+        }
 
-        // Request microphone permission
+        // Request microphone permission with optional deviceId
         try {
-            this.mediaStream = await navigator.mediaDevices.getUserMedia({
+            const constraints: MediaStreamConstraints = {
                 audio: {
+                    deviceId: this.deviceId ? { exact: this.deviceId } : undefined,
                     channelCount: 1,
                     sampleRate: this.config.sampleRate,
                     echoCancellation: true,
                     noiseSuppression: true,
                 },
-            });
+            };
+            this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (error) {
-            console.error('Microphone permission denied', error);
-            throw new Error('Microphone permission denied');
+            console.error('Microphone access failed', error);
+            throw new Error('Microphone access failed');
         }
 
-        this.audioContext = new AudioContext({
-            sampleRate: this.config.sampleRate,
-        });
+        if (!this.audioContext) {
+            this.audioContext = new AudioContext({
+                sampleRate: this.config.sampleRate,
+            });
+        }
+
 
         const processorCode = `
       class CaptureProcessor extends AudioWorkletProcessor {
@@ -110,8 +120,8 @@ export class AudioEngine implements IAudioEngine {
     }
 
     isSpeechActive(): boolean {
-    return this.currentEnergy > this.config.energyThreshold;
-  }
+        return this.currentEnergy > this.config.energyThreshold;
+    }
 
     getRingBuffer(): IRingBuffer {
         return this.ringBuffer;
@@ -131,6 +141,18 @@ export class AudioEngine implements IAudioEngine {
             minSpeechDuration: this.config.minSpeechDuration,
             minSilenceDuration: this.config.minSilenceDuration,
         });
+    }
+
+    async setDevice(deviceId: string): Promise<void> {
+        this.deviceId = deviceId;
+        await this.init();
+
+        // Reconnect if running
+        if (this.audioContext && this.workletNode) {
+            this.sourceNode?.disconnect();
+            this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream!);
+            this.sourceNode.connect(this.workletNode);
+        }
     }
 
     dispose(): void {
