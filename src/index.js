@@ -1,4 +1,4 @@
-export { ParakeetModel, StatefulStreamingTranscriber } from './parakeet.js';
+export { ParakeetModel, StatefulStreamingTranscriber, FrameAlignedMerger, LCSPTFAMerger } from './parakeet.js';
 export { getModelFile, getModelText, getParakeetModel } from './hub.js';
 export { MODELS, LANGUAGE_NAMES, DEFAULT_MODEL, getModelConfig, getModelKeyFromRepoId, supportsLanguage, listModels, getLanguageName } from './models.js';
 
@@ -28,10 +28,10 @@ export async function fromHub(repoIdOrModelKey, options = {}) {
   const { getParakeetModel } = await import('./hub.js');
   const { ParakeetModel } = await import('./parakeet.js');
   const { MODELS } = await import('./models.js');
-  
+
   // Resolve model key to repo ID if needed
   const repoId = MODELS[repoIdOrModelKey]?.repoId || repoIdOrModelKey;
-  
+
   const result = await getParakeetModel(repoId, options);
   return ParakeetModel.fromUrls({ ...result.urls, filenames: result.filenames, ...options });
 }
