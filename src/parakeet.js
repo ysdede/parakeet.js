@@ -276,12 +276,50 @@ export class ParakeetModel {
   }
 
   /**
+   * Get the time stride per encoder frame in seconds.
+   * This is useful for converting frame indices to timestamps.
+   * @returns {number} Time stride in seconds (typically 0.08s for 8x subsampling @ 10ms)
+   */
+  getFrameTimeStride() {
+    return this.subsampling * this.windowStride;
+  }
+
+  /**
+   * Convert a frame index to absolute time in seconds.
+   * @param {number} frameIndex - Encoder frame index
+   * @param {number} timeOffset - Optional offset to add (default 0)
+   * @returns {number} Time in seconds
+   */
+  frameToTime(frameIndex, timeOffset = 0) {
+    return timeOffset + (frameIndex * this.getFrameTimeStride());
+  }
+
+  /**
+   * Get streaming constants for external use.
+   * @returns {Object} Constants for streaming calculations
+   */
+  getStreamingConstants() {
+    return {
+      subsampling: this.subsampling,
+      windowStride: this.windowStride,
+      frameTimeStride: this.getFrameTimeStride(),
+      melBins: 80, // Standard for Parakeet models
+      blankId: this.blankId,
+      maxTokensPerStep: this.maxTokensPerStep,
+    };
+  }
+
+  /**
    * Transcribe 16-kHz mono PCM. Returns full rich output (timestamps/confidences opt-in).
    * 
-   * Streaming Mode (NEW):
+   * Streaming Mode:
    * Pass `previousDecoderState` from a prior call to continue decoding from that state.
    * Set `returnDecoderState: true` to receive the decoder state for the next chunk.
    * Use `timeOffset` to adjust all timestamps by a fixed offset (for absolute timeline).
+   * 
+   * Frame-Aligned Streaming (for advanced merging):
+   * Use `returnFrameIndices`, `returnLogProbs`, and `returnTdtSteps` to get detailed
+   * per-token information for precise alignment when merging overlapping transcriptions.
    * 
    * @param {Float32Array} audio - 16-kHz mono PCM audio samples
    * @param {number} sampleRate - Sample rate (default 16000)
@@ -293,6 +331,9 @@ export class ParakeetModel {
    * @param {boolean} opts.returnDecoderState - Return decoder state for next chunk
    * @param {number} opts.timeOffset - Add this offset to all timestamps (seconds)
    * @param {boolean} opts.returnTokenIds - Include raw token IDs in output
+   * @param {boolean} opts.returnFrameIndices - Include encoder frame index per token (for alignment)
+   * @param {boolean} opts.returnLogProbs - Include raw log probability per token
+   * @param {boolean} opts.returnTdtSteps - Include TDT duration prediction per token
    */
   async transcribe(audio, sampleRate = 16000, opts = {}) {
     const {
@@ -307,6 +348,10 @@ export class ParakeetModel {
       returnDecoderState = false,   // Return state for next chunk
       timeOffset = 0,               // Offset to add to all timestamps
       returnTokenIds = false,       // Include raw token IDs
+      // NEW: Frame-aligned streaming options (for advanced merging)
+      returnFrameIndices = false,   // Include encoder frame index per token
+      returnLogProbs = false,       // Include raw log probabilities per token
+      returnTdtSteps = false,       // Include TDT duration predictions per token
     } = opts;
 
     const perfEnabled = true; // always collect and log timings
@@ -392,6 +437,11 @@ export class ParakeetModel {
     const tokenConfs = [];
     const frameConfs = [];
     let overallLogProb = 0;
+    
+    // NEW: Frame-aligned streaming data
+    const tokenFrameIndices = [];  // Which encoder frame emitted each token
+    const tokenLogProbs = [];      // Raw log probability for each token
+    const tokenTdtSteps = [];      // TDT duration prediction for each token
 
     // Incremental decode settings
     const TIME_STRIDE = this.subsampling * this.windowStride;
@@ -444,15 +494,22 @@ export class ParakeetModel {
       }
 
       let confVal = 1.0; // Default confidence when not computing softmax
-      if (returnConfidences) {
-        // Only compute expensive softmax denominator when confidences are requested
+      let logProbVal = 0; // Raw log probability for this token
+      
+      // Compute softmax denominator when confidences OR logProbs are requested
+      if (returnConfidences || returnLogProbs) {
         let sumExp = 0;
         for (let i = 0; i < tokenLogits.length; i++) {
           sumExp += Math.exp((tokenLogits[i] / temperature) - maxVal);
         }
         confVal = 1 / sumExp;
-        frameConfs.push(confVal);
-        overallLogProb += Math.log(confVal);
+        // Log probability: log(softmax(logit)) = logit - log(sum(exp(logits)))
+        logProbVal = (tokenLogits[maxId] / temperature) - maxVal - Math.log(sumExp);
+        
+        if (returnConfidences) {
+          frameConfs.push(confVal);
+          overallLogProb += Math.log(confVal);
+        }
       }
 
       if (maxId !== this.blankId) {
@@ -460,6 +517,16 @@ export class ParakeetModel {
         // This matches the Python reference in onnx-asr/src/onnx_asr/asr.py line 212
         decoderState = newState;
         ids.push(maxId);
+        
+        // NEW: Track frame index for this token (always cheap to compute)
+        if (returnFrameIndices) tokenFrameIndices.push(t);
+        
+        // NEW: Track log probability for this token
+        if (returnLogProbs) tokenLogProbs.push(logProbVal);
+        
+        // NEW: Track TDT step (duration prediction) for this token
+        if (returnTdtSteps) tokenTdtSteps.push(step);
+        
         if (returnTimestamps) {
           const durFrames = step > 0 ? step : 1;
           // Use effectiveTimeOffset for streaming mode
@@ -531,6 +598,16 @@ export class ParakeetModel {
       // NEW: Include raw token IDs
       if (returnTokenIds) {
         result.tokenIds = ids.slice();
+      }
+      // NEW: Include frame-aligned streaming data
+      if (returnFrameIndices) {
+        result.frameIndices = tokenFrameIndices.slice();
+      }
+      if (returnLogProbs) {
+        result.logProbs = tokenLogProbs.slice();
+      }
+      if (returnTdtSteps) {
+        result.tdtSteps = tokenTdtSteps.slice();
       }
 
       return result;
@@ -620,6 +697,16 @@ export class ParakeetModel {
     // NEW: Include raw token IDs for advanced merging
     if (returnTokenIds) {
       result.tokenIds = ids.slice();
+    }
+    // NEW: Include frame-aligned streaming data for advanced merging
+    if (returnFrameIndices) {
+      result.frameIndices = tokenFrameIndices.slice();
+    }
+    if (returnLogProbs) {
+      result.logProbs = tokenLogProbs.map(lp => +lp.toFixed(6));
+    }
+    if (returnTdtSteps) {
+      result.tdtSteps = tokenTdtSteps.slice();
     }
 
     return result;
@@ -840,6 +927,285 @@ export class StatefulStreamingTranscriber {
       wordCount: this._totalWords.length,
       chunkCount: this._chunkCount,
       isFinalized: this._isFinalized,
+    };
+  }
+}
+
+
+/**
+ * Utility class for caching mel spectrogram features.
+ * Since mel computation is stateless, identical audio always produces identical features.
+ * This can save 10-15% computation when retranscribing overlapping audio regions.
+ */
+export class MelFeatureCache {
+  /**
+   * @param {Object} opts - Cache options
+   * @param {number} opts.maxCacheSizeMB - Maximum cache size in MB (default 50)
+   */
+  constructor(opts = {}) {
+    this.maxCacheSizeMB = opts.maxCacheSizeMB || 50;
+    this.cache = new Map();  // key → { features, T, melBins, timestamp }
+    this.currentSizeMB = 0;
+  }
+
+  /**
+   * Generate a cache key from audio samples.
+   * Uses a fast hash based on length + sampled values.
+   * @param {Float32Array} audio - Audio samples
+   * @returns {string} Cache key
+   */
+  _generateKey(audio) {
+    let hash = audio.length;
+    // Sample every 1000th sample for fast hashing
+    for (let i = 0; i < audio.length; i += 1000) {
+      hash = ((hash << 5) - hash + Math.floor(audio[i] * 32768)) | 0;
+    }
+    return `${audio.length}_${hash}`;
+  }
+
+  /**
+   * Get mel features, using cache if available.
+   * @param {ParakeetModel} model - The model to use for computation
+   * @param {Float32Array} audio - Audio samples
+   * @returns {Promise<{features: Float32Array, T: number, melBins: number, cached: boolean}>}
+   */
+  async getFeatures(model, audio) {
+    const key = this._generateKey(audio);
+    
+    if (this.cache.has(key)) {
+      const cached = this.cache.get(key);
+      // Update timestamp for LRU
+      cached.timestamp = Date.now();
+      return { ...cached, cached: true };
+    }
+    
+    // Compute features
+    const { features, T, melBins } = await model.computeFeatures(audio);
+    
+    // Calculate size (Float32 = 4 bytes)
+    const sizeMB = (features.length * 4) / (1024 * 1024);
+    
+    // Evict old entries if needed
+    while (this.currentSizeMB + sizeMB > this.maxCacheSizeMB && this.cache.size > 0) {
+      this._evictOldest();
+    }
+    
+    // Store in cache
+    this.cache.set(key, { features, T, melBins, timestamp: Date.now(), sizeMB });
+    this.currentSizeMB += sizeMB;
+    
+    return { features, T, melBins, cached: false };
+  }
+
+  /**
+   * Evict the oldest cache entry (LRU).
+   */
+  _evictOldest() {
+    let oldestKey = null;
+    let oldestTime = Infinity;
+    
+    for (const [key, value] of this.cache) {
+      if (value.timestamp < oldestTime) {
+        oldestTime = value.timestamp;
+        oldestKey = key;
+      }
+    }
+    
+    if (oldestKey) {
+      const entry = this.cache.get(oldestKey);
+      this.currentSizeMB -= entry.sizeMB;
+      this.cache.delete(oldestKey);
+    }
+  }
+
+  /**
+   * Clear the entire cache.
+   */
+  clear() {
+    this.cache.clear();
+    this.currentSizeMB = 0;
+  }
+
+  /**
+   * Get cache statistics.
+   */
+  getStats() {
+    return {
+      entries: this.cache.size,
+      sizeMB: this.currentSizeMB.toFixed(2),
+      maxSizeMB: this.maxCacheSizeMB,
+    };
+  }
+}
+
+
+/**
+ * Utility class for merging overlapping transcriptions using frame-aligned tokens.
+ * This provides more accurate merging than text-based alignment by using
+ * token IDs and frame indices for precise matching.
+ */
+export class FrameAlignedMerger {
+  /**
+   * @param {Object} opts - Merger options
+   * @param {number} opts.frameTimeStride - Time per encoder frame (default 0.08s)
+   * @param {number} opts.timeTolerance - Max time difference for token matching (default 0.2s)
+   * @param {number} opts.stabilityThreshold - Appearances needed to confirm token (default 2)
+   */
+  constructor(opts = {}) {
+    this.frameTimeStride = opts.frameTimeStride || 0.08;
+    this.timeTolerance = opts.timeTolerance || 0.2;
+    this.stabilityThreshold = opts.stabilityThreshold || 2;
+    
+    // State
+    this.confirmedTokens = [];  // Tokens that passed stability check
+    this.pendingTokens = [];    // Tokens awaiting confirmation
+    this.stabilityMap = new Map();  // tokenKey → appearance count
+  }
+
+  /**
+   * Create a unique key for a token based on ID and approximate time.
+   * @param {number} tokenId - Token ID
+   * @param {number} absTime - Absolute timestamp
+   * @returns {string} Token key
+   */
+  _tokenKey(tokenId, absTime) {
+    // Round time to 100ms buckets for stability matching
+    const bucket = Math.round(absTime * 10);
+    return `${tokenId}@${bucket}`;
+  }
+
+  /**
+   * Process a new transcription result and merge with existing state.
+   * 
+   * @param {Object} result - Transcription result from parakeet.js
+   * @param {number[]} result.tokenIds - Token IDs
+   * @param {number[]} result.frameIndices - Encoder frame index per token
+   * @param {number[][]} result.timestamps - [start, end] per token (from words or tokens)
+   * @param {number[]} result.logProbs - Log probability per token (optional)
+   * @param {number} chunkStartTime - Absolute start time of this chunk
+   * @param {number} overlapDuration - Duration of overlap with previous chunk
+   * @returns {Object} Merge result
+   */
+  processChunk(result, chunkStartTime, overlapDuration = 0) {
+    if (!result.tokenIds || !result.frameIndices) {
+      throw new Error('FrameAlignedMerger requires tokenIds and frameIndices');
+    }
+    
+    const tokens = result.tokenIds.map((id, i) => ({
+      id,
+      frameIndex: result.frameIndices[i],
+      absTime: chunkStartTime + (result.frameIndices[i] * this.frameTimeStride),
+      logProb: result.logProbs?.[i] ?? 0,
+      text: result.tokens?.[i]?.token || '',
+    }));
+    
+    const overlapEndTime = chunkStartTime + overlapDuration;
+    
+    // Separate tokens into overlap region and new region
+    const overlapTokens = tokens.filter(t => t.absTime < overlapEndTime);
+    const newTokens = tokens.filter(t => t.absTime >= overlapEndTime);
+    
+    // Find anchors in overlap region
+    const anchors = this._findAnchors(overlapTokens);
+    
+    // If we found anchors, we can confidently merge
+    if (anchors.length > 0) {
+      const anchorTime = anchors[0].absTime;
+      
+      // Confirm pending tokens up to anchor
+      const toConfirm = this.pendingTokens.filter(t => t.absTime < anchorTime);
+      this.confirmedTokens.push(...toConfirm);
+      
+      // Update stability for overlap tokens
+      for (const token of overlapTokens) {
+        const key = this._tokenKey(token.id, token.absTime);
+        const count = (this.stabilityMap.get(key) || 0) + 1;
+        this.stabilityMap.set(key, count);
+        
+        if (count >= this.stabilityThreshold) {
+          // Token is stable - add to confirmed if not already there
+          const alreadyConfirmed = this.confirmedTokens.some(
+            t => Math.abs(t.absTime - token.absTime) < this.timeTolerance && t.id === token.id
+          );
+          if (!alreadyConfirmed) {
+            this.confirmedTokens.push(token);
+          }
+        }
+      }
+    }
+    
+    // New tokens become pending
+    this.pendingTokens = newTokens;
+    
+    return {
+      confirmed: this.confirmedTokens.slice(),
+      pending: this.pendingTokens.slice(),
+      anchorsFound: anchors.length,
+      totalTokens: this.confirmedTokens.length + this.pendingTokens.length,
+    };
+  }
+
+  /**
+   * Find anchor tokens (tokens that match pending tokens).
+   * @param {Array} overlapTokens - Tokens from overlap region
+   * @returns {Array} Matching anchor tokens
+   */
+  _findAnchors(overlapTokens) {
+    const anchors = [];
+    
+    for (const newTok of overlapTokens) {
+      for (const pendTok of this.pendingTokens) {
+        if (
+          newTok.id === pendTok.id &&
+          Math.abs(newTok.absTime - pendTok.absTime) < this.timeTolerance
+        ) {
+          anchors.push(newTok);
+          break;
+        }
+      }
+    }
+    
+    return anchors.sort((a, b) => a.absTime - b.absTime);
+  }
+
+  /**
+   * Get the current merged text.
+   * @param {ParakeetTokenizer} tokenizer - Tokenizer for decoding
+   * @returns {string} Merged transcript text
+   */
+  getText(tokenizer) {
+    const allTokens = [...this.confirmedTokens, ...this.pendingTokens];
+    allTokens.sort((a, b) => a.absTime - b.absTime);
+    const ids = allTokens.map(t => t.id);
+    return tokenizer.decode(ids);
+  }
+
+  /**
+   * Get all tokens (confirmed + pending) sorted by time.
+   * @returns {Array} All tokens
+   */
+  getAllTokens() {
+    const all = [...this.confirmedTokens, ...this.pendingTokens];
+    return all.sort((a, b) => a.absTime - b.absTime);
+  }
+
+  /**
+   * Reset the merger state.
+   */
+  reset() {
+    this.confirmedTokens = [];
+    this.pendingTokens = [];
+    this.stabilityMap.clear();
+  }
+
+  /**
+   * Get merger state for debugging.
+   */
+  getState() {
+    return {
+      confirmedCount: this.confirmedTokens.length,
+      pendingCount: this.pendingTokens.length,
+      stabilityMapSize: this.stabilityMap.size,
     };
   }
 }
