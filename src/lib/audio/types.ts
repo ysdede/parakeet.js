@@ -59,8 +59,21 @@ export interface AudioEngine {
     /** Get ring buffer reference for direct access */
     getRingBuffer(): IRingBuffer;
 
-    /** Subscribe to speech segment events */
+    /** Subscribe to speech segment events (VAD-based) */
     onSpeechSegment(callback: (segment: AudioSegment) => void): () => void;
+
+    /** 
+     * Subscribe to fixed-window chunks for token streaming mode.
+     * Fires every (windowDuration - overlapDuration) seconds with windowDuration of audio.
+     * @param windowDuration - Window size in seconds (default 5.0)
+     * @param overlapDuration - Overlap with previous window in seconds (default 1.5)
+     * @param callback - Receives audio samples and window timestamp
+     */
+    onWindowChunk?(
+        windowDuration: number,
+        overlapDuration: number,
+        callback: (audio: Float32Array, startTime: number) => void
+    ): () => void;
 
     /** Update configuration at runtime */
     updateConfig(config: Partial<AudioEngineConfig>): void;

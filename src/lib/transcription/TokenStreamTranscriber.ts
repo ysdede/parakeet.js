@@ -277,4 +277,42 @@ export class TokenStreamTranscriber {
             chunkCount: this._chunkCount,
         };
     }
+
+    /**
+     * Connect to AudioEngine for automatic window-based streaming.
+     * 
+     * Usage:
+     * ```
+     * const unsubscribe = transcriber.connectToAudioEngine(audioEngine);
+     * // ... later
+     * unsubscribe();
+     * ```
+     * 
+     * @param audioEngine - AudioEngine instance with onWindowChunk support
+     * @returns Unsubscribe function
+     */
+    connectToAudioEngine(audioEngine: any): () => void {
+        if (!audioEngine.onWindowChunk) {
+            throw new Error('AudioEngine does not support onWindowChunk. Update to v3.0.');
+        }
+
+        return audioEngine.onWindowChunk(
+            this._config.windowDuration,
+            this._config.overlapDuration,
+            async (audio: Float32Array, _startTime: number) => {
+                try {
+                    await this.processChunk(audio);
+                } catch (e) {
+                    console.error('[TokenStreamTranscriber] Window processing error:', e);
+                }
+            }
+        );
+    }
+
+    /**
+     * Get configuration.
+     */
+    getConfig(): Required<TokenStreamConfig> {
+        return { ...this._config };
+    }
 }

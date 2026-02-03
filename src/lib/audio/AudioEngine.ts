@@ -9,21 +9,21 @@ import { VADResult } from '../vad/types';
  */
 function resampleLinear(input: Float32Array, fromRate: number, toRate: number): Float32Array {
     if (fromRate === toRate) return input;
-    
+
     const ratio = fromRate / toRate;
     const outputLength = Math.floor(input.length / ratio);
     const output = new Float32Array(outputLength);
-    
+
     for (let i = 0; i < outputLength; i++) {
         const srcIndex = i * ratio;
         const srcIndexFloor = Math.floor(srcIndex);
         const srcIndexCeil = Math.min(srcIndexFloor + 1, input.length - 1);
         const t = srcIndex - srcIndexFloor;
-        
+
         // Linear interpolation
         output[i] = input[srcIndexFloor] * (1 - t) + input[srcIndexCeil] * t;
     }
-    
+
     return output;
 }
 
@@ -53,6 +53,14 @@ export class AudioEngine implements IAudioEngine {
 
     private segmentCallbacks: Array<(segment: AudioSegment) => void> = [];
 
+    // Fixed-window streaming state (v3 token streaming mode)
+    private windowCallbacks: Array<{
+        windowDuration: number;
+        overlapDuration: number;
+        callback: (audio: Float32Array, startTime: number) => void;
+        lastWindowEnd: number; // Frame offset of last window end
+    }> = [];
+
     constructor(config: Partial<AudioEngineConfig> = {}) {
         this.config = {
             sampleRate: 16000,
@@ -66,7 +74,7 @@ export class AudioEngine implements IAudioEngine {
 
         this.deviceId = this.config.deviceId || null;
         this.targetSampleRate = this.config.sampleRate; // 16000 for Parakeet
-        
+
         // RingBuffer and VAD operate at TARGET sample rate (16kHz)
         this.ringBuffer = new RingBuffer(this.targetSampleRate, this.config.bufferDuration);
         this.energyVad = new EnergyVAD({
@@ -256,6 +264,28 @@ export class AudioEngine implements IAudioEngine {
         };
     }
 
+    /**
+     * Subscribe to fixed-window chunks for token streaming mode.
+     * Fires every (windowDuration - overlapDuration) seconds with windowDuration of audio.
+     */
+    onWindowChunk(
+        windowDuration: number,
+        overlapDuration: number,
+        callback: (audio: Float32Array, startTime: number) => void
+    ): () => void {
+        const entry = {
+            windowDuration,
+            overlapDuration,
+            callback,
+            lastWindowEnd: 0, // Will be set on first chunk
+        };
+        this.windowCallbacks.push(entry);
+
+        return () => {
+            this.windowCallbacks = this.windowCallbacks.filter((e) => e !== entry);
+        };
+    }
+
     updateConfig(config: Partial<AudioEngineConfig>): void {
         this.config = { ...this.config, ...config };
         this.energyVad.updateConfig({
@@ -290,7 +320,7 @@ export class AudioEngine implements IAudioEngine {
     private handleAudioChunk(rawChunk: Float32Array): void {
         // 0. Resample from device rate to target rate (e.g., 48kHz -> 16kHz)
         const chunk = resampleLinear(rawChunk, this.deviceSampleRate, this.targetSampleRate);
-        
+
         // 1. Process VAD on resampled audio
         const vadResult = this.energyVad.process(chunk);
         this.currentEnergy = vadResult.energy;
@@ -314,10 +344,10 @@ export class AudioEngine implements IAudioEngine {
         // This ensures transcription happens without waiting for silence
         if (vadResult.isSpeech && this.speechStartFrame > 0) {
             const currentSpeechDuration = (endFrame - this.speechStartFrame) / this.targetSampleRate;
-            
+
             if (currentSpeechDuration >= this.config.maxSegmentDuration) {
                 console.log(`[AudioEngine] Splitting long segment at ${currentSpeechDuration.toFixed(2)}s`);
-                
+
                 const segment: AudioSegment = {
                     startFrame: this.speechStartFrame,
                     endFrame: endFrame,
@@ -325,9 +355,9 @@ export class AudioEngine implements IAudioEngine {
                     averageEnergy: this.segmentEnergySum / this.segmentSampleCount,
                     timestamp: Date.now(),
                 };
-                
+
                 this.notifySegment(segment);
-                
+
                 // Start new segment immediately (continues speech)
                 this.speechStartFrame = endFrame;
                 this.segmentEnergySum = vadResult.energy * chunk.length;
@@ -352,6 +382,48 @@ export class AudioEngine implements IAudioEngine {
 
             if (segment.duration > 0) {
                 this.notifySegment(segment);
+            }
+        }
+
+        // 6. Fixed-window streaming (v3 token streaming mode)
+        this.processWindowCallbacks(endFrame);
+    }
+
+    /**
+     * Process fixed-window callbacks for token streaming mode.
+     * Fires when enough audio has accumulated for a new window.
+     */
+    private processWindowCallbacks(currentFrame: number): void {
+        for (const entry of this.windowCallbacks) {
+            const windowFrames = Math.floor(entry.windowDuration * this.targetSampleRate);
+            const stepFrames = Math.floor((entry.windowDuration - entry.overlapDuration) * this.targetSampleRate);
+
+            // Initialize lastWindowEnd on first call
+            if (entry.lastWindowEnd === 0) {
+                entry.lastWindowEnd = currentFrame;
+                continue;
+            }
+
+            // Check if we have enough new audio for the next window
+            const framesSinceLastWindow = currentFrame - entry.lastWindowEnd;
+            if (framesSinceLastWindow >= stepFrames) {
+                // Calculate window boundaries
+                const windowEnd = currentFrame;
+                const windowStart = windowEnd - windowFrames;
+
+                // Ensure we have enough data in the ring buffer
+                const baseOffset = this.ringBuffer.getBaseFrameOffset();
+                if (windowStart >= baseOffset) {
+                    try {
+                        const audio = this.ringBuffer.read(windowStart, windowEnd);
+                        const startTime = windowStart / this.targetSampleRate;
+
+                        entry.callback(audio, startTime);
+                        entry.lastWindowEnd = windowEnd;
+                    } catch (e) {
+                        console.warn('[AudioEngine] Window read failed:', e);
+                    }
+                }
             }
         }
     }
