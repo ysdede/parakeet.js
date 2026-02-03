@@ -437,7 +437,7 @@ export class ParakeetModel {
     const tokenConfs = [];
     const frameConfs = [];
     let overallLogProb = 0;
-    
+
     // NEW: Frame-aligned streaming data
     const tokenFrameIndices = [];  // Which encoder frame emitted each token
     const tokenLogProbs = [];      // Raw log probability for each token
@@ -495,7 +495,7 @@ export class ParakeetModel {
 
       let confVal = 1.0; // Default confidence when not computing softmax
       let logProbVal = 0; // Raw log probability for this token
-      
+
       // Compute softmax denominator when confidences OR logProbs are requested
       if (returnConfidences || returnLogProbs) {
         let sumExp = 0;
@@ -505,7 +505,7 @@ export class ParakeetModel {
         confVal = 1 / sumExp;
         // Log probability: log(softmax(logit)) = logit - log(sum(exp(logits)))
         logProbVal = (tokenLogits[maxId] / temperature) - maxVal - Math.log(sumExp);
-        
+
         if (returnConfidences) {
           frameConfs.push(confVal);
           overallLogProb += Math.log(confVal);
@@ -517,16 +517,16 @@ export class ParakeetModel {
         // This matches the Python reference in onnx-asr/src/onnx_asr/asr.py line 212
         decoderState = newState;
         ids.push(maxId);
-        
+
         // NEW: Track frame index for this token (always cheap to compute)
         if (returnFrameIndices) tokenFrameIndices.push(t);
-        
+
         // NEW: Track log probability for this token
         if (returnLogProbs) tokenLogProbs.push(logProbVal);
-        
+
         // NEW: Track TDT step (duration prediction) for this token
         if (returnTdtSteps) tokenTdtSteps.push(step);
-        
+
         if (returnTimestamps) {
           const durFrames = step > 0 ? step : 1;
           // Use effectiveTimeOffset for streaming mode
@@ -971,29 +971,29 @@ export class MelFeatureCache {
    */
   async getFeatures(model, audio) {
     const key = this._generateKey(audio);
-    
+
     if (this.cache.has(key)) {
       const cached = this.cache.get(key);
       // Update timestamp for LRU
       cached.timestamp = Date.now();
       return { ...cached, cached: true };
     }
-    
+
     // Compute features
     const { features, T, melBins } = await model.computeFeatures(audio);
-    
+
     // Calculate size (Float32 = 4 bytes)
     const sizeMB = (features.length * 4) / (1024 * 1024);
-    
+
     // Evict old entries if needed
     while (this.currentSizeMB + sizeMB > this.maxCacheSizeMB && this.cache.size > 0) {
       this._evictOldest();
     }
-    
+
     // Store in cache
     this.cache.set(key, { features, T, melBins, timestamp: Date.now(), sizeMB });
     this.currentSizeMB += sizeMB;
-    
+
     return { features, T, melBins, cached: false };
   }
 
@@ -1003,14 +1003,14 @@ export class MelFeatureCache {
   _evictOldest() {
     let oldestKey = null;
     let oldestTime = Infinity;
-    
+
     for (const [key, value] of this.cache) {
       if (value.timestamp < oldestTime) {
         oldestTime = value.timestamp;
         oldestKey = key;
       }
     }
-    
+
     if (oldestKey) {
       const entry = this.cache.get(oldestKey);
       this.currentSizeMB -= entry.sizeMB;
@@ -1055,7 +1055,7 @@ export class FrameAlignedMerger {
     this.frameTimeStride = opts.frameTimeStride || 0.08;
     this.timeTolerance = opts.timeTolerance || 0.2;
     this.stabilityThreshold = opts.stabilityThreshold || 2;
-    
+
     // State
     this.confirmedTokens = [];  // Tokens that passed stability check
     this.pendingTokens = [];    // Tokens awaiting confirmation
@@ -1090,7 +1090,7 @@ export class FrameAlignedMerger {
     if (!result.tokenIds || !result.frameIndices) {
       throw new Error('FrameAlignedMerger requires tokenIds and frameIndices');
     }
-    
+
     const tokens = result.tokenIds.map((id, i) => ({
       id,
       frameIndex: result.frameIndices[i],
@@ -1098,30 +1098,30 @@ export class FrameAlignedMerger {
       logProb: result.logProbs?.[i] ?? 0,
       text: result.tokens?.[i]?.token || '',
     }));
-    
+
     const overlapEndTime = chunkStartTime + overlapDuration;
-    
+
     // Separate tokens into overlap region and new region
     const overlapTokens = tokens.filter(t => t.absTime < overlapEndTime);
     const newTokens = tokens.filter(t => t.absTime >= overlapEndTime);
-    
+
     // Find anchors in overlap region
     const anchors = this._findAnchors(overlapTokens);
-    
+
     // If we found anchors, we can confidently merge
     if (anchors.length > 0) {
       const anchorTime = anchors[0].absTime;
-      
+
       // Confirm pending tokens up to anchor
       const toConfirm = this.pendingTokens.filter(t => t.absTime < anchorTime);
       this.confirmedTokens.push(...toConfirm);
-      
+
       // Update stability for overlap tokens
       for (const token of overlapTokens) {
         const key = this._tokenKey(token.id, token.absTime);
         const count = (this.stabilityMap.get(key) || 0) + 1;
         this.stabilityMap.set(key, count);
-        
+
         if (count >= this.stabilityThreshold) {
           // Token is stable - add to confirmed if not already there
           const alreadyConfirmed = this.confirmedTokens.some(
@@ -1133,10 +1133,10 @@ export class FrameAlignedMerger {
         }
       }
     }
-    
+
     // New tokens become pending
     this.pendingTokens = newTokens;
-    
+
     return {
       confirmed: this.confirmedTokens.slice(),
       pending: this.pendingTokens.slice(),
@@ -1152,7 +1152,7 @@ export class FrameAlignedMerger {
    */
   _findAnchors(overlapTokens) {
     const anchors = [];
-    
+
     for (const newTok of overlapTokens) {
       for (const pendTok of this.pendingTokens) {
         if (
@@ -1164,7 +1164,7 @@ export class FrameAlignedMerger {
         }
       }
     }
-    
+
     return anchors.sort((a, b) => a.absTime - b.absTime);
   }
 
@@ -1206,6 +1206,279 @@ export class FrameAlignedMerger {
       confirmedCount: this.confirmedTokens.length,
       pendingCount: this.pendingTokens.length,
       stabilityMapSize: this.stabilityMap.size,
+    };
+  }
+}
+
+
+/**
+ * LCS + PTFA Merger: Hybrid algorithm combining NeMo's Longest Common Subsequence
+ * merge with Probabilistic Token-Frame Alignment enhancements.
+ * 
+ * Key features:
+ * - LCS substring matching on token IDs (NeMo-style)
+ * - Frame index verification for alignment validation
+ * - Vignetting (temporal weighting) for boundary de-prioritization
+ * - LogProb-based arbitration for conflict resolution
+ * - Sequence anchoring (K consecutive matches required)
+ */
+export class LCSPTFAMerger {
+  /**
+   * @param {Object} opts - Merger options
+   * @param {number} opts.frameTimeStride - Time per encoder frame (default 0.08s)
+   * @param {number} opts.timeTolerance - Max time diff for frame alignment (default 0.15s)
+   * @param {number} opts.sequenceAnchorLength - Min consecutive matches for anchor (default 3)
+   * @param {number} opts.vignetteSigmaFactor - Gaussian sigma as fraction of total (default 0.25)
+   */
+  constructor(opts = {}) {
+    this.frameTimeStride = opts.frameTimeStride || 0.08;
+    this.timeTolerance = opts.timeTolerance || 0.15;
+    this.K = opts.sequenceAnchorLength || 3;
+    this.vignetteSigmaFactor = opts.vignetteSigmaFactor || 0.25;
+
+    // State
+    this.confirmedTokens = [];
+    this.pendingTokens = [];
+  }
+
+  /**
+   * Process a new transcription result and merge with existing state.
+   * 
+   * @param {Object} result - Transcription result from parakeet.js
+   * @param {number[]} result.tokenIds - Token IDs
+   * @param {number[]} result.frameIndices - Encoder frame index per token
+   * @param {number[]} [result.logProbs] - Log probability per token
+   * @param {Object[]} [result.tokens] - Token details with text
+   * @param {number} chunkStartTime - Absolute start time of this chunk
+   * @param {number} overlapDuration - Duration of overlap with previous chunk
+   * @returns {Object} Merge result with confirmed/pending tokens
+   */
+  processChunk(result, chunkStartTime, overlapDuration = 0) {
+    if (!result.tokenIds || !result.frameIndices) {
+      throw new Error('LCSPTFAMerger requires tokenIds and frameIndices');
+    }
+
+    const totalTokens = result.tokenIds.length;
+
+    // Build token objects with all metadata
+    const tokens = result.tokenIds.map((id, i) => ({
+      id,
+      frameIndex: result.frameIndices[i],
+      absTime: chunkStartTime + (result.frameIndices[i] * this.frameTimeStride),
+      logProb: result.logProbs?.[i] ?? 0,
+      text: result.tokens?.[i]?.token || '',
+      vignetteWeight: this._computeVignette(i, totalTokens)
+    }));
+
+    const overlapEnd = chunkStartTime + overlapDuration;
+
+    // Partition into overlap and new regions
+    const overlapTokens = tokens.filter(t => t.absTime < overlapEnd);
+    const newTokens = tokens.filter(t => t.absTime >= overlapEnd);
+
+    // Edge case: first chunk (no pending tokens)
+    if (this.pendingTokens.length === 0) {
+      this.pendingTokens = tokens;
+      return {
+        confirmed: this.confirmedTokens.slice(),
+        pending: this.pendingTokens.slice(),
+        lcsLength: 0,
+        anchorValid: false,
+        isFirstChunk: true
+      };
+    }
+
+    // === STEP 1: NeMo-style LCS on token IDs ===
+    const X = this.pendingTokens.map(t => t.id);
+    const Y = overlapTokens.map(t => t.id);
+    const [startX, startY, lcsLength] = this._lcsSubstring(X, Y);
+
+    // === STEP 2: PTFA Enhancement - Verify frame alignment ===
+    let anchorValid = false;
+    if (lcsLength >= this.K) {
+      anchorValid = this._verifyFrameAlignment(
+        this.pendingTokens.slice(startX, startX + lcsLength),
+        overlapTokens.slice(startY, startY + lcsLength)
+      );
+    }
+
+    if (anchorValid) {
+      // Strong anchor found - confirm tokens up to and including anchor
+      const confirmEnd = startX + lcsLength;
+      this.confirmedTokens.push(...this.pendingTokens.slice(0, confirmEnd));
+    } else if (lcsLength > 0) {
+      // Weak anchor - use logProb arbitration for overlap region
+      const pathA = this.pendingTokens.slice(startX, startX + lcsLength);
+      const pathB = overlapTokens.slice(startY, startY + lcsLength);
+      const bestPath = this._arbitrateByLogProb(pathA, pathB);
+
+      // Confirm tokens before overlap, then add best path
+      this.confirmedTokens.push(...this.pendingTokens.slice(0, startX));
+      this.confirmedTokens.push(...bestPath);
+    } else {
+      // No overlap found - possible discontinuity, confirm all pending
+      this.confirmedTokens.push(...this.pendingTokens);
+    }
+
+    // New tokens become pending
+    this.pendingTokens = newTokens;
+
+    return {
+      confirmed: this.confirmedTokens.slice(),
+      pending: this.pendingTokens.slice(),
+      lcsLength,
+      anchorValid,
+      overlapTokenCount: overlapTokens.length
+    };
+  }
+
+  /**
+   * Longest Common Substring algorithm on token ID arrays.
+   * Returns [startX, startY, length] for the longest common substring.
+   * 
+   * @param {number[]} X - Token IDs from previous chunk
+   * @param {number[]} Y - Token IDs from overlap region
+   * @returns {[number, number, number]} [startX, startY, length]
+   */
+  _lcsSubstring(X, Y) {
+    const m = X.length;
+    const n = Y.length;
+
+    if (m === 0 || n === 0) return [0, 0, 0];
+
+    // Dynamic programming matrix
+    // Using 1D array for space efficiency: LCS[j] = LCS value at column j
+    const LCS = new Array(n + 1).fill(0);
+
+    let maxLen = 0;
+    let endX = 0;
+    let endY = 0;
+
+    for (let i = 1; i <= m; i++) {
+      // Traverse right to left to avoid overwriting needed values
+      let prev = 0;
+      for (let j = 1; j <= n; j++) {
+        const temp = LCS[j];
+        if (X[i - 1] === Y[j - 1]) {
+          LCS[j] = prev + 1;
+          if (LCS[j] > maxLen) {
+            maxLen = LCS[j];
+            endX = i;
+            endY = j;
+          }
+        } else {
+          LCS[j] = 0;
+        }
+        prev = temp;
+      }
+    }
+
+    // Convert end positions to start positions
+    const startX = endX - maxLen;
+    const startY = endY - maxLen;
+
+    return [startX, startY, maxLen];
+  }
+
+  /**
+   * Verify that matched tokens have aligned frame indices within tolerance.
+   * 
+   * @param {Object[]} tokA - Tokens from previous chunk
+   * @param {Object[]} tokB - Tokens from current overlap
+   * @returns {boolean} True if all tokens align within tolerance
+   */
+  _verifyFrameAlignment(tokA, tokB) {
+    if (tokA.length !== tokB.length) return false;
+
+    for (let k = 0; k < tokA.length; k++) {
+      const timeDiff = Math.abs(tokA[k].absTime - tokB[k].absTime);
+      if (timeDiff > this.timeTolerance) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Arbitrate between conflicting paths using weighted log probabilities.
+   * 
+   * @param {Object[]} pathA - Tokens from path A
+   * @param {Object[]} pathB - Tokens from path B
+   * @returns {Object[]} The path with higher weighted score
+   */
+  _arbitrateByLogProb(pathA, pathB) {
+    const scoreA = pathA.reduce((sum, t) => sum + (t.logProb * t.vignetteWeight), 0);
+    const scoreB = pathB.reduce((sum, t) => sum + (t.logProb * t.vignetteWeight), 0);
+    return scoreA >= scoreB ? pathA : pathB;
+  }
+
+  /**
+   * Compute Gaussian vignette weight for a token based on position.
+   * Tokens at center have weight ≈ 1.0, boundary tokens ≈ 0.6.
+   * 
+   * @param {number} idx - Token index
+   * @param {number} total - Total number of tokens
+   * @returns {number} Weight between 0 and 1
+   */
+  _computeVignette(idx, total) {
+    if (total <= 1) return 1.0;
+
+    const midpoint = (total - 1) / 2;
+    const sigma = total * this.vignetteSigmaFactor;
+
+    return Math.exp(-Math.pow(idx - midpoint, 2) / (2 * sigma * sigma));
+  }
+
+  /**
+   * Get current merged text using a tokenizer.
+   * 
+   * @param {Object} tokenizer - Parakeet tokenizer with decode() method
+   * @returns {Object} Texts for confirmed and pending
+   */
+  getText(tokenizer) {
+    const confirmedIds = this.confirmedTokens.map(t => t.id);
+    const pendingIds = this.pendingTokens.map(t => t.id);
+
+    return {
+      confirmed: tokenizer.decode(confirmedIds),
+      pending: tokenizer.decode(pendingIds),
+      full: tokenizer.decode([...confirmedIds, ...pendingIds])
+    };
+  }
+
+  /**
+   * Get all tokens sorted by time.
+   * 
+   * @returns {Object[]} All tokens (confirmed + pending)
+   */
+  getAllTokens() {
+    return [...this.confirmedTokens, ...this.pendingTokens]
+      .sort((a, b) => a.absTime - b.absTime);
+  }
+
+  /**
+   * Reset merger state.
+   */
+  reset() {
+    this.confirmedTokens = [];
+    this.pendingTokens = [];
+  }
+
+  /**
+   * Get merger state for debugging.
+   * 
+   * @returns {Object} State summary
+   */
+  getState() {
+    return {
+      confirmedCount: this.confirmedTokens.length,
+      pendingCount: this.pendingTokens.length,
+      lastConfirmedTime: this.confirmedTokens.length > 0
+        ? this.confirmedTokens[this.confirmedTokens.length - 1].absTime
+        : 0,
+      lastPendingTime: this.pendingTokens.length > 0
+        ? this.pendingTokens[this.pendingTokens.length - 1].absTime
+        : 0
     };
   }
 }
