@@ -19,9 +19,42 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
         <div class="flex items-center gap-4">
           <span class="font-bold text-primary italic">BONCUK DEBUG</span>
           <span class="text-gray-500">ENGINE: <span class="text-gray-700 dark:text-gray-300">{appStore.backend().toUpperCase()}</span></span>
-          <span class="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400">
-            Local Inference: Active
-          </span>
+
+          {/* Mode Toggle */}
+          <div class="flex items-center gap-1 bg-gray-300 dark:bg-gray-700 rounded-lg p-0.5">
+            <button
+              class={`px-2 py-0.5 rounded text-xs transition-colors ${appStore.transcriptionMode() === 'v2-utterance'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
+                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              onClick={() => appStore.setTranscriptionMode('v2-utterance')}
+              title="Per-utterance VAD mode"
+            >
+              v2 VAD
+            </button>
+            <button
+              class={`px-2 py-0.5 rounded text-xs transition-colors ${appStore.transcriptionMode() === 'v3-streaming'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
+                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              onClick={() => appStore.setTranscriptionMode('v3-streaming')}
+              title="Streaming LCS+PTFA merge"
+            >
+              v3 LCS
+            </button>
+          </div>
+
+          {/* Merge Info (v3 only) */}
+          {appStore.transcriptionMode() === 'v3-streaming' && (
+            <div class="flex items-center gap-2 text-xs">
+              <span class={`px-2 py-0.5 rounded ${appStore.mergeInfo().anchorValid
+                  ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400'
+                  : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-400'
+                }`}>
+                LCS: {appStore.mergeInfo().lcsLength} | Chunks: {appStore.mergeInfo().chunkCount}
+              </span>
+            </div>
+          )}
         </div>
         <div class="flex gap-4 text-gray-500">
           <span>Latency: <span class="text-gray-900 dark:text-gray-100">{appStore.inferenceLatency()}ms</span></span>

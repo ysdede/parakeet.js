@@ -1,15 +1,17 @@
 /**
- * BoncukJS v2.0 - Main Application Component
+ * BoncukJS v3.0 - Main Application Component
  * 
  * Privacy-first, offline-capable real-time transcription.
- * Uses state-preserving streaming (NVIDIA approach) via parakeet.js.
+ * Supports two modes:
+ * - v2: Per-utterance VAD-based transcription
+ * - v3: Overlapping window streaming with LCS+PTFA merge
  */
 
 import { Component, Show, For, Switch, Match, createSignal, onMount, onCleanup } from 'solid-js';
 import { appStore } from './stores/appStore';
 import { CompactWaveform, ModelLoadingOverlay, Sidebar, DebugPanel, StatusBar, PrivacyBadge } from './components';
 import { AudioEngine } from './lib/audio';
-import { ModelManager, TranscriptionService } from './lib/transcription';
+import { ModelManager, TranscriptionService, TokenStreamTranscriber } from './lib/transcription';
 
 // Singleton instances
 let audioEngine: AudioEngine | null = null;
@@ -18,9 +20,15 @@ export const [audioEngineSignal, setAudioEngineSignal] = createSignal<AudioEngin
 
 let modelManager: ModelManager | null = null;
 
+// v2: Per-utterance transcription
 let transcriptionService: TranscriptionService | null = null;
-let energyPollInterval: number | undefined;
 let segmentUnsubscribe: (() => void) | null = null;
+
+// v3: Token stream transcription with LCS merge
+let tokenStreamTranscriber: TokenStreamTranscriber | null = null;
+let windowUnsubscribe: (() => void) | null = null;
+
+let energyPollInterval: number | undefined;
 
 const Header: Component<{ onTabChange: (tab: string) => void }> = (props) => {
   const isRecording = () => appStore.recordingState() === 'recording';
@@ -28,15 +36,30 @@ const Header: Component<{ onTabChange: (tab: string) => void }> = (props) => {
 
   const toggleRecording = async () => {
     if (isRecording()) {
-      // Stop recording
+      // === STOP RECORDING ===
       if (energyPollInterval) {
         clearInterval(energyPollInterval);
         energyPollInterval = undefined;
       }
       audioEngine?.stop();
 
-      // Finalize transcription
-      if (transcriptionService) {
+      // Cleanup subscriptions
+      if (segmentUnsubscribe) {
+        segmentUnsubscribe();
+        segmentUnsubscribe = null;
+      }
+      if (windowUnsubscribe) {
+        windowUnsubscribe();
+        windowUnsubscribe = null;
+      }
+
+      // Finalize based on mode
+      if (appStore.transcriptionMode() === 'v3-streaming' && tokenStreamTranscriber) {
+        const final = tokenStreamTranscriber.finalize();
+        appStore.setTranscript(final.confirmedText);
+        appStore.setPendingText('');
+        console.log('[App] v3 finalized:', final.chunkCount, 'chunks processed');
+      } else if (transcriptionService) {
         const final = transcriptionService.finalize();
         if (final.text) {
           appStore.appendTranscript(final.text + ' ');
@@ -46,17 +69,17 @@ const Header: Component<{ onTabChange: (tab: string) => void }> = (props) => {
       appStore.setAudioLevel(0);
       appStore.stopRecording();
     } else {
-      // Start recording
+      // === START RECORDING ===
       try {
         // Initialize audio engine if needed
         if (!audioEngine) {
           audioEngine = new AudioEngine({
             sampleRate: 16000,
-            bufferDuration: 30,
+            bufferDuration: 60, // Increased for v3 windowing
             energyThreshold: 0.01,
-            minSpeechDuration: 80,    // 80ms to confirm speech (fast)
-            minSilenceDuration: 400,  // 400ms silence = end segment (natural pauses)
-            maxSegmentDuration: 30.0, // Don't split artificially - let VAD handle it
+            minSpeechDuration: 80,
+            minSilenceDuration: 400,
+            maxSegmentDuration: 30.0,
             deviceId: appStore.selectedDeviceId(),
           });
           setAudioEngineSignal(audioEngine);
@@ -64,63 +87,95 @@ const Header: Component<{ onTabChange: (tab: string) => void }> = (props) => {
           audioEngine.updateConfig({ deviceId: appStore.selectedDeviceId() });
         }
 
+        const mode = appStore.transcriptionMode();
+        console.log(`[App] Starting in ${mode} mode`);
+
         if (isModelReady() && modelManager) {
-          // Per-utterance transcription mode: Just need the model reference
-          // We don't use the streaming transcriber since parakeet.js lacks encoder cache
-          if (!transcriptionService) {
-            transcriptionService = new TranscriptionService(modelManager, {
-              sampleRate: 16000,
-              returnTimestamps: true,
-              returnConfidences: true,
-              debug: true,
-            }, {});
-            transcriptionService.initialize();
-            console.log('[App] Per-utterance transcription mode initialized');
-          }
-        }
-
-        // Subscribe to speech segments for transcription (ensure clean sub)
-        // NOTE: Using per-utterance transcription mode.
-        // Each VAD segment is transcribed independently and appended to transcript.
-        // This is necessary because parakeet.js lacks encoder cache for true streaming.
-        if (segmentUnsubscribe) segmentUnsubscribe();
-        segmentUnsubscribe = audioEngine.onSpeechSegment(async (segment) => {
-          if (transcriptionService && isModelReady()) {
-            const startTime = Date.now();
-            try {
-              const samples = audioEngine!.getRingBuffer().read(segment.startFrame, segment.endFrame);
-
-              // Phase 1: Stateless/Per-Utterance Transcription
-              // Transcribe this utterance directly using the service helper
-              const result = await transcriptionService.transcribeSegment(samples);
-
-              // Append utterance to transcript
-              if (result.text) {
-                appStore.appendTranscript(result.text + ' ');
-
-                // Update metrics and debug tokens
-                if (result.words && result.words.length > 0) {
-                  const lastWords = result.words.slice(-5).map((w, i) => ({
-                    id: `TOK_${Date.now()}_${i}`,
-                    text: w.text,
-                    confidence: w.confidence ?? 0
-                  }));
-                  appStore.setDebugTokens(prev => [...prev.slice(-15), ...lastWords]);
-
-                  const avgConf = result.words.reduce((acc, w) => acc + (w.confidence || 0), 0) / result.words.length;
-                  appStore.setSystemMetrics({
-                    throughput: result.words.length / (segment.duration || 0.1),
-                    modelConfidence: avgConf,
+          if (mode === 'v3-streaming') {
+            // === v3: Token Stream with LCS+PTFA merge ===
+            if (!tokenStreamTranscriber) {
+              tokenStreamTranscriber = new TokenStreamTranscriber(modelManager, {
+                windowDuration: 5.0,
+                overlapDuration: 1.5,
+                sampleRate: 16000,
+                debug: true,
+              }, {
+                onConfirmedUpdate: (text) => {
+                  appStore.setTranscript(text);
+                },
+                onPendingUpdate: (text) => {
+                  appStore.setPendingText(text);
+                },
+                onMergeInfo: (info) => {
+                  appStore.setMergeInfo({
+                    lcsLength: info.lcsLength,
+                    anchorValid: info.anchorValid,
+                    chunkCount: tokenStreamTranscriber?.getState()?.chunkCount ?? 0,
                   });
+                },
+                onError: (err) => {
+                  console.error('[v3] Error:', err);
+                  appStore.setErrorMessage(err.message);
+                },
+              });
+              await tokenStreamTranscriber.initialize();
+              console.log('[App] v3 TokenStreamTranscriber initialized');
+            } else {
+              tokenStreamTranscriber.reset();
+            }
+
+            // Connect to fixed-window audio stream
+            windowUnsubscribe = tokenStreamTranscriber.connectToAudioEngine(audioEngine);
+
+          } else {
+            // === v2: Per-utterance VAD-based transcription ===
+            if (!transcriptionService) {
+              transcriptionService = new TranscriptionService(modelManager, {
+                sampleRate: 16000,
+                returnTimestamps: true,
+                returnConfidences: true,
+                debug: true,
+              }, {});
+              transcriptionService.initialize();
+              console.log('[App] v2 per-utterance mode initialized');
+            }
+
+            // Subscribe to VAD segments
+            if (segmentUnsubscribe) segmentUnsubscribe();
+            segmentUnsubscribe = audioEngine.onSpeechSegment(async (segment) => {
+              if (transcriptionService && isModelReady()) {
+                const startTime = Date.now();
+                try {
+                  const samples = audioEngine!.getRingBuffer().read(segment.startFrame, segment.endFrame);
+                  const result = await transcriptionService.transcribeSegment(samples);
+
+                  if (result.text) {
+                    appStore.appendTranscript(result.text + ' ');
+
+                    if (result.words && result.words.length > 0) {
+                      const lastWords = result.words.slice(-5).map((w, i) => ({
+                        id: `TOK_${Date.now()}_${i}`,
+                        text: w.text,
+                        confidence: w.confidence ?? 0
+                      }));
+                      appStore.setDebugTokens(prev => [...prev.slice(-15), ...lastWords]);
+
+                      const avgConf = result.words.reduce((acc, w) => acc + (w.confidence || 0), 0) / result.words.length;
+                      appStore.setSystemMetrics({
+                        throughput: result.words.length / (segment.duration || 0.1),
+                        modelConfidence: avgConf,
+                      });
+                    }
+                  }
+
+                  appStore.setInferenceLatency(Date.now() - startTime);
+                } catch (e) {
+                  console.error('[v2] Transcription error:', e);
                 }
               }
-
-              appStore.setInferenceLatency(Date.now() - startTime);
-            } catch (e) {
-              console.error('Transcription error:', e);
-            }
+            });
           }
-        });
+        }
 
         await audioEngine.start();
         appStore.startRecording();

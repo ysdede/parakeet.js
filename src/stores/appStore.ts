@@ -1,5 +1,5 @@
 /**
- * BoncukJS v2.0 - App Store
+ * BoncukJS v3.0 - App Store
  * 
  * Central state management using SolidJS signals.
  * Manages recording state, model status, and transcript.
@@ -18,6 +18,16 @@ export interface SystemMetrics {
   throughput: number; // tokens/sec
   modelConfidence: number; // 0-1
   vramUsage?: string;
+}
+
+/** Transcription mode: v2 (per-utterance VAD) or v3 (overlapping windows + LCS merge) */
+export type TranscriptionMode = 'v2-utterance' | 'v3-streaming';
+
+/** Merge info for v3 streaming mode */
+export interface MergeInfo {
+  lcsLength: number;
+  anchorValid: boolean;
+  chunkCount: number;
 }
 
 function createAppStore() {
@@ -57,6 +67,14 @@ function createAppStore() {
   const [systemMetrics, setSystemMetrics] = createSignal<SystemMetrics>({
     throughput: 0,
     modelConfidence: 0,
+  });
+
+  // v3 Transcription mode toggle
+  const [transcriptionMode, setTranscriptionMode] = createSignal<TranscriptionMode>('v3-streaming');
+  const [mergeInfo, setMergeInfo] = createSignal<MergeInfo>({
+    lcsLength: 0,
+    anchorValid: false,
+    chunkCount: 0,
   });
 
   // Network status listeners
@@ -141,6 +159,8 @@ function createAppStore() {
     debugTokens,
     systemMetrics,
     errorMessage,
+    transcriptionMode,
+    mergeInfo,
 
     // Setters (for internal use)
     setRecordingState,
@@ -163,6 +183,8 @@ function createAppStore() {
     setInferenceLatency,
     setDebugTokens,
     setSystemMetrics,
+    setTranscriptionMode,
+    setMergeInfo,
 
     // Actions
     startRecording,
