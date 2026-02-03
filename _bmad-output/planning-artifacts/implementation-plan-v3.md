@@ -19,10 +19,11 @@ that NVIDIA's "State-Preserving Streaming" approach doesn't work with ONNX Runti
 - ✅ Helper methods: `getFrameTimeStride()`, `frameToTime()`, `getStreamingConstants()`
 
 ### To Implement (in BoncukJS)
-- [ ] `TokenStreamTranscriber` - main streaming orchestrator
-- [ ] `DelayedTextFormatter` - capitalization and punctuation
-- [ ] `SentenceBoundaryDetector` - detect sentence ends from pauses
+- [ ] `TokenStreamTranscriber` - main streaming orchestrator (sentence-context windows)
+- [ ] `SentenceBoundaryDetector` - detect sentence ends to define retranscription windows
 - [ ] UI integration - confirmed vs pending text display
+
+**Note:** NO post-processing for caps/punctuation. The Parakeet model outputs proper formatting when given sufficient context. We achieve this by retranscribing with sentence-context windows (last 2-3 sentences).
 
 ---
 
@@ -167,64 +168,63 @@ export class TokenStreamTranscriber {
 
 ---
 
-### Task 2: DelayedTextFormatter Class
+### Task 2: SentenceBoundaryDetector Class
 
-**File:** `src/lib/transcription/DelayedTextFormatter.ts`
+**File:** `src/lib/transcription/SentenceBoundaryDetector.ts`
 
-**Purpose:** Applies capitalization and punctuation to confirmed tokens based on
-silence gaps and linguistic rules (not relying on model's formatting decisions).
+**Purpose:** Detects sentence boundaries in the FINALIZED transcript to determine
+the START POINT for the retranscription window. This is NOT for post-processing
+formatting - it's for defining WHERE to start the sliding context window.
+
+**Key Insight:** The Parakeet model already outputs proper capitalization and 
+punctuation when given sufficient context. We achieve this by retranscribing 
+the last 2-3 sentences + new audio. The model sees complete sentences and 
+produces correct formatting.
 
 ```typescript
-export interface FormatterConfig {
-  pauseThresholds: {
-    comma: number;     // seconds (default: 0.3)
-    period: number;    // seconds (default: 0.7)
-    paragraph: number; // seconds (default: 2.0)
-  };
-  abbreviations: string[];  // Words that don't end sentences
+export interface SentenceInfo {
+  text: string;
+  startTime: number;      // Audio timestamp where sentence starts
+  endTime: number;        // Audio timestamp where sentence ends
+  startSample: number;    // Sample index in audio buffer
+  endSample: number;      // Sample index in audio buffer
 }
 
-export class DelayedTextFormatter {
-  private config: FormatterConfig;
+export class SentenceBoundaryDetector {
+  private sentences: SentenceInfo[] = [];
   
-  constructor(config: Partial<FormatterConfig> = {}) {
-    this.config = {
-      pauseThresholds: {
-        comma: config.pauseThresholds?.comma ?? 0.3,
-        period: config.pauseThresholds?.period ?? 0.7,
-        paragraph: config.pauseThresholds?.paragraph ?? 2.0,
-      },
-      abbreviations: config.abbreviations ?? ['mr', 'mrs', 'dr', 'ms', 'prof', 'etc', 'vs'],
-    };
+  /**
+   * Update with new finalized transcript from model.
+   * Parses punctuation (. ! ?) to find sentence boundaries.
+   */
+  updateFromTranscript(text: string, words: WordWithTimestamp[]): void {
+    // Find sentence-ending punctuation in model output
+    // Map back to word timestamps
+    // Store sentence boundaries
   }
   
   /**
-   * Format confirmed tokens into proper text with capitalization and punctuation.
+   * Get the start point for retranscription window.
+   * Returns the start of the Nth-to-last sentence.
+   * 
+   * @param sentencesBack - How many sentences to include (default: 2)
+   * @returns Audio timestamp to start retranscription from
    */
-  format(tokens: TokenData[]): string {
-    if (tokens.length === 0) return '';
-    
-    // 1. Build raw text from tokens
-    let words: WordWithTiming[] = this.tokensToWords(tokens);
-    
-    // 2. Detect sentence boundaries from pauses
-    const boundaries = this.detectSentenceBoundaries(words);
-    
-    // 3. Apply formatting
-    let result = '';
-    let sentenceStart = true;
-    
-    for (let i = 0; i < words.length; i++) {
-      let word = words[i].text;
-      
-      // Capitalize sentence start
-      if (sentenceStart && word.length > 0) {
-        word = word.charAt(0).toUpperCase() + word.slice(1);
-        sentenceStart = false;
-      }
-      
-      // Add word
-      result += (result.length > 0 ? ' ' : '') + word;
+  getRetranscriptionStart(sentencesBack: number = 2): number {
+    if (this.sentences.length < sentencesBack) {
+      return 0; // Not enough sentences, start from beginning
+    }
+    const targetSentence = this.sentences[this.sentences.length - sentencesBack];
+    return targetSentence.startTime;
+  }
+  
+  /**
+   * Get the last N sentences for context display.
+   */
+  getLastSentences(n: number): SentenceInfo[] {
+    return this.sentences.slice(-n);
+  }
+}
       
       // Check for sentence boundary after this word
       if (boundaries.has(i)) {

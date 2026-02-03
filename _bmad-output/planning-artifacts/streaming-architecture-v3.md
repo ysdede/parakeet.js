@@ -19,7 +19,7 @@ because:
 - **Token-Level Local Agreement** (improved from user's proven merging approach)
 - **Frame-Aligned Streaming** (new capability added to parakeet.js)
 - **Mel Feature Caching** (10-15% compute savings)
-- **Two-Stage Pipeline** (separate acoustic recognition from text formatting)
+- **Sentence-Context Windows** (retranscribe with context so model produces correct caps/punct)
 
 ---
 
@@ -80,17 +80,17 @@ because:
 │  └─────────────────────────────────────────────────────────────────────────┘   │
 │                                    ↓                                           │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
-│  │                    TEXT FORMATTING LAYER                                │   │
+│  │                    MODEL OUTPUT (No Post-Processing)                    │   │
 │  ├─────────────────────────────────────────────────────────────────────────┤   │
-│  │  DelayedTextFormatter (runs on CONFIRMED tokens only)                   │   │
+│  │  The Parakeet model already outputs proper caps & punctuation!          │   │
 │  │                                                                         │   │
-│  │  1. Sentence boundary detection (silence gaps, keywords)               │   │
-│  │  2. Apply capitalization rules (sentence start = uppercase)            │   │
-│  │  3. Insert punctuation (based on pauses + linguistic patterns)         │   │
-│  │  4. Optional: lightweight punctuation model                            │   │
+│  │  Key: Retranscribe with SENTENCE CONTEXT (last 2-3 sentences)          │   │
+│  │       so model has enough context to produce correct formatting.        │   │
 │  │                                                                         │   │
-│  │  Raw:   "how are you today i am fine"                                  │   │
-│  │  Final: "How are you today? I am fine."                                │   │
+│  │  NO post-processing needed - just merge and display model output.      │   │
+│  │                                                                         │   │
+│  │  Model output: "How are you today? I am fine."                         │   │
+│  │  We display:   "How are you today? I am fine."  (as-is)                │   │
 │  └─────────────────────────────────────────────────────────────────────────┘   │
 │                                    ↓                                           │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │

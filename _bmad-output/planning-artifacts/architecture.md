@@ -16,7 +16,7 @@ keyDecisions:
   - 'ADOPTED: Token-Level Local Agreement with Frame-Aligned Merging'
   - 'Dual-stage VAD pipeline (Pre + Post)'
   - 'SolidJS frontend with TypeScript'
-  - 'Two-Stage Pipeline: Acoustic Recognition vs. Text Formatting'
+  - 'Sentence-Context Windows: Retranscribe last 2-3 sentences for model context (NO post-processing for caps/punct)'
 ---
 
 # BoncukJS v2.0 Architecture Decision Document
@@ -39,7 +39,7 @@ _Real-time Speech Transcription Web Application_
 1.  **Token-Level Merging:** Compare tokens by `(id, frameIndex, timestamp)` instead of text.
 2.  **Frame-Aligned Streaming:** Leverage new `parakeet.js` features (`returnFrameIndices`, `returnLogProbs`) for precise alignment.
 3.  **Mel Feature Caching:** Cache mel spectrograms for 10-15% compute savings on overlapping regions.
-4.  **Two-Stage Pipeline:** Separate acoustic recognition (streaming) from text formatting (delayed).
+4.  **Sentence-Context Windows:** Retranscribe last 2-3 sentences + new audio so model has context to produce correct caps/punct (NO post-processing).
 
 | Approach | Logic | Status |
 |----------|-------|--------|
@@ -100,16 +100,16 @@ _Real-time Speech Transcription Web Application_
 │  │ Result: Keep prev tokens up to anchor, append curr after       │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│  LAYER 5: DELAYED TEXT FORMATTING                                      │
+│  LAYER 5: MODEL OUTPUT (No Post-Processing)                           │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │ Raw tokens: [how, are, you, today, i, am, fine]               │   │
+│  │ The Parakeet model ALREADY outputs proper caps & punctuation!  │   │
 │  │                                                                 │   │
-│  │ After stabilization (token confirmed in 2+ chunks):           │   │
-│  │   • Sentence boundary detection (silence gaps, keywords)       │   │
-│  │   • Apply capitalization rules                                 │   │
-│  │   • Insert punctuation                                         │   │
+│  │ We achieve correct formatting by:                              │   │
+│  │   • Retranscribing last 2-3 sentences + new audio              │   │
+│  │   • Model sees complete sentences → produces correct format    │   │
+│  │   • NO post-processing needed                                  │   │
 │  │                                                                 │   │
-│  │ Final: "How are you today? I am fine."                        │   │
+│  │ Model output: "How are you today? I am fine."  (display as-is)│   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
