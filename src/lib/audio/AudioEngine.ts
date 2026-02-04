@@ -82,6 +82,10 @@ export class AudioEngine implements IAudioEngine {
     // Subscribers for visualization updates
     private visualizationCallbacks: Array<(data: Float32Array, metrics: AudioMetrics) => void> = [];
 
+    // Recent segments for visualization (stores timing info only)
+    private recentSegments: Array<{ startTime: number; endTime: number; isProcessed: boolean }> = [];
+    private readonly MAX_SEGMENTS_FOR_VISUALIZATION = 50;
+
     constructor(config: Partial<AudioEngineConfig> = {}) {
         this.config = {
             sampleRate: 16000,
@@ -469,7 +473,36 @@ export class AudioEngine implements IAudioEngine {
     }
 
     private notifySegment(segment: AudioSegment): void {
+        // Track segment for visualization
+        this.recentSegments.push({
+            startTime: segment.startFrame / this.targetSampleRate,
+            endTime: segment.endFrame / this.targetSampleRate,
+            isProcessed: false
+        });
+
+        // Limit segments count
+        if (this.recentSegments.length > this.MAX_SEGMENTS_FOR_VISUALIZATION) {
+            this.recentSegments.shift();
+        }
+
         this.segmentCallbacks.forEach((cb) => cb(segment));
+    }
+
+    /**
+     * Get recent segments for visualization.
+     */
+    getSegmentsForVisualization(): Array<{ startTime: number; endTime: number; isProcessed: boolean }> {
+        return [...this.recentSegments];
+    }
+
+    /**
+     * Mark a segment as processed (for visualization color coding).
+     */
+    markSegmentProcessed(startTime: number): void {
+        const segment = this.recentSegments.find(s => Math.abs(s.startTime - startTime) < 0.1);
+        if (segment) {
+            segment.isProcessed = true;
+        }
     }
 
     /**

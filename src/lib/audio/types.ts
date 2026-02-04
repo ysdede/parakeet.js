@@ -130,6 +130,16 @@ export interface AudioEngine {
      * Callback is invoked after each audio chunk is processed.
      */
     onVisualizationUpdate(callback: (data: Float32Array, metrics: AudioMetrics) => void): () => void;
+
+    /**
+     * Get recent segments for visualization.
+     */
+    getSegmentsForVisualization(): Array<{ startTime: number; endTime: number; isProcessed: boolean }>;
+
+    /**
+     * Mark a segment as processed (for visualization color coding).
+     */
+    markSegmentProcessed(startTime: number): void;
 }
 
 /**

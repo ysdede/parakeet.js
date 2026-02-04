@@ -39,6 +39,7 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     currentSNR: 0,
     isSpeaking: false,
   });
+  const [segments, setSegments] = createSignal<Array<{ startTime: number; endTime: number; isProcessed: boolean }>>([]);
 
   const height = () => props.height ?? 80;
   const showThreshold = () => props.showThreshold ?? true;
@@ -83,6 +84,11 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     // Draw time markers at the top
     if (showTimeMarkers() && props.audioEngine) {
       drawTimeMarkers(width, canvasHeight, textColor, tickColor);
+    }
+
+    // Draw segment boundaries (before waveform so they appear behind)
+    if (props.audioEngine) {
+      drawSegments(width, canvasHeight, isDarkMode);
     }
 
     // Draw waveform using min/max data
@@ -242,6 +248,49 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     }
   };
 
+  // Draw segment boundaries
+  const drawSegments = (width: number, canvasHeight: number, isDarkMode: boolean) => {
+    const context = ctx;
+    if (!context || !props.audioEngine) return;
+
+    const bufferDuration = props.audioEngine.getVisualizationDuration();
+    const currentTime = props.audioEngine.getCurrentTime();
+    const windowStart = currentTime - bufferDuration;
+    const segmentList = segments();
+
+    // Colors for segments
+    const pendingColor = isDarkMode ? 'rgba(250, 204, 21, 0.15)' : 'rgba(234, 179, 8, 0.15)';
+    const processedColor = isDarkMode ? 'rgba(34, 197, 94, 0.15)' : 'rgba(22, 163, 74, 0.15)';
+    const pendingBorderColor = isDarkMode ? 'rgba(250, 204, 21, 0.5)' : 'rgba(234, 179, 8, 0.5)';
+    const processedBorderColor = isDarkMode ? 'rgba(34, 197, 94, 0.5)' : 'rgba(22, 163, 74, 0.5)';
+
+    segmentList.forEach(segment => {
+      // Calculate relative position in visualization window
+      const relativeStart = segment.startTime - windowStart;
+      const relativeEnd = segment.endTime - windowStart;
+
+      // Only draw if segment is within visible window
+      if (relativeEnd > 0 && relativeStart < bufferDuration) {
+        const startX = Math.max(0, (relativeStart / bufferDuration)) * width;
+        const endX = Math.min(1, (relativeEnd / bufferDuration)) * width;
+
+        // Fill segment area
+        context.fillStyle = segment.isProcessed ? processedColor : pendingColor;
+        context.fillRect(startX, 0, endX - startX, canvasHeight);
+
+        // Draw segment boundaries
+        context.strokeStyle = segment.isProcessed ? processedBorderColor : pendingBorderColor;
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(startX, 0);
+        context.lineTo(startX, canvasHeight);
+        context.moveTo(endX, 0);
+        context.lineTo(endX, canvasHeight);
+        context.stroke();
+      }
+    });
+  };
+
   // Animation loop
   const drawLoop = () => {
     if (!ctx || !canvasRef || canvasRef.width === 0) {
@@ -313,6 +362,9 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
             setWaveformData(data);
           }
           setMetrics(newMetrics);
+
+          // Fetch segments for visualization
+          setSegments(props.audioEngine!.getSegmentsForVisualization());
         } else {
           // Still update metrics even when not visible
           setMetrics(newMetrics);
