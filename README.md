@@ -1,92 +1,145 @@
----
-title: Parakeet.js Demo
-emoji: 🦜
-colorFrom: indigo
-colorTo: blue
-sdk: static
-pinned: false
-app_build_command: npm run build
-app_file: build/index.html
-license: mit
-short_description: NVIDIA Parakeet speech recognition for the browser
-models:
-- istupakov/parakeet-tdt-0.6b-v2-onnx
-tags:
-- parakeet-js
-- parakeet
-- onnx
-- webgpu
-- asr
-- istupakov/parakeet-tdt-0.6b-v2-onnx
-custom_headers:
-  cross-origin-embedder-policy: require-corp
-  cross-origin-opener-policy: same-origin
-  cross-origin-resource-policy: cross-origin
----
+# Parakeet.js Demo
 
-# 🦜 Parakeet.js - HF Spaces Demo
+This is the unified demo application for parakeet.js. It can be used for:
+- **Development**: Testing local source code changes
+- **NPM Testing**: Testing the published npm package
+- **Deployment**: Deploying to HuggingFace Spaces and GitHub Pages
 
-> **NVIDIA Parakeet speech recognition for the browser using WebGPU/WASM**
-
-This demo showcases the **[parakeet.js](https://www.npmjs.com/package/parakeet.js)** library, which brings NVIDIA's Parakeet speech recognition models to the browser using ONNX Runtime Web with WebGPU and WASM backends.
-
-## 🚀 Features
-
-- **🖥️ Browser-based**: Runs entirely in your browser - no server required
-- **⚡ WebGPU acceleration**: Fast inference using WebGPU when available
-- **🔧 WASM fallback**: CPU-based inference using WebAssembly
-- **📱 Multiple formats**: Supports various audio formats (WAV, MP3, etc.)
-- **🎯 Real-time performance**: Optimized for fast transcription
-- **📊 Performance metrics**: Shows detailed timing information
-- **🎛️ Configurable**: Adjustable quantization, preprocessing, and backend settings
-
-## 🔧 How to Use
-
-1. **Click "Load Model"** to download and initialize the speech recognition model
-2. **Select your preferences**:
-   - **Backend**: Choose WebGPU (faster) or WASM (more compatible)
-   - **Quantization**: fp32 (higher quality) or int8 (faster)
-   - **Preprocessor**: Different audio processing options
-3. **Upload an audio file** using the file input
-4. **View the transcription** in real-time with performance metrics
-
-## 📦 Integration
-
-You can use parakeet.js in your own projects:
+## Quick Start
 
 ```bash
-npm install parakeet.js onnxruntime-web
+cd examples/demo
+npm install
 ```
 
-```javascript
-import { ParakeetModel, getParakeetModel } from 'parakeet.js';
+## Development Modes
 
-// Load model from HuggingFace Hub
-const modelUrls = await getParakeetModel('istupakov/parakeet-tdt-0.6b-v2-onnx');
-const model = await ParakeetModel.fromUrls(modelUrls);
+### 🔧 Local Development (Test Local Changes)
 
-// Transcribe audio
-const result = await model.transcribe(audioData, sampleRate);
-console.log(result.utterance_text);
+Use this when modifying the parakeet.js library source code:
+
+```bash
+npm run dev:local
 ```
 
-## 🔗 Links
+This runs Vite with the `PARAKEET_LOCAL=true` environment variable, which aliases `parakeet.js` imports to `/src/index.js` instead of the npm package.
 
-- **📚 [GitHub Repository](https://github.com/ysdede/parakeet.js)** - Source code and documentation
-- **📦 [npm Package](https://www.npmjs.com/package/parakeet.js)** - Install via npm
+**When to use:**
+- Developing new features in `/src/`
+- Debugging issues in the library
+- Testing before publishing to npm
 
-## 🧠 Model Information
+### 📦 NPM Package Testing
 
-This demo uses the **istupakov/parakeet-tdt-0.6b-v2-onnx** model, which is an ONNX-converted version of NVIDIA's Parakeet speech recognition model optimized for browser deployment.
+Use this to test the published npm package (simulates end-user experience):
 
-## 💡 Technical Details
+```bash
+npm run dev
+```
 
-- **Model Format**: ONNX for cross-platform compatibility
-- **Backends**: WebGPU (GPU acceleration) and WASM (CPU fallback)
-- **Quantization**: Support for both fp32 and int8 precision
-- **Audio Processing**: Built-in preprocessing for various audio formats
-- **Performance**: Real-time factor (RTF) typically < 1.0x for fast transcription
+This uses the `parakeet.js` package from npm (version specified in `package.json`).
 
----
+**When to use:**
+- Verifying the published package works correctly
+- Testing after `npm publish`
+- Before deploying to production
 
-*Built with ❤️ using React and deployed on Hugging Face Spaces*
+## Building
+
+### Local Source Build
+```bash
+npm run build:local
+```
+
+### NPM Package Build (for deployment)
+```bash
+npm run build
+```
+
+## Deployment
+
+### 🤗 HuggingFace Spaces
+
+Deploy to HuggingFace Spaces (uses npm package build):
+
+```bash
+npm run deploy-to-hf
+```
+
+This will:
+1. Build the app with `npm run build`
+2. Clone the HF Space repository
+3. Copy build files and space template
+4. Push to HuggingFace
+
+**Requirements:**
+- HuggingFace CLI logged in (`huggingface-cli login`)
+- Write access to the Space repository
+
+### 🐙 GitHub Pages
+
+GitHub Pages deployment is automated via GitHub Actions.
+
+**Automatic Deployment:**
+Pushing changes to `examples/demo/**` on the `master` branch triggers the workflow.
+
+**Manual Trigger:**
+```bash
+gh workflow run deploy-gh-pages.yml
+```
+
+**Check Status:**
+```bash
+gh run list --workflow="deploy-gh-pages.yml"
+```
+
+## Cross-Origin Isolation
+
+Both deployment targets require Cross-Origin Isolation headers for `SharedArrayBuffer` support (multi-threaded WASM):
+
+### HuggingFace Spaces
+Headers are configured in `space_template/README.md`:
+```yaml
+custom_headers:
+  cross-origin-embedder-policy: credentialless
+  cross-origin-opener-policy: same-origin
+```
+
+### GitHub Pages
+Since GitHub Pages doesn't support custom headers, we use `coi-serviceworker.js` which is included in the build.
+
+## Directory Structure
+
+```
+demo/
+├── src/
+│   ├── App.jsx          # Main React component
+│   ├── App.css          # Styles
+│   └── utils/           # Utility functions
+├── public/
+│   ├── assets/          # Static assets (test audio)
+│   └── coi-serviceworker.js  # Cross-origin isolation workaround
+├── scripts/
+│   └── deploy-to-hf.js  # HF deployment script
+├── space_template/
+│   └── README.md        # HF Space configuration
+├── vite.config.js       # Vite config with local/npm switching
+└── package.json         # Scripts and dependencies
+```
+
+## Troubleshooting
+
+### "SharedArrayBuffer unavailable" warning
+- **Local dev**: Should work automatically (Vite sets COOP/COEP headers)
+- **HF Spaces**: Check `space_template/README.md` has `custom_headers`
+- **GitHub Pages**: Ensure `coi-serviceworker.js` is in the build
+
+### Model loading fails with memory error
+- Check browser DevTools isn't pausing on potential OOM
+- Try closing other browser tabs to free memory
+- Use int8 quantization for smaller models
+
+### Changes not reflected after deployment
+- GitHub Pages: Wait 1-2 minutes for CDN cache
+- HF Spaces: Wait for Space rebuild (~1 minute)
+- Clear browser cache or use incognito window

@@ -10,6 +10,8 @@
 
 # production
 /build
+/dist
+/temp_hf_deploy
 
 # misc
 .DS_Store
