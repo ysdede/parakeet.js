@@ -308,7 +308,7 @@ export default function App() {
 
       try {
         // Use GitHub raw URL for the test audio file
-        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/refs/heads/master/examples/react-demo-dev/public/assets/life_Jim.wav';
+        const audioUrl = './assets/life_Jim.wav';
         const audioBlob = await getCachedAudioFile(audioUrl, 'life_Jim.wav');
         const buf = await audioBlob.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });
@@ -628,8 +628,8 @@ export default function App() {
             {/* Threading Status Indicator */}
             <div className="flex items-center gap-2 px-1 mt-2">
               <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${threadingStatus.sab
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
                 }`}>
                 <span className="material-icons-outlined text-xs">
                   {threadingStatus.sab ? 'check_circle' : 'warning'}
