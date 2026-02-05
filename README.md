@@ -1,4 +1,30 @@
-# Parakeet.js Demo
+---
+title: Parakeet.js Demo
+emoji: 🦜
+colorFrom: indigo
+colorTo: blue
+sdk: static
+pinned: false
+app_build_command: npm run build
+app_file: dist/index.html
+license: mit
+short_description: NVIDIA Parakeet speech recognition for the browser
+models:
+- istupakov/parakeet-tdt-0.6b-v2-onnx
+tags:
+- parakeet-js
+- parakeet
+- onnx
+- webgpu
+- asr
+- istupakov/parakeet-tdt-0.6b-v2-onnx
+custom_headers:
+  cross-origin-embedder-policy: require-corp
+  cross-origin-opener-policy: same-origin
+  cross-origin-resource-policy: cross-origin
+---
+
+# 🦜 Parakeet.js Demo
 
 This is the unified demo application for parakeet.js. It can be used for:
 - **Development**: Testing local source code changes
@@ -8,138 +34,23 @@ This is the unified demo application for parakeet.js. It can be used for:
 ## Quick Start
 
 ```bash
-cd examples/demo
 npm install
-```
-
-## Development Modes
-
-### 🔧 Local Development (Test Local Changes)
-
-Use this when modifying the parakeet.js library source code:
-
-```bash
-npm run dev:local
-```
-
-This runs Vite with the `PARAKEET_LOCAL=true` environment variable, which aliases `parakeet.js` imports to `/src/index.js` instead of the npm package.
-
-**When to use:**
-- Developing new features in `/src/`
-- Debugging issues in the library
-- Testing before publishing to npm
-
-### 📦 NPM Package Testing
-
-Use this to test the published npm package (simulates end-user experience):
-
-```bash
 npm run dev
 ```
 
-This uses the `parakeet.js` package from npm (version specified in `package.json`).
+## Deployment to HuggingFace Spaces
 
-**When to use:**
-- Verifying the published package works correctly
-- Testing after `npm publish`
-- Before deploying to production
+This project is configured to **build directly on Hugging Face**. Just push the source code to your Space repository.
 
-## Building
+**Key Configuration:**
+- **SDK**: `static`
+- **Build Command**: `npm run build`
+- **Output Path**: `dist/index.html`
 
-### Local Source Build
-```bash
-npm run build:local
-```
+## 🔗 Links
 
-### NPM Package Build (for deployment)
-```bash
-npm run build
-```
+- **📚 [GitHub Repository](https://github.com/ysdede/parakeet.js)**
+- **📦 [npm Package](https://www.npmjs.com/package/parakeet.js)**
 
-## Deployment
-
-### 🤗 HuggingFace Spaces
-
-Deploy to HuggingFace Spaces (uses npm package build):
-
-```bash
-npm run deploy-to-hf
-```
-
-This will:
-1. Build the app with `npm run build`
-2. Clone the HF Space repository
-3. Copy build files and space template
-4. Push to HuggingFace
-
-**Requirements:**
-- HuggingFace CLI logged in (`huggingface-cli login`)
-- Write access to the Space repository
-
-### 🐙 GitHub Pages
-
-GitHub Pages deployment is automated via GitHub Actions.
-
-**Automatic Deployment:**
-Pushing changes to `examples/demo/**` on the `master` branch triggers the workflow.
-
-**Manual Trigger:**
-```bash
-gh workflow run deploy-gh-pages.yml
-```
-
-**Check Status:**
-```bash
-gh run list --workflow="deploy-gh-pages.yml"
-```
-
-## Cross-Origin Isolation
-
-Both deployment targets require Cross-Origin Isolation headers for `SharedArrayBuffer` support (multi-threaded WASM):
-
-### HuggingFace Spaces
-Headers are configured in `space_template/README.md`:
-```yaml
-custom_headers:
-  cross-origin-embedder-policy: credentialless
-  cross-origin-opener-policy: same-origin
-```
-
-### GitHub Pages
-Since GitHub Pages doesn't support custom headers, we use `coi-serviceworker.js` which is included in the build.
-
-## Directory Structure
-
-```
-demo/
-├── src/
-│   ├── App.jsx          # Main React component
-│   ├── App.css          # Styles
-│   └── utils/           # Utility functions
-├── public/
-│   ├── assets/          # Static assets (test audio)
-│   └── coi-serviceworker.js  # Cross-origin isolation workaround
-├── scripts/
-│   └── deploy-to-hf.js  # HF deployment script
-├── space_template/
-│   └── README.md        # HF Space configuration
-├── vite.config.js       # Vite config with local/npm switching
-└── package.json         # Scripts and dependencies
-```
-
-## Troubleshooting
-
-### "SharedArrayBuffer unavailable" warning
-- **Local dev**: Should work automatically (Vite sets COOP/COEP headers)
-- **HF Spaces**: Check `space_template/README.md` has `custom_headers`
-- **GitHub Pages**: Ensure `coi-serviceworker.js` is in the build
-
-### Model loading fails with memory error
-- Check browser DevTools isn't pausing on potential OOM
-- Try closing other browser tabs to free memory
-- Use int8 quantization for smaller models
-
-### Changes not reflected after deployment
-- GitHub Pages: Wait 1-2 minutes for CDN cache
-- HF Spaces: Wait for Space rebuild (~1 minute)
-- Clear browser cache or use incognito window
+---
+*Built with ❤️ using React and parakeet.js*
