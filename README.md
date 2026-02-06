@@ -8,8 +8,43 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 
 > **Parakeet.js** offers a high-performance, browser-first implementation for NVIDIA's Parakeet-TDT speech-to-text models, running entirely client-side via WebGPU and WASM. Powered by ONNX Runtime Web, this library makes it simple to integrate state-of-the-art transcription into any web application.
 
-> **Status:** Stable v1.0.1 release - Production ready
+> **Status:** Stable v1.1.0 release - Production ready
 > **Supported Models:** Parakeet-TDT v2 (English) and v3 (Multilingual - 13 languages)
+
+---
+
+## What's New in v1.1.0 (Preprocessing Optimization)
+
+### Pure JS Mel Spectrogram — Now Default
+- **Pure JavaScript mel spectrogram computation is now the default** (`preprocessorBackend: 'js'`).
+- Eliminates ONNX Runtime overhead for preprocessing (no session creation, tensor allocation, WASM bridge).
+- **Skips preprocessor ONNX download** — one fewer file to download from HuggingFace Hub.
+- Validated against ONNX reference: max absolute error < 4e-4, mean error < 1e-5 across all test signals.
+- Switch back to ONNX with `preprocessorBackend: 'onnx'` in config.
+
+### Incremental Mel Caching for Streaming
+- `IncrementalMelProcessor` caches raw mel frames across overlapping streaming windows.
+- **Integrated into `transcribe()` via `prefixSamples` option** — streaming callers pass the overlap sample count and mel frames are reused automatically.
+- For typical 70% overlap scenarios: **reuses ~350 cached frames, computes only ~150 new frames** (~60-70% preprocessing savings).
+- Exact numerical match with full computation (zero error vs non-incremental path).
+- Call `model.resetMelCache()` when starting a new recording session.
+
+### Runtime Preprocessor Switching
+- New `model.setPreprocessorBackend('js' | 'onnx')` to switch preprocessors at runtime.
+- New `model.getPreprocessorBackend()` to query the active backend.
+- Both backends are available when model is loaded with `preprocessorUrl`.
+
+### Preprocessor Warm-up
+- JS/ONNX preprocessor warms up automatically during `fromUrls()` model loading.
+- Eliminates first-call latency (~100-200ms for ONNX session creation).
+
+### Model Repository Update
+- Default v2 model now points to `ysdede/parakeet-tdt-0.6b-v2-onnx` with corrected ONNX preprocessing.
+
+### Known Issue: nemo128.onnx Version
+- The `nemo128.onnx` in some HuggingFace model repos may use an older version from onnx-asr.
+- Latest onnx-asr (Dec 2025+) includes a **correctness fix** (`features_lens` calculation), pre-emphasis time masking, and ONNX graph optimizations.
+- **Recommendation**: Use the default JS preprocessor which implements the corrected algorithm.
 
 ---
 
