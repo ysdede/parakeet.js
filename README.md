@@ -18,9 +18,29 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 ### Pure JS Mel Spectrogram — Now Default
 - **Pure JavaScript mel spectrogram computation is now the default** (`preprocessorBackend: 'js'`).
 - Eliminates ONNX Runtime overhead for preprocessing (no session creation, tensor allocation, WASM bridge).
-- **Skips preprocessor ONNX download** — one fewer file to download from HuggingFace Hub.
-- Validated against ONNX reference: max absolute error < 4e-4, mean error < 1e-5 across all test signals.
+- **Skips preprocessor ONNX download** — one fewer file to download from HuggingFace Hub (~5MB saved).
 - Switch back to ONNX with `preprocessorBackend: 'onnx'` in config.
+
+**Accuracy (validated with 70 automated tests against ONNX reference):**
+
+| Metric | Value |
+|---|---|
+| Mel filterbank max error vs ONNX | **2.645e-7** |
+| Full pipeline max error vs ONNX | **3.633e-4** |
+| Full pipeline mean error vs ONNX | **9.368e-6** |
+| Test signals validated | 4 (sine mix, short sine, noise, 5s mix) |
+
+The JS implementation matches NeMo's preprocessing pipeline exactly: pre-emphasis (0.97) → zero-pad → STFT (512-pt FFT, hop 160, win 400) → power spectrum → Slaney mel filterbank (128 bands) → log → per-feature normalization.
+
+**Performance (Node.js benchmarks):**
+
+| Audio Duration | Processing Time | Realtime Factor |
+|---|---|---|
+| 0.5s | ~4ms | 125x |
+| 1s | ~8ms | 125x |
+| 2s | ~15ms | 133x |
+| 5s | **36.9ms** | **135x** |
+| 10s | ~76ms | 132x |
 
 ### Incremental Mel Caching for Streaming
 - `IncrementalMelProcessor` caches raw mel frames across overlapping streaming windows.
@@ -28,6 +48,13 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 - For typical 70% overlap scenarios: **reuses ~350 cached frames, computes only ~150 new frames** (~60-70% preprocessing savings).
 - Exact numerical match with full computation (zero error vs non-incremental path).
 - Call `model.resetMelCache()` when starting a new recording session.
+
+**Incremental caching benchmark (5s audio, 70% overlap):**
+
+| Mode | Time | Speedup |
+|---|---|---|
+| Full computation | 71.7ms | — |
+| Incremental (cached prefix) | **36.6ms** | **~2x** |
 
 ### Runtime Preprocessor Switching
 - New `model.setPreprocessorBackend('js' | 'onnx')` to switch preprocessors at runtime.
@@ -493,14 +520,16 @@ npm run test:watch  # Watch mode
 
 ## Changelog
 
-### v1.1.1 (February 2026) — Streaming Enhancements
-**Pre-computed features & conditional ONNX loading for real-time applications.**
+### v1.1.1 (February 2026) — Streaming Enhancements & Test Suite
+**Pre-computed features, conditional ONNX loading, and comprehensive test coverage.**
 
 - **`precomputedFeatures` option**: `transcribe()` now accepts pre-computed mel spectrograms, allowing external mel workers to feed features directly and bypass the internal preprocessor entirely.
 - **Conditional ONNX preprocessor loading**: `fromUrls()` no longer creates an ONNX preprocessor session when `preprocessorBackend: 'js'` is active. This prevents unnecessary loading of `nemo128.onnx`.
 - **Conditional `nemo128.onnx` download**: `getParakeetModel()` in `hub.js` now skips downloading `nemo128.onnx` when `preprocessorBackend: 'js'` is configured, saving ~5MB of network transfer and IndexedDB storage.
 - **Enhanced logging**: Model loading now logs the preprocessor backend selection (`JS (mel.js)` vs `ONNX`), and performance metrics include `preprocessor_backend` and `mel_cache` fields.
 - **`timeOffset` bugfix**: Fixed `effectiveTimeOffset` in the incremental decoder cache path — the caller's `timeOffset` base was being lost when combined with prefix frame offset.
+- **Vitest test suite (70 tests)**: Comprehensive automated tests for mel spectrogram accuracy (cross-validated against ONNX reference), preprocessor selection logic, and precomputedFeatures format compatibility.
+- **New exports**: `hzToMel`, `melToHz` now exported from `mel.js` and package index for downstream use and testing.
 
 ### v1.0.0 (January 2026)
 **First stable release**
