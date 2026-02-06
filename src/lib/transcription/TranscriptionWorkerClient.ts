@@ -102,6 +102,22 @@ export class TranscriptionWorkerClient {
         return this.sendRequest('PROCESS_V3_CHUNK', { audio, startTime });
     }
 
+    /**
+     * Process a chunk using pre-computed mel features (from mel worker).
+     * Bypasses the preprocessor in the inference worker entirely.
+     */
+    async processV3ChunkWithFeatures(
+        features: Float32Array,
+        T: number,
+        melBins: number,
+        startTime?: number,
+        overlapSeconds?: number,
+    ): Promise<TokenStreamResult> {
+        return this.sendRequest('PROCESS_V3_CHUNK_WITH_FEATURES', {
+            features, T, melBins, startTime, overlapSeconds,
+        });
+    }
+
     async transcribeSegment(audio: Float32Array): Promise<TranscriptionResult> {
         return this.sendRequest('TRANSCRIBE_SEGMENT', audio);
     }

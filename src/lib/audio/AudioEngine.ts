@@ -64,6 +64,9 @@ export class AudioEngine implements IAudioEngine {
         lastWindowEnd: number; // Frame offset of last window end
     }> = [];
 
+    // Resampled audio chunk callbacks (for mel worker, etc.)
+    private audioChunkCallbacks: Array<(chunk: Float32Array) => void> = [];
+
     // SMA buffer for energy calculation
     private energyHistory: number[] = [];
 
@@ -405,6 +408,18 @@ export class AudioEngine implements IAudioEngine {
         };
     }
 
+    /**
+     * Subscribe to every resampled audio chunk (16kHz).
+     * Used to feed the continuous mel producer worker.
+     * Returns an unsubscribe function.
+     */
+    onAudioChunk(callback: (chunk: Float32Array) => void): () => void {
+        this.audioChunkCallbacks.push(callback);
+        return () => {
+            this.audioChunkCallbacks = this.audioChunkCallbacks.filter((cb) => cb !== callback);
+        };
+    }
+
     updateConfig(config: Partial<AudioEngineConfig>): void {
         this.config = { ...this.config, ...config };
 
@@ -449,6 +464,11 @@ export class AudioEngine implements IAudioEngine {
     private handleAudioChunk(rawChunk: Float32Array): void {
         // 0. Resample from device rate to target rate (e.g., 48kHz -> 16kHz)
         const chunk = resampleLinear(rawChunk, this.deviceSampleRate, this.targetSampleRate);
+
+        // 0.5. Notify audio chunk subscribers (e.g., mel worker)
+        for (const cb of this.audioChunkCallbacks) {
+            cb(chunk);
+        }
 
         // Calculate chunk energy (Peak Amplitude) + SMA for VAD compatibility
         let maxAbs = 0;

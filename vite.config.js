@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 import solidPlugin from 'vite-plugin-solid'
 import path from 'path'
 import fs from 'fs'
@@ -96,6 +97,20 @@ export default defineConfig({
       ...(useLocalParakeet && localParakeetExists && {
         'parakeet.js': path.resolve(localParakeetPath, 'src/index.js'),
       }),
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'happy-dom',
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: [...configDefaults.exclude],
+    // @vitest/web-worker polyfills Web Workers for Vitest
+    deps: {
+      optimizer: {
+        web: {
+          include: ['@vitest/web-worker'],
+        },
+      },
     },
   },
 })

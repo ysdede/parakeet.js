@@ -287,8 +287,145 @@ export class TokenStreamTranscriber {
             anchorTokens: mergeResult.anchorTokens
         });
 
+        // Always log preprocessing info from model metrics
+        const m = result.metrics;
+        if (m) {
+            console.log(`[TokenStreamTranscriber] Chunk #${this._chunkCount + 1}: preprocessor=${m.preprocessor_backend || 'unknown'}, preprocess=${m.preprocess_ms}ms, encode=${m.encode_ms}ms, decode=${m.decode_ms}ms, total=${m.total_ms}ms${m.mel_cache ? `, mel_cache: ${m.mel_cache.cached_frames} cached / ${m.mel_cache.new_frames} new` : ''}`);
+        }
+
         if (this._config.debug) {
             console.log(`[TokenStreamTranscriber] Chunk ${this._chunkCount}: start=${chunkStartTime.toFixed(2)}s, overlap=${actualOverlap.toFixed(2)}s, LCS=${mergeResult.lcsLength}, anchor=${mergeResult.anchorValid}`);
+        }
+
+        return {
+            confirmedText,
+            pendingText,
+            fullText,
+            lcsLength: mergeResult.lcsLength,
+            anchorValid: mergeResult.anchorValid,
+            chunkCount: this._chunkCount,
+            anchorTokens: mergeResult.anchorTokens,
+        };
+    }
+
+    /**
+     * Process a chunk using pre-computed mel features from the mel worker.
+     * Bypasses the preprocessor entirely — encoder + decoder only.
+     * 
+     * @param features - Normalized mel features [melBins, T] from mel worker
+     * @param T - Number of time frames
+     * @param melBins - Number of mel frequency bins
+     * @param startTime - Start time of this audio window in seconds
+     * @param overlapSeconds - Overlap with previous window in seconds (for decoder cache)
+     */
+    async processChunkWithFeatures(
+        features: Float32Array,
+        T: number,
+        melBins: number,
+        startTime?: number,
+        overlapSeconds?: number,
+    ): Promise<TokenStreamResult> {
+        if (!this._merger) {
+            throw new Error('TokenStreamTranscriber not initialized. Call initialize() first.');
+        }
+
+        if (this._isProcessing) {
+            if (this._config.debug) {
+                console.log('[TokenStreamTranscriber] Queued features chunk (processing busy)');
+            }
+            return this._getEmptyResult();
+        }
+
+        this._isProcessing = true;
+
+        try {
+            const result = await this._processChunkWithFeaturesInternal(
+                features, T, melBins, startTime, overlapSeconds,
+            );
+            return result;
+        } catch (error) {
+            console.error('[TokenStreamTranscriber] Process features chunk error:', error);
+            this._callbacks.onError?.(error as Error);
+            throw error;
+        } finally {
+            this._isProcessing = false;
+        }
+    }
+
+    private async _processChunkWithFeaturesInternal(
+        features: Float32Array,
+        T: number,
+        melBins: number,
+        startTime?: number,
+        overlapSeconds?: number,
+    ): Promise<TokenStreamResult> {
+        const model = this._modelManager.getModel();
+        if (!model) {
+            throw new Error('Model not available');
+        }
+
+        const chunkStartTime = startTime !== undefined ? startTime : this._currentTimestamp;
+
+        // Calculate overlap for decoder cache
+        let actualOverlap = 0;
+        if (this._chunkCount > 0 && overlapSeconds !== undefined) {
+            actualOverlap = overlapSeconds;
+        } else if (this._chunkCount > 0) {
+            // Estimate from config
+            actualOverlap = this._config.overlapDuration;
+        }
+
+        const overlapSec = this._chunkCount > 0 ? actualOverlap : 0;
+
+        // Call transcribe with pre-computed features (bypasses preprocessor)
+        const result = await model.transcribe(null, this._config.sampleRate, {
+            returnTimestamps: true,
+            returnTokenIds: true,
+            returnFrameIndices: true,
+            returnLogProbs: this._config.returnLogProbs,
+            timeOffset: chunkStartTime,
+            frameStride: this._config.frameStride,
+            precomputedFeatures: { features, T, melBins },
+            incremental: overlapSec > 0 ? {
+                cacheKey: 'streaming',
+                prefixSeconds: overlapSec,
+            } : undefined,
+        });
+
+        // Merge using LCSPTFAMerger (same as audio path)
+        const mergeResult = this._merger!.processChunk(
+            result,
+            chunkStartTime,
+            this._chunkCount > 0 ? actualOverlap : 0
+        );
+
+        // Update state for next chunk
+        this._currentTimestamp = chunkStartTime;
+        this._chunkCount++;
+
+        // Get formatted text
+        const texts = this._merger!.getText(this._tokenizer);
+        const confirmedText = texts.confirmed;
+        const pendingText = texts.pending;
+        const fullText = texts.full;
+
+        // Notify callbacks
+        this._callbacks.onConfirmedUpdate?.(confirmedText, mergeResult.confirmed);
+        this._callbacks.onPendingUpdate?.(pendingText, mergeResult.pending);
+        this._callbacks.onMergeInfo?.({
+            lcsLength: mergeResult.lcsLength,
+            anchorValid: mergeResult.anchorValid,
+            anchorTokens: mergeResult.anchorTokens
+        });
+
+        // Always log preprocessing info from model metrics
+        const m = result.metrics;
+        if (m) {
+            console.log(`[TokenStreamTranscriber] Features chunk #${this._chunkCount + 1}: preprocessor=${m.preprocessor_backend || 'unknown'}, preprocess=${m.preprocess_ms}ms, encode=${m.encode_ms}ms, decode=${m.decode_ms}ms, total=${m.total_ms}ms, T=${T}`);
+        }
+
+        if (this._config.debug) {
+            console.log(`[TokenStreamTranscriber] Features chunk ${this._chunkCount}: start=${chunkStartTime.toFixed(2)}s, overlap=${actualOverlap.toFixed(2)}s, T=${T}, LCS=${mergeResult.lcsLength}`);
         }
 
         return {

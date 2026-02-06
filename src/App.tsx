@@ -9,6 +9,7 @@ import { Component, Show, For, Switch, Match, createSignal, onMount, onCleanup, 
 import { appStore } from './stores/appStore';
 import { CompactWaveform, BufferVisualizer, ModelLoadingOverlay, Sidebar, DebugPanel, StatusBar, TranscriptionDisplay } from './components';
 import { AudioEngine } from './lib/audio';
+import { MelWorkerClient } from './lib/audio/MelWorkerClient';
 import { TranscriptionWorkerClient } from './lib/transcription';
 
 // Singleton instances
@@ -16,8 +17,10 @@ let audioEngine: AudioEngine | null = null;
 export const [audioEngineSignal, setAudioEngineSignal] = createSignal<AudioEngine | null>(null);
 
 let workerClient: TranscriptionWorkerClient | null = null;
+let melClient: MelWorkerClient | null = null;
 let segmentUnsubscribe: (() => void) | null = null;
 let windowUnsubscribe: (() => void) | null = null;
+let melChunkUnsubscribe: (() => void) | null = null;
 let energyPollInterval: number | undefined;
 
 const TranscriptPanel: Component = () => {
@@ -120,6 +123,7 @@ const App: Component = () => {
 
   onCleanup(() => {
     if (energyPollInterval) clearInterval(energyPollInterval);
+    melClient?.dispose();
     workerClient?.dispose();
   });
 
@@ -133,6 +137,7 @@ const App: Component = () => {
 
       if (segmentUnsubscribe) segmentUnsubscribe();
       if (windowUnsubscribe) windowUnsubscribe();
+      if (melChunkUnsubscribe) melChunkUnsubscribe();
 
       if (workerClient) {
         const final = await workerClient.finalize();
@@ -142,6 +147,7 @@ const App: Component = () => {
         appStore.setPendingText('');
       }
 
+      melClient?.reset();
       audioEngine?.reset();
       appStore.setAudioLevel(0);
       appStore.stopRecording();
@@ -174,6 +180,25 @@ const App: Component = () => {
               frameStride: appStore.frameStride(),
             });
 
+            // Initialize mel worker for continuous mel production
+            if (!melClient) {
+              melClient = new MelWorkerClient();
+            }
+            try {
+              await melClient.init({ nMels: 128 });
+              console.log('[App] Mel worker initialized successfully');
+            } catch (e) {
+              console.error('[App] Mel worker init failed, will use fallback path:', e);
+              melClient.dispose();
+              melClient = null;
+            }
+
+            // Subscribe to resampled audio chunks → feed mel worker continuously
+            melChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
+              // pushAudioCopy: mel worker gets a copy since chunk is shared with ring buffer
+              melClient?.pushAudioCopy(chunk);
+            });
+
             windowUnsubscribe = audioEngine.onWindowChunk(
               windowDur,
               overlapDur,
@@ -181,7 +206,40 @@ const App: Component = () => {
               async (audio, startTime) => {
                 if (!workerClient) return;
                 const start = performance.now();
-                const result = await workerClient.processV3Chunk(audio, startTime);
+
+                let result;
+                if (melClient) {
+                  // Request pre-computed mel features from mel worker
+                  const startSample = Math.round(startTime * 16000);
+                  const endSample = startSample + audio.length;
+
+                  const melStart = performance.now();
+                  const melFeatures = await melClient.getFeatures(startSample, endSample);
+                  const melFetchMs = performance.now() - melStart;
+
+                  if (melFeatures) {
+                    // Use pre-computed features → skip preprocessor in inference worker
+                    console.log(`[App] Preprocessor: mel-worker, ${melFeatures.T} frames × ${melFeatures.melBins} bins, fetch ${melFetchMs.toFixed(1)} ms (samples ${startSample}..${endSample})`);
+                    const inferStart = performance.now();
+                    result = await workerClient.processV3ChunkWithFeatures(
+                      melFeatures.features,
+                      melFeatures.T,
+                      melFeatures.melBins,
+                      startTime,
+                      overlapDur,
+                    );
+                    console.log(`[App] Inference (encoder+decoder only): ${(performance.now() - inferStart).toFixed(1)} ms`);
+                  } else {
+                    // Mel worker returned null — fall back
+                    console.warn('[App] Preprocessor: FALLBACK (mel worker returned null)');
+                    result = await workerClient.processV3Chunk(audio, startTime);
+                  }
+                } else {
+                  // No mel worker — use internal preprocessor
+                  console.log('[App] Preprocessor: internal (no mel worker)');
+                  result = await workerClient.processV3Chunk(audio, startTime);
+                }
+
                 const duration = performance.now() - start;
 
                 const stride = appStore.triggerInterval();

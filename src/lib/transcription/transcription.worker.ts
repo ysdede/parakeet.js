@@ -117,6 +117,32 @@ self.onmessage = async (e: MessageEvent) => {
                 });
                 break;
 
+            case 'PROCESS_V3_CHUNK_WITH_FEATURES':
+                if (!tokenStreamTranscriber) {
+                    throw new Error('TokenStreamTranscriber not initialized');
+                }
+                const v3FeatResult = await tokenStreamTranscriber.processChunkWithFeatures(
+                    payload.features,
+                    payload.T,
+                    payload.melBins,
+                    payload.startTime,
+                    payload.overlapSeconds,
+                );
+                // Return result AND current state for UI
+                const featState = tokenStreamTranscriber.getState();
+                postMessage({
+                    type: 'PROCESS_V3_CHUNK_WITH_FEATURES_DONE',
+                    payload: {
+                        ...v3FeatResult,
+                        lcsLength: v3FeatResult.lcsLength,
+                        anchorValid: v3FeatResult.anchorValid,
+                        anchorTokens: v3FeatResult.anchorTokens,
+                        chunkCount: featState.chunkCount
+                    },
+                    id
+                });
+                break;
+
             case 'TRANSCRIBE_SEGMENT':
                 if (!transcriptionService) {
                     throw new Error('TranscriptionService not initialized');
