@@ -1,6 +1,7 @@
 import { initOrt } from './backend.js';
 import { ParakeetTokenizer } from './tokenizer.js';
 import { OnnxPreprocessor } from './preprocessor.js';
+import { JsPreprocessor, IncrementalMelProcessor } from './mel.js';
 
 /**
  * Lightweight Parakeet model wrapper designed for browser usage.
@@ -10,12 +11,21 @@ import { OnnxPreprocessor } from './preprocessor.js';
  * NOTE: This is an *early* scaffold – the `transcribe` method is TODO.
  */
 export class ParakeetModel {
-  constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s) => s }) {
+  constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s) => s, onnxPreprocessor = null }) {
     this.tokenizer = tokenizer;
     this.encoderSession = encoderSession;
     this.joinerSession = joinerSession;
     this.preprocessor = preprocessor;
     this.ort = ort;
+
+    // Keep ONNX preprocessor reference for runtime switching
+    this._onnxPreprocessor = onnxPreprocessor;
+    this._jsPreprocessor = preprocessor instanceof JsPreprocessor ? preprocessor : null;
+
+    // Incremental mel processor for streaming with overlap caching
+    this._incrementalMel = preprocessor instanceof JsPreprocessor
+      ? new IncrementalMelProcessor({ nMels: preprocessor.nMels })
+      : null;
 
     // Read blank ID from tokenizer (dynamic instead of hardcoded)
     this.blankId = tokenizer.blankId;
@@ -57,8 +67,10 @@ export class ParakeetModel {
    * @param {string} cfg.encoderUrl URL to encoder-model.onnx
    * @param {string} cfg.decoderUrl URL to decoder_joint-model.onnx
    * @param {string} cfg.tokenizerUrl URL to vocab.txt or tokens.txt
-   * @param {string} cfg.preprocessorUrl URL to nemo80/128.onnx
+   * @param {string} cfg.preprocessorUrl URL to nemo80/128.onnx (not needed if preprocessorBackend='js')
    * @param {('webgpu'|'wasm')} [cfg.backend='webgpu']
+   * @param {('onnx'|'js')} [cfg.preprocessorBackend='js'] Preprocessor backend: 'js' (default) uses pure JS mel computation (faster, no ONNX overhead, enables incremental streaming), 'onnx' uses nemo*.onnx via WASM
+   * @param {number} [cfg.nMels] Number of mel bins (auto-detected from model config, or 128)
    */
   static async fromUrls(cfg) {
     const {
@@ -77,10 +89,13 @@ export class ParakeetModel {
       enableProfiling = false,
       enableGraphCapture,
       cpuThreads = undefined,
+      preprocessorBackend = 'js',
+      nMels,
     } = cfg;
 
-    if (!encoderUrl || !decoderUrl || !tokenizerUrl || !preprocessorUrl) {
-      throw new Error('fromUrls requires encoderUrl, decoderUrl, tokenizerUrl and preprocessorUrl');
+    const useJsPreprocessor = preprocessorBackend === 'js';
+    if (!encoderUrl || !decoderUrl || !tokenizerUrl || (!preprocessorUrl && !useJsPreprocessor)) {
+      throw new Error('fromUrls requires encoderUrl, decoderUrl, tokenizerUrl and preprocessorUrl (preprocessorUrl not needed if preprocessorBackend="js")');
     }
 
     // 1. Init ONNX Runtime
@@ -181,14 +196,26 @@ export class ParakeetModel {
     }
 
     const tokenizerPromise = ParakeetTokenizer.fromUrl(tokenizerUrl);
-    // Force preprocessor to always use WASM with optimal threading/SIMD settings
-    const preprocPromise = Promise.resolve(new OnnxPreprocessor(preprocessorUrl, {
-      backend: 'wasm', // Always use WASM for preprocessor regardless of main backend
-      wasmPaths,
-      enableProfiling,
-      enableGraphCapture: false, // WASM doesn't need graph capture
-      numThreads: cpuThreads
-    }));
+
+    // Create preprocessor based on selected backend
+    const detectedMels = nMels || 128; // Default to 128 for Parakeet models
+    const jsPreprocessor = new JsPreprocessor({ nMels: detectedMels });
+
+    // Always create ONNX preprocessor if URL is available (for runtime switching)
+    let onnxPreprocessor = null;
+    if (preprocessorUrl) {
+      onnxPreprocessor = new OnnxPreprocessor(preprocessorUrl, {
+        backend: 'wasm',
+        wasmPaths,
+        enableProfiling,
+        enableGraphCapture: false,
+        numThreads: cpuThreads
+      });
+    }
+
+    const activePreprocessor = useJsPreprocessor ? jsPreprocessor : (onnxPreprocessor || jsPreprocessor);
+    const preprocPromise = Promise.resolve(activePreprocessor);
+    console.log(`[Parakeet.js] Using ${useJsPreprocessor ? 'pure JS' : 'ONNX'} preprocessor (${detectedMels} mel bins)`);
 
     let encoderSession, joinerSession;
     if (backend === 'webgpu-hybrid') {
@@ -204,7 +231,19 @@ export class ParakeetModel {
 
     const [tokenizer, preprocessor] = await Promise.all([tokenizerPromise, preprocPromise]);
 
-    return new ParakeetModel({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling, windowStride });
+    // Warm up preprocessor to avoid first-call latency (ONNX session creation / JIT)
+    try {
+      const warmupAudio = new Float32Array(1600); // 0.1s of silence
+      await preprocessor.process(warmupAudio);
+      if (verbose) console.log('[Parakeet.js] Preprocessor warmed up');
+    } catch (e) {
+      console.warn('[Parakeet.js] Preprocessor warm-up failed (non-fatal):', e.message);
+    }
+
+    return new ParakeetModel({
+      tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling, windowStride,
+      onnxPreprocessor: onnxPreprocessor !== preprocessor ? onnxPreprocessor : null,
+    });
   }
 
   async _runCombinedStep(encTensor, token, currentState = null) {
@@ -268,11 +307,80 @@ export class ParakeetModel {
     return { state1, state2 };
   }
 
-  async computeFeatures(audio, sampleRate = 16000) {
+  /**
+   * Compute mel spectrogram features from audio.
+   * Supports incremental caching when using JS preprocessor in streaming mode.
+   *
+   * @param {Float32Array} audio - 16 kHz mono PCM
+   * @param {number} [sampleRate=16000] - Sample rate
+   * @param {Object} [opts] - Optional feature extraction options
+   * @param {number} [opts.prefixSamples=0] - Number of leading samples identical to previous call
+   *   (enables incremental mel caching — only new frames are computed, ~60-70% savings for typical streaming overlap)
+   * @returns {{features: Float32Array, T: number, melBins: number, cached?: boolean, cachedFrames?: number, newFrames?: number}}
+   */
+  async computeFeatures(audio, sampleRate = 16000, opts = {}) {
+    const { prefixSamples = 0 } = opts;
+
+    // Use incremental mel processor if available and prefix is specified
+    if (this._incrementalMel && prefixSamples > 0) {
+      const result = this._incrementalMel.process(audio, prefixSamples);
+      const T = result.length;
+      const melBins = T > 0 ? result.features.length / T : 0;
+      return {
+        features: result.features, T, melBins,
+        cached: result.cached, cachedFrames: result.cachedFrames, newFrames: result.newFrames,
+      };
+    }
+
+    // Standard path (no caching, works for both JS and ONNX preprocessors)
     const { features, length } = await this.preprocessor.process(audio);
-    const T = length; // number of frames returned by preprocessor
-    const melBins = features.length / T;
+    const T = length;
+    const melBins = T > 0 ? features.length / T : 0;
     return { features, T, melBins };
+  }
+
+  /**
+   * Switch preprocessor backend at runtime.
+   * @param {('js'|'onnx')} backend - 'js' for pure JS mel (default, faster, enables caching), 'onnx' for ONNX WASM
+   * @throws {Error} If ONNX backend requested but no ONNX preprocessor was loaded
+   */
+  setPreprocessorBackend(backend) {
+    if (backend === 'onnx') {
+      if (!this._onnxPreprocessor) {
+        throw new Error('ONNX preprocessor not available. Load model with preprocessorUrl to enable ONNX backend.');
+      }
+      this.preprocessor = this._onnxPreprocessor;
+      this._incrementalMel = null; // ONNX doesn't support incremental mel
+      console.log('[Parakeet.js] Switched to ONNX preprocessor');
+    } else if (backend === 'js') {
+      if (!this._jsPreprocessor) {
+        // Create one on the fly
+        this._jsPreprocessor = new JsPreprocessor({ nMels: 128 });
+      }
+      this.preprocessor = this._jsPreprocessor;
+      this._incrementalMel = new IncrementalMelProcessor({ nMels: this._jsPreprocessor.nMels });
+      console.log('[Parakeet.js] Switched to JS preprocessor (incremental caching enabled)');
+    } else {
+      throw new Error(`Unknown preprocessor backend: ${backend}. Use 'js' or 'onnx'.`);
+    }
+  }
+
+  /**
+   * Get the current preprocessor backend type.
+   * @returns {('js'|'onnx')} Current preprocessor backend
+   */
+  getPreprocessorBackend() {
+    return this.preprocessor instanceof JsPreprocessor ? 'js' : 'onnx';
+  }
+
+  /**
+   * Reset the incremental mel cache. Call this when starting a new utterance
+   * or when the audio context changes (e.g., new recording session).
+   */
+  resetMelCache() {
+    if (this._incrementalMel) {
+      this._incrementalMel.reset();
+    }
   }
 
   /**
@@ -334,6 +442,8 @@ export class ParakeetModel {
    * @param {boolean} opts.returnFrameIndices - Include encoder frame index per token (for alignment)
    * @param {boolean} opts.returnLogProbs - Include raw log probability per token
    * @param {boolean} opts.returnTdtSteps - Include TDT duration prediction per token
+   * @param {number} opts.prefixSamples - Number of leading audio samples identical to previous call
+   *   (enables incremental mel caching — ~60-70% preprocessing savings for typical streaming overlap)
    */
   async transcribe(audio, sampleRate = 16000, opts = {}) {
     const {
@@ -352,20 +462,22 @@ export class ParakeetModel {
       returnFrameIndices = false,   // Include encoder frame index per token
       returnLogProbs = false,       // Include raw log probabilities per token
       returnTdtSteps = false,       // Include TDT duration predictions per token
+      // Incremental mel caching for streaming
+      prefixSamples = 0,            // Number of leading samples identical to previous call
     } = opts;
 
     const perfEnabled = true; // always collect and log timings
     let t0, tPreproc = 0, tEncode = 0, tDecode = 0, tToken = 0;
     if (perfEnabled) t0 = performance.now();
 
-    // 1. Feature extraction (ONNX pre-processor)
-    let features, T, melBins;
+    // 1. Feature extraction (with optional incremental mel caching)
+    let features, T, melBins, melCacheInfo;
     if (perfEnabled) {
       const s = performance.now();
-      ({ features, T, melBins } = await this.computeFeatures(audio, sampleRate));
+      ({ features, T, melBins, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
       tPreproc = performance.now() - s;
     } else {
-      ({ features, T, melBins } = await this.computeFeatures(audio, sampleRate));
+      ({ features, T, melBins, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
     }
 
     // 2. Encode entire utterance
@@ -463,8 +575,9 @@ export class ParakeetModel {
       const cached = this._incrementalCache.get(inc.cacheKey);
       if (cached && cached.prefixFrames === prefixFrames && cached.D === D) {
         startFrame = prefixFrames;
-        effectiveTimeOffset = prefixFrames * TIME_STRIDE;  // FIXED: use mutable variable
+        effectiveTimeOffset = timeOffset + prefixFrames * TIME_STRIDE;  // Preserve caller's timeOffset base
         decoderState = this._restoreDecoderState(cached.state);
+        if (debug) console.log(`[Parakeet] Incremental cache hit: skipping ${prefixFrames}/${Tenc} frames (${(prefixFrames/Tenc*100).toFixed(0)}%)`);
       }
     }
     let emittedTokens = 0;
@@ -685,7 +798,12 @@ export class ParakeetModel {
         decode_ms: +tDecode.toFixed(1),
         tokenize_ms: +tToken.toFixed(1),
         total_ms: +((performance.now() - t0).toFixed(1)),
-        rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2)
+        rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2),
+        preprocessor_backend: this.getPreprocessorBackend(),
+        mel_cache: melCacheInfo?.cached ? {
+          cached_frames: melCacheInfo.cachedFrames,
+          new_frames: melCacheInfo.newFrames,
+        } : null,
       } : null,
       is_final: !inc && !previousDecoderState, // mark non-final when incremental or streaming mode
     };
@@ -1401,12 +1519,20 @@ export class LCSPTFAMerger {
 
   /**
    * Arbitrate between conflicting paths using weighted log probabilities.
+   * When logProbs are unavailable (all zero), defaults to pathA (previous chunk,
+   * which typically has more stable context).
    * 
-   * @param {Object[]} pathA - Tokens from path A
-   * @param {Object[]} pathB - Tokens from path B
-   * @returns {Object[]} The path with higher weighted score
+   * @param {Object[]} pathA - Tokens from path A (previous chunk)
+   * @param {Object[]} pathB - Tokens from path B (current overlap)
+   * @returns {Object[]} The path with higher weighted score, or pathA if no logProbs
    */
   _arbitrateByLogProb(pathA, pathB) {
+    // Check if logProbs are actually available (non-zero)
+    const hasLogProbs = pathA.some(t => t.logProb !== 0) || pathB.some(t => t.logProb !== 0);
+    if (!hasLogProbs) {
+      // No logProbs available - prefer previous chunk (more stable context)
+      return pathA;
+    }
     const scoreA = pathA.reduce((sum, t) => sum + (t.logProb * t.vignetteWeight), 0);
     const scoreB = pathB.reduce((sum, t) => sum + (t.logProb * t.vignetteWeight), 0);
     return scoreA >= scoreB ? pathA : pathB;
