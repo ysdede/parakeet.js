@@ -1,6 +1,6 @@
 {
   "name": "parakeet.js",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "NVIDIA Parakeet speech recognition for the browser (WebGPU/WASM) powered by ONNX Runtime Web.",
   "type": "module",
   "exports": {
