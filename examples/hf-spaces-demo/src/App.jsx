@@ -114,7 +114,7 @@ export default function App() {
   const [encoderQuant, setEncoderQuant] = useState('int8');
   const [decoderQuant, setDecoderQuant] = useState('int8');
   const [preprocessor, setPreprocessor] = useState('nemo128');
-  const [preprocessorBackend, setPreprocessorBackend] = useState('js');
+  const [preprocessorBackend, setPreprocessorBackend] = useState('onnx');
   const [status, setStatus] = useState('Idle');
   const [progressText, setProgressText] = useState('');
   const [progressPct, setProgressPct] = useState(null);
