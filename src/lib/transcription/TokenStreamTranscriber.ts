@@ -27,6 +27,11 @@ export interface TokenStreamConfig {
     sequenceAnchorLength?: number;
     /** Time tolerance for frame alignment (default 0.15s) */
     timeTolerance?: number;
+    /** Decoder frame stride (default 1). Set to 2 to halve decoder steps at cost of coarser timestamps */
+    frameStride?: number;
+    /** Request log probabilities per token for merger arbitration (default false).
+     *  Adds per-frame softmax cost. Disable unless using logProb-based merging. */
+    returnLogProbs?: boolean;
 }
 
 export interface TokenStreamCallbacks {
@@ -73,6 +78,7 @@ export class TokenStreamTranscriber {
     private _currentTimestamp: number = 0;
     private _chunkCount: number = 0;
     private _isProcessing: boolean = false;
+    private _pendingChunk: { audio: Float32Array; startTime?: number } | null = null;
     private _tokenizer: any = null;
 
     constructor(
@@ -88,6 +94,8 @@ export class TokenStreamTranscriber {
             debug: config.debug ?? false,
             sequenceAnchorLength: config.sequenceAnchorLength ?? 3,
             timeTolerance: config.timeTolerance ?? 0.15,
+            frameStride: config.frameStride ?? 1,
+            returnLogProbs: config.returnLogProbs ?? false,
         };
         this._callbacks = callbacks;
     }
@@ -169,86 +177,35 @@ export class TokenStreamTranscriber {
         }
 
         if (this._isProcessing) {
-            console.warn('[TokenStreamTranscriber] Already processing, skipping chunk');
+            // Queue the latest chunk instead of dropping it entirely.
+            // Only the most recent pending chunk is kept (older ones are stale).
+            this._pendingChunk = { audio, startTime };
+            if (this._config.debug) {
+                console.log('[TokenStreamTranscriber] Queued chunk (processing busy)');
+            }
             return this._getEmptyResult();
         }
 
         this._isProcessing = true;
 
         try {
-            const model = this._modelManager.getModel();
-            if (!model) {
-                throw new Error('Model not available');
+            const result = await this._processChunkInternal(audio, startTime);
+
+            // After finishing, check if a newer chunk was queued while we were busy
+            if (this._pendingChunk) {
+                const pending = this._pendingChunk;
+                this._pendingChunk = null;
+                // Process the queued chunk immediately (non-blocking schedule)
+                // We don't await here to avoid blocking the caller, but we do
+                // need to keep _isProcessing true until it completes.
+                this._isProcessing = false; // Release lock temporarily
+                // Use queueMicrotask to process next chunk without starving the event loop
+                queueMicrotask(() => {
+                    this.processChunk(pending.audio, pending.startTime);
+                });
             }
 
-            // Use provided startTime or fall back to internal tracking
-            const chunkStartTime = startTime !== undefined ? startTime : this._currentTimestamp;
-            
-            // Calculate actual overlap based on previous chunk end
-            let actualOverlap = 0;
-            if (this._chunkCount > 0) {
-                const prevChunkEnd = this._currentTimestamp + (this._config.windowDuration - this._config.overlapDuration);
-                // In v3, _currentTimestamp is the start of the current window.
-                // Wait, the logic in v3 (OLD) was:
-                // this._currentTimestamp += chunkDuration - this._config.overlapDuration;
-                // This meant _currentTimestamp was always the START of the window.
-                
-                // If we use explicit startTime, we can calculate overlap precisely:
-                // overlap = previousWindowEnd - currentWindowStart
-                const previousWindowEnd = this._currentTimestamp + (audio.length / this._config.sampleRate);
-                actualOverlap = Math.max(0, previousWindowEnd - chunkStartTime);
-            }
-
-            // Transcribe with all metadata needed for merging
-            const result = await model.transcribe(audio, this._config.sampleRate, {
-                returnTimestamps: true,
-                returnTokenIds: true,
-                returnFrameIndices: true,
-                returnLogProbs: true,
-                timeOffset: chunkStartTime,
-            });
-
-            // Merge using LCSPTFAMerger
-            // We use the provided overlap or calculated one
-            const mergeResult = this._merger.processChunk(
-                result,
-                chunkStartTime,
-                this._chunkCount > 0 ? (startTime !== undefined ? actualOverlap : this._config.overlapDuration) : 0
-            );
-
-            // Update state for next chunk
-            this._currentTimestamp = chunkStartTime;
-            this._chunkCount++;
-
-            // Get formatted text from the merger (handles SentencePiece spaces correctly)
-            const texts = this._merger.getText(this._tokenizer);
-            const confirmedText = texts.confirmed;
-            const pendingText = texts.pending;
-            const fullText = texts.full;
-
-            // Notify callbacks
-            this._callbacks.onConfirmedUpdate?.(confirmedText, mergeResult.confirmed);
-            this._callbacks.onPendingUpdate?.(pendingText, mergeResult.pending);
-            this._callbacks.onMergeInfo?.({
-                lcsLength: mergeResult.lcsLength,
-                anchorValid: mergeResult.anchorValid,
-                anchorTokens: mergeResult.anchorTokens // Available in v3 merger
-            });
-
-            if (this._config.debug) {
-                console.log(`[TokenStreamTranscriber] Chunk ${this._chunkCount}: start=${chunkStartTime.toFixed(2)}s, overlap=${actualOverlap.toFixed(2)}s, LCS=${mergeResult.lcsLength}, anchor=${mergeResult.anchorValid}`);
-            }
-
-            return {
-                confirmedText: confirmedText,
-                pendingText: pendingText,
-                fullText: fullText,
-                lcsLength: mergeResult.lcsLength,
-                anchorValid: mergeResult.anchorValid,
-                chunkCount: this._chunkCount,
-                anchorTokens: mergeResult.anchorTokens,
-            };
-
+            return result;
         } catch (error) {
             console.error('[TokenStreamTranscriber] Process chunk error:', error);
             this._callbacks.onError?.(error as Error);
@@ -256,6 +213,93 @@ export class TokenStreamTranscriber {
         } finally {
             this._isProcessing = false;
         }
+    }
+
+    /**
+     * Internal processing logic extracted for queue support.
+     */
+    private async _processChunkInternal(audio: Float32Array, startTime?: number): Promise<TokenStreamResult> {
+        const model = this._modelManager.getModel();
+        if (!model) {
+            throw new Error('Model not available');
+        }
+
+        // Use provided startTime or fall back to internal tracking
+        const chunkStartTime = startTime !== undefined ? startTime : this._currentTimestamp;
+        
+        // Calculate actual overlap based on previous chunk end
+        let actualOverlap = 0;
+        if (this._chunkCount > 0) {
+            // If we use explicit startTime, we can calculate overlap precisely:
+            // overlap = previousWindowEnd - currentWindowStart
+            const previousWindowEnd = this._currentTimestamp + (audio.length / this._config.sampleRate);
+            actualOverlap = Math.max(0, previousWindowEnd - chunkStartTime);
+        }
+
+        // Transcribe with all metadata needed for merging.
+        // Use incremental cache to skip re-decoding the overlap prefix.
+        // On subsequent chunks, the decoder resumes from cached state at
+        // the boundary of the overlap, saving ~80% of decode frames.
+        //
+        // prefixSamples enables incremental mel caching (JS preprocessor):
+        // the overlap portion's mel features are reused from the previous call,
+        // saving ~60-70% of preprocessing time for typical 70% overlap.
+        const overlapSeconds = this._chunkCount > 0 ? actualOverlap : 0;
+        const overlapSamples = Math.floor(overlapSeconds * this._config.sampleRate);
+        const result = await model.transcribe(audio, this._config.sampleRate, {
+            returnTimestamps: true,
+            returnTokenIds: true,
+            returnFrameIndices: true,
+            returnLogProbs: this._config.returnLogProbs,
+            timeOffset: chunkStartTime,
+            frameStride: this._config.frameStride,
+            prefixSamples: overlapSamples > 0 ? overlapSamples : 0,
+            incremental: overlapSeconds > 0 ? {
+                cacheKey: 'streaming',
+                prefixSeconds: overlapSeconds,
+            } : undefined,
+        });
+
+        // Merge using LCSPTFAMerger
+        // We use the provided overlap or calculated one
+        const mergeResult = this._merger!.processChunk(
+            result,
+            chunkStartTime,
+            this._chunkCount > 0 ? (startTime !== undefined ? actualOverlap : this._config.overlapDuration) : 0
+        );
+
+        // Update state for next chunk
+        this._currentTimestamp = chunkStartTime;
+        this._chunkCount++;
+
+        // Get formatted text from the merger (handles SentencePiece spaces correctly)
+        const texts = this._merger!.getText(this._tokenizer);
+        const confirmedText = texts.confirmed;
+        const pendingText = texts.pending;
+        const fullText = texts.full;
+
+        // Notify callbacks
+        this._callbacks.onConfirmedUpdate?.(confirmedText, mergeResult.confirmed);
+        this._callbacks.onPendingUpdate?.(pendingText, mergeResult.pending);
+        this._callbacks.onMergeInfo?.({
+            lcsLength: mergeResult.lcsLength,
+            anchorValid: mergeResult.anchorValid,
+            anchorTokens: mergeResult.anchorTokens
+        });
+
+        if (this._config.debug) {
+            console.log(`[TokenStreamTranscriber] Chunk ${this._chunkCount}: start=${chunkStartTime.toFixed(2)}s, overlap=${actualOverlap.toFixed(2)}s, LCS=${mergeResult.lcsLength}, anchor=${mergeResult.anchorValid}`);
+        }
+
+        return {
+            confirmedText,
+            pendingText,
+            fullText,
+            lcsLength: mergeResult.lcsLength,
+            anchorValid: mergeResult.anchorValid,
+            chunkCount: this._chunkCount,
+            anchorTokens: mergeResult.anchorTokens,
+        };
     }
 
     /**
@@ -286,10 +330,16 @@ export class TokenStreamTranscriber {
         if (this._merger) {
             this._merger.reset();
         }
+        // Reset mel cache in the model's JS preprocessor (if available)
+        const model = this._modelManager.getModel();
+        if (model?.resetMelCache) {
+            model.resetMelCache();
+        }
         this._audioBuffer = [];
         this._currentTimestamp = 0;
         this._chunkCount = 0;
         this._isProcessing = false;
+        this._pendingChunk = null;
     }
 
     /**
