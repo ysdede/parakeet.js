@@ -454,6 +454,33 @@ See `examples/demo/README.md` for detailed deployment instructions.
 
 ---
 
+## Testing
+
+The library includes a comprehensive Vitest test suite (70 tests):
+
+```bash
+npm test          # Run all tests once
+npm run test:watch  # Watch mode
+```
+
+### Test Suites
+
+| Suite | Tests | Description |
+|---|---|---|
+| `mel.test.mjs` | 39 | Mel constants, filterbank, FFT, JsPreprocessor, IncrementalMelProcessor, performance, ONNX cross-validation |
+| `preprocessor-selection.test.mjs` | 16 | Hub file selection logic, fromUrls preprocessor creation, default config |
+| `precomputed-features.test.mjs` | 15 | Feature format, audioDur computation, preprocessorPath detection, edge cases |
+
+### Key Validations
+
+- **Mel filterbank** matches ONNX reference within `2.6e-7` max error
+- **Full pipeline** matches ONNX within `3.6e-4` max error, `1.1e-5` mean error
+- **Performance**: 5s audio processed in ~37ms (Node.js)
+- **Incremental**: ~2x faster with 70% overlap caching
+- **Preprocessor selection**: `nemo128.onnx` correctly skipped when `preprocessorBackend='js'`
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
