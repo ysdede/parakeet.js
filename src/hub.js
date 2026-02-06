@@ -183,7 +183,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   // Use model config defaults if available
   const defaultPreprocessor = modelConfig?.preprocessor || 'nemo128';
   
-  const { encoderQuant = 'int8', decoderQuant = 'int8', preprocessor = defaultPreprocessor, backend = 'webgpu', progress } = options;
+  const { encoderQuant = 'int8', decoderQuant = 'int8', preprocessor = defaultPreprocessor, preprocessorBackend = 'js', backend = 'webgpu', progress } = options;
   
   // Decide quantisation per component
   let encoderQ = encoderQuant;
@@ -206,8 +206,14 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
     { key: 'encoderUrl', name: encoderName },
     { key: 'decoderUrl', name: decoderName },
     { key: 'tokenizerUrl', name: 'vocab.txt' },
-    { key: 'preprocessorUrl', name: `${preprocessor}.onnx` },
   ];
+
+  // Only download preprocessor ONNX when not using JS backend
+  if (preprocessorBackend !== 'js') {
+    filesToGet.push({ key: 'preprocessorUrl', name: `${preprocessor}.onnx` });
+  } else {
+    console.log('[Hub] Using JS preprocessor — skipping preprocessor ONNX download');
+  }
 
   // Conditionally include external data files only if they exist in the repo file list.
   if (repoFiles.includes(`${encoderName}.data`)) {
@@ -226,6 +232,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
       },
       quantisation: { encoder: encoderQ, decoder: decoderQ },
       modelConfig: modelConfig || null,  // Include model config for downstream use
+      preprocessorBackend,  // Pass through so callers know which backend to use
   };
   
   for (const { key, name } of filesToGet) {
