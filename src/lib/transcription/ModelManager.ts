@@ -108,13 +108,20 @@ export class ModelManager {
         message: 'Compiling model (this may take a moment)...'
       });
 
+      const preprocessorBackend = modelAssets.preprocessorBackend || 'js';
+      console.log(`[ModelManager] Loading model with backend=${this._backend}, preprocessorBackend=${preprocessorBackend}`);
+
       this._model = await ParakeetModel.fromUrls({
         ...modelAssets.urls,
         filenames: modelAssets.filenames,
-        preprocessorBackend: modelAssets.preprocessorBackend || 'js',
+        preprocessorBackend,
         backend: this._backend === 'webgpu' ? 'webgpu-hybrid' : 'wasm',
         verbose: false,
       });
+
+      // Log which preprocessor the model is actually using
+      const ppBackend = this._model.getPreprocessorBackend?.() || 'unknown';
+      console.log(`[ModelManager] Model ready. Preprocessor: ${ppBackend === 'js' ? 'JS (mel.js) — no ONNX preprocessor loaded' : 'ONNX (nemo128.onnx)'}`);
 
       this._setProgress({ stage: 'complete', progress: 100, message: 'Model ready' });
       this._setState('ready');

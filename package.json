@@ -9,18 +9,23 @@
     "dev:local": "cross-env USE_LOCAL_PARAKEET=true vite",
     "build": "vite build",
     "build:local": "cross-env USE_LOCAL_PARAKEET=true vite build",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "license": "MIT",
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.10",
+    "@vitest/web-worker": "^4.0.18",
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
+    "happy-dom": "^20.5.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.7.2",
     "vite": "^6.0.0",
-    "vite-plugin-solid": "^2.11.6"
+    "vite-plugin-solid": "^2.11.6",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
