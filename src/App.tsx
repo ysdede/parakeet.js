@@ -171,6 +171,7 @@ const App: Component = () => {
               windowDuration: windowDur,
               overlapDuration: overlapDur,
               sampleRate: 16000,
+              frameStride: appStore.frameStride(),
             });
 
             windowUnsubscribe = audioEngine.onWindowChunk(

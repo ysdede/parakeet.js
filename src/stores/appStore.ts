@@ -87,10 +87,15 @@ function createAppStore() {
   });
 
   // v3 Streaming config
-  const [streamingWindow, setStreamingWindow] = createSignal(7.0);
-  const [streamingOverlap, setStreamingOverlap] = createSignal(5.5);
-  const [triggerInterval, setTriggerInterval] = createSignal(1.0);
+  // Window=5s gives ~62 encoder frames (vs 87 for 7s) - 30% less decode work.
+  // Overlap=3.5s with trigger=1.5s provides enough context for LCS merging
+  // while giving the transcriber 1.5s headroom per chunk.
+  const [streamingWindow, setStreamingWindow] = createSignal(5.0);
+  const [streamingOverlap, setStreamingOverlap] = createSignal(3.5);
+  const [triggerInterval, setTriggerInterval] = createSignal(1.5);
   const [energyThreshold, setEnergyThreshold] = createSignal(0.08);
+  // Decoder frame stride: 1 = full precision, 2 = halves decoder steps (faster, coarser timestamps)
+  const [frameStride, setFrameStride] = createSignal(1);
 
 
   // Network status listeners
@@ -183,6 +188,7 @@ function createAppStore() {
     streamingOverlap,
     triggerInterval,
     energyThreshold,
+    frameStride,
 
     // Setters (for internal use)
     setRecordingState,
@@ -213,6 +219,7 @@ function createAppStore() {
     setStreamingOverlap,
     setTriggerInterval,
     setEnergyThreshold,
+    setFrameStride,
 
     // Actions
     startRecording,
