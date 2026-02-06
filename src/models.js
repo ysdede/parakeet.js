@@ -43,7 +43,7 @@ export const LANGUAGE_NAMES = {
  */
 export const MODELS = {
   'parakeet-tdt-0.6b-v2': {
-    repoId: 'istupakov/parakeet-tdt-0.6b-v2-onnx',
+    repoId: 'ysdede/parakeet-tdt-0.6b-v2-onnx',
     displayName: 'Parakeet TDT 0.6B v2 (English)',
     languages: ['en'],
     defaultLanguage: 'en',
