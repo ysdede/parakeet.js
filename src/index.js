@@ -1,7 +1,7 @@
 export { ParakeetModel, StatefulStreamingTranscriber, FrameAlignedMerger, LCSPTFAMerger } from './parakeet.js';
 export { getModelFile, getModelText, getParakeetModel } from './hub.js';
 export { MODELS, LANGUAGE_NAMES, DEFAULT_MODEL, getModelConfig, getModelKeyFromRepoId, supportsLanguage, listModels, getLanguageName } from './models.js';
-export { JsPreprocessor, IncrementalMelProcessor, MEL_CONSTANTS } from './mel.js';
+export { JsPreprocessor, IncrementalMelProcessor, MEL_CONSTANTS, hzToMel, melToHz, createMelFilterbank, createPaddedHannWindow, precomputeTwiddles, fft } from './mel.js';
 
 /**
  * Convenience factory to load from a local path.

@@ -618,4 +618,4 @@ export const MEL_CONSTANTS = {
 };
 
 // Export internal functions for testing
-export { createMelFilterbank, createPaddedHannWindow, precomputeTwiddles, fft };
+export { hzToMel, melToHz, createMelFilterbank, createPaddedHannWindow, precomputeTwiddles, fft };
