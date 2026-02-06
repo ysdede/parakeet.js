@@ -1,6 +1,7 @@
 export { ParakeetModel, StatefulStreamingTranscriber, FrameAlignedMerger, LCSPTFAMerger } from './parakeet.js';
 export { getModelFile, getModelText, getParakeetModel } from './hub.js';
 export { MODELS, LANGUAGE_NAMES, DEFAULT_MODEL, getModelConfig, getModelKeyFromRepoId, supportsLanguage, listModels, getLanguageName } from './models.js';
+export { JsPreprocessor, IncrementalMelProcessor, MEL_CONSTANTS } from './mel.js';
 
 /**
  * Convenience factory to load from a local path.
@@ -33,5 +34,10 @@ export async function fromHub(repoIdOrModelKey, options = {}) {
   const repoId = MODELS[repoIdOrModelKey]?.repoId || repoIdOrModelKey;
 
   const result = await getParakeetModel(repoId, options);
-  return ParakeetModel.fromUrls({ ...result.urls, filenames: result.filenames, ...options });
+  return ParakeetModel.fromUrls({
+    ...result.urls,
+    filenames: result.filenames,
+    preprocessorBackend: result.preprocessorBackend,
+    ...options,
+  });
 }
