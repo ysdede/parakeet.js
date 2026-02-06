@@ -8,7 +8,7 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 
 > **Parakeet.js** offers a high-performance, browser-first implementation for NVIDIA's Parakeet-TDT speech-to-text models, running entirely client-side via WebGPU and WASM. Powered by ONNX Runtime Web, this library makes it simple to integrate state-of-the-art transcription into any web application.
 
-> **Status:** Stable v1.1.0 release - Production ready
+> **Status:** Stable v1.1.1 release - Production ready
 > **Supported Models:** Parakeet-TDT v2 (English) and v3 (Multilingual - 13 languages)
 
 ---
