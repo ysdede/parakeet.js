@@ -88,6 +88,7 @@ export class ModelManager {
 
       const modelAssets = await getParakeetModel(modelId, {
         backend: this._backend,
+        preprocessorBackend: 'js', // Use pure JS mel — faster, no ONNX download needed
         progress: (p: any) => {
           // Map parakeet.js progress to our UI
           const pct = Math.round(20 + (p.loaded / p.total) * 70);
@@ -110,6 +111,7 @@ export class ModelManager {
       this._model = await ParakeetModel.fromUrls({
         ...modelAssets.urls,
         filenames: modelAssets.filenames,
+        preprocessorBackend: modelAssets.preprocessorBackend || 'js',
         backend: this._backend === 'webgpu' ? 'webgpu-hybrid' : 'wasm',
         verbose: false,
       });
@@ -159,13 +161,12 @@ export class ModelManager {
         decoderData: findFile(/decoder.*\.onnx\.data$/i),
       };
 
-      // Validation
-      if (!assets.encoder || !assets.decoder || !assets.tokenizer || !assets.preprocessor) {
+      // Validation — preprocessor ONNX is optional (JS backend is default)
+      if (!assets.encoder || !assets.decoder || !assets.tokenizer) {
         const missing = [];
         if (!assets.encoder) missing.push('encoder-model.onnx');
         if (!assets.decoder) missing.push('decoder_joint-model.onnx');
         if (!assets.tokenizer) missing.push('vocab.txt');
-        if (!assets.preprocessor) missing.push('preprocessor (nemo128.onnx)');
         throw new Error(`Missing required files: ${missing.join(', ')}`);
       }
 
@@ -177,14 +178,19 @@ export class ModelManager {
 
       this._setProgress({ stage: 'compile', progress: 40, message: 'Compiling local model...' });
 
-      const urls = {
+      // Use JS preprocessor by default; fall back to ONNX if preprocessor file is provided
+      const useOnnxPreprocessor = !!assets.preprocessor;
+
+      const urls: Record<string, string | undefined> = {
         encoderUrl: URL.createObjectURL(assets.encoder),
         decoderUrl: URL.createObjectURL(assets.decoder),
         tokenizerUrl: URL.createObjectURL(assets.tokenizer),
-        preprocessorUrl: URL.createObjectURL(assets.preprocessor),
         encoderDataUrl: assets.encoderData ? URL.createObjectURL(assets.encoderData) : undefined,
         decoderDataUrl: assets.decoderData ? URL.createObjectURL(assets.decoderData) : undefined,
       };
+      if (useOnnxPreprocessor) {
+        urls.preprocessorUrl = URL.createObjectURL(assets.preprocessor!);
+      }
 
       this._model = await ParakeetModel.fromUrls({
         ...urls,
@@ -192,6 +198,7 @@ export class ModelManager {
           encoder: assets.encoder.name,
           decoder: assets.decoder.name
         },
+        preprocessorBackend: useOnnxPreprocessor ? 'onnx' : 'js',
         backend: this._backend === 'webgpu' ? 'webgpu-hybrid' : 'wasm',
         verbose: false,
       });
