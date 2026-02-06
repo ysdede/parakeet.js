@@ -211,8 +211,9 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   // Only download preprocessor ONNX when not using JS backend
   if (preprocessorBackend !== 'js') {
     filesToGet.push({ key: 'preprocessorUrl', name: `${preprocessor}.onnx` });
+    console.log(`[Hub] Preprocessor: ONNX — will download ${preprocessor}.onnx`);
   } else {
-    console.log('[Hub] Using JS preprocessor — skipping preprocessor ONNX download');
+    console.log(`[Hub] Preprocessor: JS (mel.js) — skipping ${preprocessor}.onnx download`);
   }
 
   // Conditionally include external data files only if they exist in the repo file list.

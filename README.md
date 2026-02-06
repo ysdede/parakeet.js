@@ -215,6 +215,49 @@ Extra options:
 |--------|---------|-------------|
 | `temperature` | 1.0 | Softmax temperature for decoding (1.0 = greedy, >1.0 = sampling) |
 | `frameStride` | 1 | Advance decoder by *n* encoder frames per step |
+| `returnLogProbs` | false | Return per-token log probabilities |
+| `timeOffset` | 0 | Time offset (seconds) to add to all timestamps |
+| `prefixSamples` | 0 | Number of overlapping prefix samples for incremental mel caching |
+| `precomputedFeatures` | null | Pre-computed mel features (see [Streaming with Pre-computed Features](#streaming-with-pre-computed-features)) |
+| `incremental` | null | Incremental decoder cache config (see [Incremental Decoder Cache](#incremental-decoder-cache)) |
+
+### Streaming with Pre-computed Features
+
+For streaming applications that compute mel spectrograms in a separate worker, you can bypass the internal preprocessor entirely:
+
+```js
+const result = await model.transcribe(null, 16000, {
+  precomputedFeatures: {
+    features: melFloat32Array,  // [T * melBins] row-major Float32Array
+    T: 500,                     // number of time frames
+    melBins: 128                // number of mel bands
+  }
+});
+```
+
+When `precomputedFeatures` is provided:
+- The audio parameter can be `null` (audio is not needed)
+- The internal preprocessor (JS or ONNX) is completely skipped
+- Features must be normalized (zero mean, unit variance per feature)
+- This enables **pipeline parallelism**: compute mel in one worker, run inference in another
+
+### Incremental Decoder Cache
+
+For overlapping streaming windows, the decoder can cache its state to avoid re-decoding the overlapping prefix:
+
+```js
+const result = await model.transcribe(audio, 16000, {
+  incremental: {
+    cacheKey: 'stream-1',     // unique key for this stream
+    prefixSeconds: 3.5        // seconds of overlap to cache
+  },
+  timeOffset: windowStartTime  // adjust timestamps for the window position
+});
+```
+
+The cache stores decoder state at the prefix boundary. On the next call with the same `cacheKey`, frames up to `prefixSeconds` are skipped, reducing decoder time by **~80%** for typical overlap ratios.
+
+Call `model.resetIncrementalCache()` when starting a new recording session.
 
 ### Result schema
 
@@ -267,9 +310,11 @@ if (utterance_text.toLowerCase().includes(expected)) {
 | Property | Where | Effect |
 |----------|-------|--------|
 | `cpuThreads` | `fromUrls()` | Sets `ort.env.wasm.numThreads`; pick *cores-2* for best balance |
-| `encoderQuant` | `getParakeetModel()` | Selects `fp32` or `int8` model for the encoder. |
-| `decoderQuant` | `getParakeetModel()` | Selects `fp32` or `int8` model for the decoder. |
+| `encoderQuant` | `getParakeetModel()` | Selects `fp32` or `int8` model for the encoder |
+| `decoderQuant` | `getParakeetModel()` | Selects `fp32` or `int8` model for the decoder |
+| `preprocessorBackend` | `getParakeetModel()` / `fromUrls()` | `'js'` (default) uses pure JS mel; `'onnx'` uses nemo128.onnx |
 | `frameStride` | `transcribe()` | Trade-off latency vs accuracy |
+| `precomputedFeatures` | `transcribe()` | Bypass preprocessor with external mel features |
 | `enableProfiling` | `fromUrls()` | Enables ORT profiler (JSON written to `/tmp/profile_*.json`) |
 
 ---
@@ -420,6 +465,15 @@ See `examples/demo/README.md` for detailed deployment instructions.
 ---
 
 ## Changelog
+
+### v1.1.1 (February 2026) — Streaming Enhancements
+**Pre-computed features & conditional ONNX loading for real-time applications.**
+
+- **`precomputedFeatures` option**: `transcribe()` now accepts pre-computed mel spectrograms, allowing external mel workers to feed features directly and bypass the internal preprocessor entirely.
+- **Conditional ONNX preprocessor loading**: `fromUrls()` no longer creates an ONNX preprocessor session when `preprocessorBackend: 'js'` is active. This prevents unnecessary loading of `nemo128.onnx`.
+- **Conditional `nemo128.onnx` download**: `getParakeetModel()` in `hub.js` now skips downloading `nemo128.onnx` when `preprocessorBackend: 'js'` is configured, saving ~5MB of network transfer and IndexedDB storage.
+- **Enhanced logging**: Model loading now logs the preprocessor backend selection (`JS (mel.js)` vs `ONNX`), and performance metrics include `preprocessor_backend` and `mel_cache` fields.
+- **`timeOffset` bugfix**: Fixed `effectiveTimeOffset` in the incremental decoder cache path — the caller's `timeOffset` base was being lost when combined with prefix frame offset.
 
 ### v1.0.0 (January 2026)
 **First stable release**

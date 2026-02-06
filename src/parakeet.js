@@ -94,6 +94,8 @@ export class ParakeetModel {
     } = cfg;
 
     const useJsPreprocessor = preprocessorBackend === 'js';
+    console.log(`[Parakeet.js] Preprocessor backend requested: '${preprocessorBackend}' → ${useJsPreprocessor ? 'JS (mel.js)' : 'ONNX'}`);
+
     if (!encoderUrl || !decoderUrl || !tokenizerUrl || (!preprocessorUrl && !useJsPreprocessor)) {
       throw new Error('fromUrls requires encoderUrl, decoderUrl, tokenizerUrl and preprocessorUrl (preprocessorUrl not needed if preprocessorBackend="js")');
     }
@@ -106,13 +108,6 @@ export class ParakeetModel {
     const ort = await initOrt({ backend: ortBackend, wasmPaths, numThreads: cpuThreads });
 
     // 2. Configure session options for better performance
-    // Graph-capture is beneficial only when every node runs on the same EP and
-    // ORT can fully record the graph (currently true only for a “strict”
-    // WebGPU session).  We therefore enable it *only* when the caller passes
-    // `enableGraphCapture:true` **and** the selected backend is the strict
-    // WebGPU preset.  In all other scenarios (hybrid WebGPU or pure WASM)
-    // it is forced off to avoid the “External buffer must be provided …”
-    // runtime error on recent ORT builds.
     const graphCaptureEnabled = !!enableGraphCapture && backend === 'webgpu-strict';
     const isFullWasm = backend === 'wasm';
 
@@ -124,12 +119,11 @@ export class ParakeetModel {
       enableMemPattern: true,
       enableProfiling,
       enableGraphCapture: graphCaptureEnabled,
-      logSeverityLevel: verbose ? 0 : 2, // 0=verbose, 2=warning
+      logSeverityLevel: verbose ? 0 : 2,
     };
 
     // Set execution provider based on backend
     if (backend === 'webgpu-hybrid') {
-      // WebGPU with fallback to WASM for encoder; decoder may be forced to WASM-only.
       baseSessionOptions.executionProviders = [
         {
           name: 'webgpu',
@@ -172,15 +166,12 @@ export class ParakeetModel {
       }];
     }
 
-    // In hybrid mode, the decoder is always run on WASM to avoid per-step
-    // stalls. In pure WASM mode, both EPs are WASM anyway.
+    // In hybrid mode, the decoder is always run on WASM
     if (backend.startsWith('webgpu')) {
-      // Force decoder to run on WASM
       decoderSessionOptions.executionProviders = ['wasm'];
     }
 
     // 3. Load tokenizer & preprocessor in parallel with model sessions
-    // helper to create session with graceful fallback if graph capture is unsupported
     async function createSession(url, opts) {
       try {
         return await ort.InferenceSession.create(url, opts);
@@ -198,12 +189,12 @@ export class ParakeetModel {
     const tokenizerPromise = ParakeetTokenizer.fromUrl(tokenizerUrl);
 
     // Create preprocessor based on selected backend
-    const detectedMels = nMels || 128; // Default to 128 for Parakeet models
+    const detectedMels = nMels || 128;
     const jsPreprocessor = new JsPreprocessor({ nMels: detectedMels });
 
-    // Always create ONNX preprocessor if URL is available (for runtime switching)
+    // Only create ONNX preprocessor if explicitly requested AND URL is available
     let onnxPreprocessor = null;
-    if (preprocessorUrl) {
+    if (!useJsPreprocessor && preprocessorUrl) {
       onnxPreprocessor = new OnnxPreprocessor(preprocessorUrl, {
         backend: 'wasm',
         wasmPaths,
@@ -211,11 +202,15 @@ export class ParakeetModel {
         enableGraphCapture: false,
         numThreads: cpuThreads
       });
+      console.log(`[Parakeet.js] ONNX preprocessor session created (${detectedMels} mel bins)`);
+    } else if (!useJsPreprocessor && !preprocessorUrl) {
+      console.warn(`[Parakeet.js] ONNX preprocessor requested but no URL provided — falling back to JS`);
     }
 
     const activePreprocessor = useJsPreprocessor ? jsPreprocessor : (onnxPreprocessor || jsPreprocessor);
     const preprocPromise = Promise.resolve(activePreprocessor);
-    console.log(`[Parakeet.js] Using ${useJsPreprocessor ? 'pure JS' : 'ONNX'} preprocessor (${detectedMels} mel bins)`);
+    const actualBackend = activePreprocessor === jsPreprocessor ? 'js' : 'onnx';
+    console.log(`[Parakeet.js] Active preprocessor: ${actualBackend === 'js' ? 'JS (mel.js) — no ONNX preprocessor needed' : 'ONNX (nemo128.onnx)'}, ${detectedMels} mel bins`);
 
     let encoderSession, joinerSession;
     if (backend === 'webgpu-hybrid') {
@@ -444,6 +439,10 @@ export class ParakeetModel {
    * @param {boolean} opts.returnTdtSteps - Include TDT duration prediction per token
    * @param {number} opts.prefixSamples - Number of leading audio samples identical to previous call
    *   (enables incremental mel caching — ~60-70% preprocessing savings for typical streaming overlap)
+   * @param {Object} opts.precomputedFeatures - Pre-computed mel features (bypasses preprocessor entirely)
+   * @param {Float32Array} opts.precomputedFeatures.features - Normalized mel features [melBins, T]
+   * @param {number} opts.precomputedFeatures.T - Number of time frames
+   * @param {number} opts.precomputedFeatures.melBins - Number of mel frequency bins
    */
   async transcribe(audio, sampleRate = 16000, opts = {}) {
     const {
@@ -464,6 +463,8 @@ export class ParakeetModel {
       returnTdtSteps = false,       // Include TDT duration predictions per token
       // Incremental mel caching for streaming
       prefixSamples = 0,            // Number of leading samples identical to previous call
+      // Pre-computed mel features (bypass preprocessor entirely)
+      precomputedFeatures = null,    // { features: Float32Array, T: number, melBins: number }
     } = opts;
 
     const perfEnabled = true; // always collect and log timings
@@ -472,10 +473,24 @@ export class ParakeetModel {
 
     // 1. Feature extraction (with optional incremental mel caching)
     let features, T, melBins, melCacheInfo;
-    if (perfEnabled) {
+    // Track which preprocessor path was used
+    let preprocessorPath = precomputedFeatures ? 'mel-worker' : this.getPreprocessorBackend();
+
+    if (precomputedFeatures) {
+      // Bypass preprocessor — features already computed by external mel worker
+      features = precomputedFeatures.features;
+      T = precomputedFeatures.T;
+      melBins = precomputedFeatures.melBins;
+      melCacheInfo = {};
+      console.log(`[Parakeet] Preprocessor: mel-worker (precomputed ${T} frames × ${melBins} mel bins, 0 ms)`);
+    } else if (perfEnabled) {
       const s = performance.now();
       ({ features, T, melBins, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
       tPreproc = performance.now() - s;
+      const cacheStr = melCacheInfo?.cached
+        ? ` (cached: ${melCacheInfo.cachedFrames} frames, new: ${melCacheInfo.newFrames} frames)`
+        : '';
+      console.log(`[Parakeet] Preprocessor: ${preprocessorPath}, ${T} frames × ${melBins} mel bins, ${tPreproc.toFixed(1)} ms${cacheStr}`);
     } else {
       ({ features, T, melBins, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
     }
@@ -494,6 +509,9 @@ export class ParakeetModel {
         is_final: !opts?.incremental,
       };
     }
+
+    // Compute audio duration for metrics (handle precomputed features where audio may be null)
+    const audioDur = audio ? audio.length / sampleRate : (T * 160 / sampleRate);
 
     const input = new this.ort.Tensor('float32', features, [1, melBins, T]);
     const lenTensor = new this.ort.Tensor('int64', BigInt64Array.from([BigInt(T)]), [1]);
@@ -688,7 +706,6 @@ export class ParakeetModel {
     if (!returnTimestamps && !returnConfidences) {
       if (perfEnabled) {
         const total = performance.now() - t0;
-        const audioDur = audio.length / sampleRate;
         const rtf = audioDur / (total / 1000);
         console.log(`[Perf] RTF: ${rtf.toFixed(2)}x (audio ${audioDur.toFixed(2)} s, time ${(total / 1000).toFixed(2)} s)`);
         console.table({ Preprocess: `${tPreproc.toFixed(1)} ms`, Encode: `${tEncode.toFixed(1)} ms`, Decode: `${tDecode.toFixed(1)} ms`, Tokenize: `${tToken.toFixed(1)} ms`, Total: `${total.toFixed(1)} ms` });
@@ -699,7 +716,12 @@ export class ParakeetModel {
         decode_ms: +tDecode.toFixed(1),
         tokenize_ms: +tToken.toFixed(1),
         total_ms: +((performance.now() - t0).toFixed(1)),
-        rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2)
+        rtf: +(audioDur / ((performance.now() - t0) / 1000)).toFixed(2),
+        preprocessor_backend: preprocessorPath,
+        mel_cache: melCacheInfo?.cached ? {
+          cached_frames: melCacheInfo.cachedFrames,
+          new_frames: melCacheInfo.newFrames,
+        } : null,
       } : null;
 
       const result = { utterance_text: text, words: [], metrics, is_final: !previousDecoderState };
@@ -773,7 +795,6 @@ export class ParakeetModel {
 
     if (perfEnabled) {
       const total = performance.now() - t0;
-      const audioDur = audio.length / sampleRate;
       const rtf = audioDur / (total / 1000);
       console.log(`[Perf] RTF: ${rtf.toFixed(2)}x (audio ${audioDur.toFixed(2)} s, time ${(total / 1000).toFixed(2)} s)`);
       console.table({ Preprocess: `${tPreproc.toFixed(1)} ms`, Encode: `${tEncode.toFixed(1)} ms`, Decode: `${tDecode.toFixed(1)} ms`, Tokenize: `${tToken.toFixed(1)} ms`, Total: `${total.toFixed(1)} ms` });
@@ -798,8 +819,8 @@ export class ParakeetModel {
         decode_ms: +tDecode.toFixed(1),
         tokenize_ms: +tToken.toFixed(1),
         total_ms: +((performance.now() - t0).toFixed(1)),
-        rtf: +((audio.length / sampleRate) / ((performance.now() - t0) / 1000)).toFixed(2),
-        preprocessor_backend: this.getPreprocessorBackend(),
+        rtf: +(audioDur / ((performance.now() - t0) / 1000)).toFixed(2),
+        preprocessor_backend: preprocessorPath,
         mel_cache: melCacheInfo?.cached ? {
           cached_frames: melCacheInfo.cachedFrames,
           new_frames: melCacheInfo.newFrames,
