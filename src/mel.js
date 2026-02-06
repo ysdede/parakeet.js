@@ -312,20 +312,23 @@ export class JsPreprocessor {
     // ─── 5. Per-feature normalization (Bessel-corrected) ──────────────
     // Matches: normalize(x, lens) in nemo.py
     // For each mel bin: mean over valid frames, var/(N-1), then standardize
+    // Output compact [nMels, featuresLen] so features.length / length === nMels (integer)
+    const features = new Float32Array(nMels * featuresLen);
     for (let m = 0; m < nMels; m++) {
-      const base = m * nFrames;
+      const srcBase = m * nFrames;
+      const dstBase = m * featuresLen;
 
       // Mean
       let sum = 0;
       for (let t = 0; t < featuresLen; t++) {
-        sum += melFeatures[base + t];
+        sum += melFeatures[srcBase + t];
       }
       const mean = sum / featuresLen;
 
       // Variance with Bessel correction (N-1)
       let varSum = 0;
       for (let t = 0; t < featuresLen; t++) {
-        const d = melFeatures[base + t] - mean;
+        const d = melFeatures[srcBase + t] - mean;
         varSum += d * d;
       }
       const invStd =
@@ -333,18 +336,14 @@ export class JsPreprocessor {
           ? 1.0 / (Math.sqrt(varSum / (featuresLen - 1)) + 1e-5)
           : 0; // single frame → zero output (matches ONNX div-by-zero → Inf → 0)
 
-      // Normalize valid frames
+      // Normalize and copy into compact output
       for (let t = 0; t < featuresLen; t++) {
-        melFeatures[base + t] = (melFeatures[base + t] - mean) * invStd;
-      }
-      // Zero out invalid frames (beyond featuresLen)
-      for (let t = featuresLen; t < nFrames; t++) {
-        melFeatures[base + t] = 0;
+        features[dstBase + t] = (melFeatures[srcBase + t] - mean) * invStd;
       }
     }
 
     return {
-      features: melFeatures,
+      features,
       length: featuresLen,
     };
   }
@@ -429,20 +428,21 @@ export class JsPreprocessor {
    */
   normalizeFeatures(rawMel, nFrames, featuresLen) {
     const nMels = this.nMels;
-    const features = new Float32Array(rawMel.length);
+    const features = new Float32Array(nMels * featuresLen);
 
     for (let m = 0; m < nMels; m++) {
-      const base = m * nFrames;
+      const srcBase = m * nFrames;
+      const dstBase = m * featuresLen;
 
       let sum = 0;
       for (let t = 0; t < featuresLen; t++) {
-        sum += rawMel[base + t];
+        sum += rawMel[srcBase + t];
       }
       const mean = sum / featuresLen;
 
       let varSum = 0;
       for (let t = 0; t < featuresLen; t++) {
-        const d = rawMel[base + t] - mean;
+        const d = rawMel[srcBase + t] - mean;
         varSum += d * d;
       }
       const invStd =
@@ -451,10 +451,7 @@ export class JsPreprocessor {
           : 0;
 
       for (let t = 0; t < featuresLen; t++) {
-        features[base + t] = (rawMel[base + t] - mean) * invStd;
-      }
-      for (let t = featuresLen; t < nFrames; t++) {
-        features[base + t] = 0;
+        features[dstBase + t] = (rawMel[srcBase + t] - mean) * invStd;
       }
     }
 

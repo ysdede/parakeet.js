@@ -11,7 +11,7 @@ import { JsPreprocessor, IncrementalMelProcessor } from './mel.js';
  * NOTE: This is an *early* scaffold – the `transcribe` method is TODO.
  */
 export class ParakeetModel {
-  constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s) => s, onnxPreprocessor = null }) {
+  constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s) => s, onnxPreprocessor = null, nMels }) {
     this.tokenizer = tokenizer;
     this.encoderSession = encoderSession;
     this.joinerSession = joinerSession;
@@ -46,6 +46,7 @@ export class ParakeetModel {
     this._normalizer = normalizer;
     this.subsampling = subsampling;
     this.windowStride = windowStride;
+    this._nMels = nMels || 128;
 
     // Pre-allocate reusable tensors for decoder loop to reduce GC pressure
     this._targetIdArray = new Int32Array(1);
@@ -238,6 +239,7 @@ export class ParakeetModel {
     return new ParakeetModel({
       tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling, windowStride,
       onnxPreprocessor: onnxPreprocessor !== preprocessor ? onnxPreprocessor : null,
+      nMels: detectedMels,
     });
   }
 
@@ -320,18 +322,23 @@ export class ParakeetModel {
     if (this._incrementalMel && prefixSamples > 0) {
       const result = this._incrementalMel.process(audio, prefixSamples);
       const T = result.length;
-      const melBins = T > 0 ? result.features.length / T : 0;
       return {
-        features: result.features, T, melBins,
+        features: result.features, T, melBins: this._nMels,
         cached: result.cached, cachedFrames: result.cachedFrames, newFrames: result.newFrames,
       };
     }
 
     // Standard path (no caching, works for both JS and ONNX preprocessors)
+    // The preprocessor returns:
+    //   features — flat Float32Array, row-major [nMels, nFrames]
+    //   length   — valid frame count (features_lens from ONNX)
+    // For the ONNX preprocessor, nFrames may be > length (extra STFT padding frame).
+    // Per the NeMo reference (onnx-asr), the encoder expects the FULL tensor as
+    // audio_signal and features_lens as a SEPARATE length input. We must NOT
+    // truncate or re-layout — just pass the data as-is with both values.
     const { features, length } = await this.preprocessor.process(audio);
-    const T = length;
-    const melBins = T > 0 ? features.length / T : 0;
-    return { features, T, melBins };
+    const nFrames = features.length / this._nMels;          // actual tensor dim (may be length+1)
+    return { features, T: nFrames, melBins: this._nMels, validLength: length };
   }
 
   /**
@@ -472,7 +479,7 @@ export class ParakeetModel {
     if (perfEnabled) t0 = performance.now();
 
     // 1. Feature extraction (with optional incremental mel caching)
-    let features, T, melBins, melCacheInfo;
+    let features, T, melBins, melCacheInfo, validLength;
     // Track which preprocessor path was used
     let preprocessorPath = precomputedFeatures ? 'mel-worker' : this.getPreprocessorBackend();
 
@@ -485,14 +492,14 @@ export class ParakeetModel {
       console.log(`[Parakeet] Preprocessor: mel-worker (precomputed ${T} frames × ${melBins} mel bins, 0 ms)`);
     } else if (perfEnabled) {
       const s = performance.now();
-      ({ features, T, melBins, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
+      ({ features, T, melBins, validLength, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
       tPreproc = performance.now() - s;
       const cacheStr = melCacheInfo?.cached
         ? ` (cached: ${melCacheInfo.cachedFrames} frames, new: ${melCacheInfo.newFrames} frames)`
         : '';
       console.log(`[Parakeet] Preprocessor: ${preprocessorPath}, ${T} frames × ${melBins} mel bins, ${tPreproc.toFixed(1)} ms${cacheStr}`);
     } else {
-      ({ features, T, melBins, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
+      ({ features, T, melBins, validLength, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
     }
 
     // 2. Encode entire utterance
@@ -514,7 +521,12 @@ export class ParakeetModel {
     const audioDur = audio ? audio.length / sampleRate : (T * 160 / sampleRate);
 
     const input = new this.ort.Tensor('float32', features, [1, melBins, T]);
-    const lenTensor = new this.ort.Tensor('int64', BigInt64Array.from([BigInt(T)]), [1]);
+    // Per NeMo reference (onnx-asr): encoder receives the FULL tensor (including
+    // any padding frames from STFT), but 'length' carries features_lens — the
+    // count of *valid* frames.  For the JS preprocessor T === validLength;
+    // for the ONNX preprocessor T may be validLength+1.
+    const encoderLength = validLength ?? T;
+    const lenTensor = new this.ort.Tensor('int64', BigInt64Array.from([BigInt(encoderLength)]), [1]);
     let enc;
     if (perfEnabled) {
       const s = performance.now();
