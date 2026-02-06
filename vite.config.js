@@ -3,8 +3,7 @@ import { configDefaults } from 'vitest/config'
 import solidPlugin from 'vite-plugin-solid'
 import path from 'path'
 import fs from 'fs'
-import tailwindcss from '@tailwindcss/postcss'
-import autoprefixer from 'autoprefixer'
+import tailwindcss from '@tailwindcss/vite'
 
 // Check if we should use local parakeet.js
 const useLocalParakeet = process.env.USE_LOCAL_PARAKEET === 'true';
@@ -30,7 +29,7 @@ if (useLocalParakeet) {
   console.log('📦 Using NPM parakeet.js (v1.0.1)');
 }
 
-// Optional HTTPS setup - only if certificates exist
+// Optional HTTPS setup
 let httpsConfig = false;
 try {
   const keyPath = path.resolve('./localhost-key.pem');
@@ -42,17 +41,16 @@ try {
       cert: fs.readFileSync(certPath),
     };
     console.log('✅ HTTPS enabled with local certificates');
-  } else {
-    console.log('ℹ️ No local certificates found, running on HTTP');
-    httpsConfig = false;
   }
 } catch (err) {
-  console.log('ℹ️ HTTPS setup failed, running on HTTP:', err.message);
   httpsConfig = false;
 }
 
 export default defineConfig({
-  plugins: [solidPlugin()],
+  plugins: [
+    tailwindcss(),
+    solidPlugin()
+  ],
   server: {
     port: 3100,
     host: '0.0.0.0',
@@ -61,11 +59,6 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
     ...(httpsConfig && { https: httpsConfig }),
-  },
-  css: {
-    postcss: {
-      plugins: [tailwindcss, autoprefixer],
-    },
   },
   build: {
     target: 'esnext',
@@ -82,7 +75,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['audio-processor.js'],
-    // Include parakeet.js in optimization when using local version
     ...(useLocalParakeet && localParakeetExists && {
       include: ['parakeet.js'],
     }),
@@ -93,7 +85,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // Conditionally alias parakeet.js to local source
       ...(useLocalParakeet && localParakeetExists && {
         'parakeet.js': path.resolve(localParakeetPath, 'src/index.js'),
       }),
@@ -104,7 +95,6 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: [...configDefaults.exclude],
-    // @vitest/web-worker polyfills Web Workers for Vitest
     deps: {
       optimizer: {
         web: {
@@ -114,3 +104,4 @@ export default defineConfig({
     },
   },
 })
+

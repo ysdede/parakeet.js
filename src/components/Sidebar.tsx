@@ -1,4 +1,4 @@
-import { Component, For, Show, createSignal, onCleanup } from 'solid-js';
+import { Component, For, Show, createSignal } from 'solid-js';
 
 interface SidebarProps {
   activeTab: string;
@@ -22,109 +22,101 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   const [showDevices, setShowDevices] = createSignal(false);
 
   return (
-    <div class="flex flex-col h-full gap-4">
-      <nav class="w-20 flex-1 nm-flat rounded-2xl flex flex-col items-center py-4 gap-3 z-20 transition-all duration-300">
-        {/* Power Button - Reflects System Readiness */}
-        <div class="relative mb-2">
+    <aside class="w-20 min-w-[80px] bg-neu-bg flex flex-col items-center py-6 h-full border-r border-sidebar-border/30">
+      {/* Power Button - Reflects System Readiness */}
+      <div class="mb-8 relative">
+        <button
+          onClick={() => props.onLoadModel()}
+          class="neu-circle-btn text-slate-600 transition-all active:scale-95"
+          title={props.isModelReady ? "Model Loaded" : "Load Model"}
+        >
+          <span class="material-symbols-outlined text-xl">power_settings_new</span>
+          <span class={`status-led ${props.isModelReady ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-slate-300'}`}></span>
+        </button>
+      </div>
+
+      <nav class="flex flex-col gap-6 items-center w-full px-2">
+        {/* Record Button */}
+        <button
+          onClick={() => props.onToggleRecording()}
+          disabled={!props.isModelReady}
+          class={`neu-circle-btn transition-all active:scale-95 ${props.isRecording ? 'text-red-500 active' : 'text-slate-500'}`}
+          title={props.isRecording ? "Stop Recording" : "Start Recording"}
+        >
+          <span class="material-symbols-outlined text-xl">mic</span>
+        </button>
+
+        <div class="w-8 h-[1px] bg-slate-300/60 my-2"></div>
+
+        {/* Model Selection Icon */}
+        <button
+          onClick={() => props.onLoadModel()}
+          class={`neu-square-btn transition-all active:scale-95 ${props.activeTab === 'ai' ? 'active' : 'text-slate-500'}`}
+          title="AI Model Selection"
+        >
+          <span class="material-symbols-outlined text-xl">psychology</span>
+        </button>
+
+        {/* Device Selection Popover Trigger */}
+        <div class="relative">
           <button
-            onClick={() => props.onLoadModel()}
-            class="w-14 h-14 rounded-full nm-button flex items-center justify-center group active:scale-95 transition-all"
+            class={`neu-square-btn transition-all active:scale-95 ${showDevices() ? 'active' : 'text-slate-500'}`}
+            onClick={() => setShowDevices(!showDevices())}
+            title="Audio Input Selection"
           >
-            <span class={`material-icons-round text-2xl transition-all ${props.isModelReady ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}`}>power_settings_new</span>
-            {/* LED indicator */}
-            <div class={`absolute bottom-3 right-3 led-dot ${props.isModelReady ? 'led-green-active' : 'led-green-passive'}`}></div>
+            <span class="material-symbols-outlined text-xl">settings_input_composite</span>
           </button>
-        </div>
 
-        {/* Record Button - High Prominence Mechanical Style */}
-        <div class="relative group mb-2">
-          <button
-            onClick={() => props.onToggleRecording()}
-            class={`w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all duration-300 active:scale-95 ${props.isRecording
-              ? 'nm-inset text-[var(--primary)]'
-              : props.isModelReady
-                ? 'nm-button text-slate-700 dark:text-slate-200'
-                : 'nm-button text-gray-400 opacity-50'
-              }`}
-            title={props.isRecording ? "Stop Recording" : "Start Recording"}
-          >
-            <span class="material-icons-round text-2xl mb-0.5">{props.isRecording ? 'pause' : 'mic'}</span>
-            {/* Mechanical LED dot for Status */}
-            <div class={`led-dot ${props.isRecording ? 'led-red-active' : 'led-red-passive'}`}></div>
-          </button>
-        </div>
-
-        <div class="w-10 h-[2px] nm-inset rounded-full opacity-10 my-2"></div>
-
-        {/* Navigation Items */}
-        <div class="flex flex-col gap-4 w-full items-center">
-          {/* Device Selection Popover Trigger */}
-          <div class="relative">
-            <button
-              class={`group relative w-12 h-12 flex items-center justify-center rounded-2xl transition-all ${showDevices() ? 'nm-inset text-[var(--accent-blue)]' : 'nm-button text-slate-400 dark:text-slate-500'
-                }`}
-              onClick={() => setShowDevices(!showDevices())}
-            >
-              <span class="material-icons-round text-xl">settings_input_composite</span>
-            </button>
-
-            {/* Device Selection Popover */}
-            <Show when={showDevices()}>
-              <div class="absolute left-full bottom-0 ml-6 w-64 nm-flat rounded-[32px] p-4 z-50 animate-in fade-in slide-in-from-left-2 duration-200">
-                <div class="text-[9px] font-black text-slate-400 p-2 uppercase tracking-widest mb-2 border-b border-slate-200 dark:border-slate-700">Mechanical_Input</div>
-                <div class="flex flex-col gap-1 max-h-64 overflow-y-auto pr-1">
-                  <For each={props.availableDevices}>
-                    {(device) => (
-                      <button
-                        class={`w-full text-left px-4 py-3 rounded-2xl text-xs transition-all flex items-center gap-3 ${props.selectedDeviceId === device.deviceId
-                          ? 'nm-inset text-[var(--accent-blue)] font-bold'
-                          : 'text-slate-600 dark:text-slate-400 hover:nm-button'
-                          }`}
-                        onClick={() => {
-                          props.onDeviceSelect(device.deviceId);
-                          setShowDevices(false);
-                        }}
-                      >
-                        <span class="material-icons-round text-lg opacity-40">keyboard_voice</span>
-                        <span class="truncate font-medium">{device.label || `Channel ${device.deviceId.slice(0, 4)}`}</span>
-                      </button>
-                    )}
-                  </For>
-                </div>
+          {/* Device Selection Popover */}
+          <Show when={showDevices()}>
+            <div class="absolute left-full bottom-0 ml-6 w-64 nm-flat rounded-[32px] p-4 z-50 animate-in fade-in slide-in-from-left-2 duration-200">
+              <div class="text-[9px] font-black text-slate-400 p-2 uppercase tracking-widest mb-2 border-b border-slate-200">Mechanical_Input</div>
+              <div class="flex flex-col gap-1 max-h-64 overflow-y-auto pr-1">
+                <For each={props.availableDevices}>
+                  {(device) => (
+                    <button
+                      class={`w-full text-left px-4 py-3 rounded-2xl text-xs transition-all flex items-center gap-3 ${props.selectedDeviceId === device.deviceId
+                        ? 'nm-inset text-primary font-bold'
+                        : 'text-slate-600 hover:nm-flat'
+                        }`}
+                      onClick={() => {
+                        props.onDeviceSelect(device.deviceId);
+                        setShowDevices(false);
+                      }}
+                    >
+                      <span class="material-symbols-outlined text-lg opacity-40">mic</span>
+                      <span class="truncate font-medium">{device.label || `Channel ${device.deviceId.slice(0, 4)}`}</span>
+                    </button>
+                  )}
+                </For>
               </div>
-            </Show>
-          </div>
-
-          <button
-            class={`group relative w-12 h-12 flex items-center justify-center rounded-2xl transition-all ${props.activeTab === 'transcript' ? 'nm-inset text-[var(--accent-blue)]' : 'nm-button text-slate-400 dark:text-slate-500'
-              }`}
-            onClick={() => props.onTabChange('transcript')}
-          >
-            <span class="material-icons-round text-xl">text_fields</span>
-          </button>
-
-          <button
-            class={`group relative w-12 h-12 flex items-center justify-center rounded-2xl transition-all ${props.activeTab === 'translate' ? 'nm-inset text-[var(--accent-blue)]' : 'nm-button text-slate-400 dark:text-slate-500'
-              }`}
-            onClick={() => props.onTabChange('translate')}
-          >
-            <span class="material-icons-round text-xl">translate</span>
-          </button>
+            </div>
+          </Show>
         </div>
 
-        <div class="mt-auto flex flex-col gap-4">
-          <button
-            class={`group relative w-12 h-12 flex items-center justify-center rounded-2xl transition-all ${props.activeTab === 'ai' ? 'nm-inset text-[var(--accent-blue)]' : 'nm-button text-slate-400 dark:text-slate-500'
-              }`}
-            onClick={() => props.onTabChange('ai')}
-          >
-            <span class="material-icons-round text-xl">psychology</span>
-          </button>
-        </div>
+        {/* Placeholder Items matching design */}
+        <button class="neu-square-btn text-slate-300 cursor-not-allowed" title="Translation (Pro)">
+          <span class="material-symbols-outlined text-xl">translate</span>
+        </button>
+
+        <button class="neu-square-btn text-slate-500" title="Export Transcript" onClick={() => (window as any).appStore?.copyTranscript()}>
+          <span class="material-symbols-outlined text-xl">download</span>
+        </button>
       </nav>
-    </div>
+
+      <div class="mt-auto">
+        <button
+          class={`neu-square-btn transition-all active:scale-95 ${props.activeTab === 'settings' ? 'active' : 'text-slate-500'}`}
+          onClick={() => props.onTabChange('settings')}
+          title="Settings"
+        >
+          <span class="material-symbols-outlined text-xl">settings</span>
+        </button>
+      </div>
+    </aside>
   );
 };
 
 export default Sidebar;
+
 

@@ -1,11 +1,9 @@
-/**
- * BoncukJS v3.0 - Components Index
- */
-
-export { Waveform, CompactWaveform } from './Waveform';
-export { BufferVisualizer } from './BufferVisualizer';
-export { ModelLoadingOverlay } from './ModelLoadingOverlay';
-export { Sidebar } from './Sidebar';
-export { DebugPanel } from './DebugPanel';
-export { StatusBar } from './StatusBar';
-export { TranscriptionDisplay } from './TranscriptionDisplay';
+export * from './Sidebar';
+export * from './StatusBar';
+export * from './TranscriptionDisplay';
+export * from './Waveform';
+export * from './ModelLoadingOverlay';
+export * from './DebugPanel';
+export * from './BufferVisualizer';
+export * from './EnergyMeter';
+export * from './PrivacyBadge';

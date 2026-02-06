@@ -1,7 +1,3 @@
-/**
- * BoncukJS v2.0 - Waveform Visualization Component
- */
-
 import { Component, For, createSignal, onCleanup, onMount } from 'solid-js';
 
 interface WaveformProps {
@@ -11,11 +7,11 @@ interface WaveformProps {
 }
 
 export const Waveform: Component<WaveformProps> = (props) => {
-  const barCount = () => props.barCount ?? 24;
+  const barCount = () => props.barCount ?? 32;
   const [barHeights, setBarHeights] = createSignal<number[]>([]);
 
   onMount(() => {
-    setBarHeights(Array.from({ length: barCount() }, () => Math.random()));
+    setBarHeights(Array.from({ length: barCount() }, () => 0.1));
   });
 
   let animationId: number | undefined;
@@ -25,13 +21,13 @@ export const Waveform: Component<WaveformProps> = (props) => {
       const level = props.audioLevel;
       setBarHeights(prev =>
         prev.map(() => {
-          // Significant boost for visualization sensitivity
-          const base = level * 20.0 + Math.random() * 0.1;
+          // Dynamic bars based on energy
+          const base = level * 15.0 + Math.random() * 0.2;
           return Math.min(1, Math.max(0.1, base));
         })
       );
     } else {
-      setBarHeights(prev => prev.map(() => 0.05 + Math.random() * 0.05));
+      setBarHeights(prev => prev.map(h => Math.max(0.05, h * 0.9)));
     }
     animationId = requestAnimationFrame(animate);
   };
@@ -45,17 +41,16 @@ export const Waveform: Component<WaveformProps> = (props) => {
   });
 
   return (
-    <div class="flex items-center justify-end gap-[6px] h-10 px-5 nm-inset rounded-[24px] bg-slate-500/5 overflow-hidden">
+    <div class="flex items-end justify-center gap-1.5 h-12 w-full opacity-80 overflow-hidden">
       <For each={barHeights()}>
         {(height) => (
           <div
-            class={`w-1 rounded-full transition-all duration-75 ${props.isRecording
-                ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5),_inset_0.5px_0.5px_1px_rgba(255,255,255,0.4),_inset_-0.5px_-0.5px_1px_rgba(0,0,0,0.2)]'
-                : 'bg-slate-300 dark:bg-slate-700 shadow-[inset_0.5px_0.5px_1px_rgba(0,0,0,0.2),_0.5px_0.5px_1px_rgba(255,255,255,0.1)]'
-              }`}
+            class="w-1.5 rounded-full transition-all duration-150"
             style={{
-              height: `${Math.max(15, height * 100)}%`,
-              opacity: props.isRecording ? 1 : 0.6,
+              height: `${Math.max(4, height * 100)}%`,
+              'background-color': 'var(--color-primary)',
+              opacity: props.isRecording ? 0.4 + height * 0.4 : 0.1,
+              'box-shadow': props.isRecording ? '0 0 8px var(--color-primary)' : 'none'
             }}
           />
         )}
@@ -65,7 +60,8 @@ export const Waveform: Component<WaveformProps> = (props) => {
 };
 
 export const CompactWaveform: Component<WaveformProps> = (props) => {
-  return <Waveform {...props} barCount={24} />;
+  return <Waveform {...props} barCount={20} />;
 };
 
 export default Waveform;
+

@@ -1,10 +1,3 @@
-/**
- * BoncukJS v3.0 - Main Application Component
- * 
- * Privacy-first, offline-capable real-time transcription.
- * Optimized performance via Transcription Web Worker to prevent UI stuttering.
- */
-
 import { Component, Show, For, Switch, Match, createSignal, onMount, onCleanup, createEffect } from 'solid-js';
 import { appStore } from './stores/appStore';
 import { CompactWaveform, BufferVisualizer, ModelLoadingOverlay, Sidebar, DebugPanel, StatusBar, TranscriptionDisplay } from './components';
@@ -23,68 +16,68 @@ let windowUnsubscribe: (() => void) | null = null;
 let melChunkUnsubscribe: (() => void) | null = null;
 let energyPollInterval: number | undefined;
 
-const TranscriptPanel: Component = () => {
-  const isRecording = () => appStore.recordingState() === 'recording';
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
 
+const Header: Component<{ isRecording: boolean, audioLevel: number }> = (props) => {
   return (
-    <section class="flex-1 flex flex-col min-w-0 nm-flat rounded-2xl overflow-hidden relative z-10 transition-all duration-500">
-      <Show when={isRecording()}>
-        <div class="px-4 pt-4">
-          <div class="rounded-xl overflow-hidden nm-inset border-2 border-transparent">
-            <BufferVisualizer
-              audioEngine={audioEngineSignal() ?? undefined}
-              height={100}
-              showThreshold={true}
-              snrThreshold={6.0}
-              showTimeMarkers={true}
-              visible={isRecording()}
-            />
-          </div>
-        </div>
-      </Show>
-
-      <div class="flex-1 overflow-y-auto px-4 pb-4 pt-2 relative group">
-        <div class="absolute top-6 right-8 z-20 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div class="nm-flat rounded-xl px-3 py-1 flex items-center gap-3">
-            <div class="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700">
-              <div class={`w-1.5 h-1.5 rounded-full ${isRecording() ? 'bg-red-500 animate-pulse' : 'bg-slate-300'}`} />
-              <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                {formatDuration(appStore.sessionDuration())}
+    <header class="bg-white border-b border-slate-200 shrink-0 z-10 transition-all duration-300">
+      <div class="px-8 h-20 flex items-center justify-between">
+        <div class="flex items-center gap-10">
+          <div>
+            <h1 class="text-xl font-extrabold text-[#0f172a] tracking-tight">Boncuk AI</h1>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span class="flex h-2 w-2">
+                <span class={`absolute inline-flex h-2 w-2 rounded-full opacity-75 ${props.isRecording ? 'animate-ping bg-red-400' : 'bg-slate-300'}`}></span>
+                <span class={`relative inline-flex rounded-full h-2 w-2 ${props.isRecording ? 'bg-red-500' : 'bg-slate-400'}`}></span>
+              </span>
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                {props.isRecording ? 'Live' : 'Standby'}
               </span>
             </div>
+          </div>
 
-            <div class="flex gap-2">
-              <button onClick={() => appStore.copyTranscript()} class="w-7 h-7 rounded-lg nm-button flex items-center justify-center text-slate-500 hover:text-blue-500 transition-all" title="Copy">
-                <span class="material-icons-round text-sm">content_copy</span>
-              </button>
-              <button onClick={() => appStore.clearTranscript()} class="w-7 h-7 rounded-lg nm-button flex items-center justify-center text-slate-500 hover:text-red-500 transition-all" title="Clear">
-                <span class="material-icons-round text-sm">delete_outline</span>
-              </button>
+          <div class="flex items-center gap-8 border-l border-slate-100 pl-10">
+            <div class="flex flex-col">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Model</span>
+              <span class="text-sm font-bold text-slate-700 capitalize">
+                {appStore.selectedModelId().split('-').slice(0, 2).join(' ')}
+              </span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inference</span>
+              <span class="text-sm font-bold text-slate-700">
+                {appStore.inferenceLatency().toFixed(0)} ms
+              </span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Duration</span>
+              <span class="text-sm font-bold text-slate-700">{formatDuration(appStore.sessionDuration())}</span>
             </div>
           </div>
         </div>
 
-        <div class="nm-inset rounded-2xl min-h-full p-4 leading-relaxed relative">
-          <TranscriptionDisplay
-            confirmedText={appStore.transcript()}
-            pendingText={appStore.pendingText()}
-            isRecording={isRecording()}
-            lcsLength={appStore.mergeInfo().lcsLength}
-            anchorValid={appStore.mergeInfo().anchorValid}
-            showConfidence={appStore.transcriptionMode() === 'v3-streaming'}
-            class="h-full"
-          />
+        <div class="flex-1 max-w-md h-12 mx-12 flex items-center justify-center">
+          <CompactWaveform audioLevel={props.audioLevel} isRecording={props.isRecording} />
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div class="text-right mr-2 hidden sm:block">
+            <p class="text-xs font-bold text-slate-700">On-Device AI</p>
+            <p class="text-[10px] text-slate-500">{appStore.backend().toUpperCase()} Backend</p>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-neu-bg shadow-neu-flat flex items-center justify-center border border-slate-100">
+            <span class="material-symbols-outlined text-primary">shield</span>
+          </div>
         </div>
       </div>
-    </section>
+    </header>
   );
 };
-
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
 
 const App: Component = () => {
   const [activeTab, setActiveTab] = createSignal('transcript');
@@ -141,7 +134,6 @@ const App: Component = () => {
 
       if (workerClient) {
         const final = await workerClient.finalize();
-        // Handle both TranscriptionResult (v2) and TokenStreamResult (v3)
         const text = (final as any).text || (final as any).fullText || '';
         appStore.setTranscript(text);
         appStore.setPendingText('');
@@ -167,8 +159,6 @@ const App: Component = () => {
         const mode = appStore.transcriptionMode();
         if (isModelReady() && workerClient) {
           if (mode === 'v3-streaming') {
-            // Calculate optimal overlap for the current trigger frequency
-            // overlap = window - trigger
             const windowDur = appStore.streamingWindow();
             const triggerInt = appStore.triggerInterval();
             const overlapDur = Math.max(1.0, windowDur - triggerInt);
@@ -180,22 +170,17 @@ const App: Component = () => {
               frameStride: appStore.frameStride(),
             });
 
-            // Initialize mel worker for continuous mel production
             if (!melClient) {
               melClient = new MelWorkerClient();
             }
             try {
               await melClient.init({ nMels: 128 });
-              console.log('[App] Mel worker initialized successfully');
             } catch (e) {
-              console.error('[App] Mel worker init failed, will use fallback path:', e);
               melClient.dispose();
               melClient = null;
             }
 
-            // Subscribe to resampled audio chunks → feed mel worker continuously
             melChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
-              // pushAudioCopy: mel worker gets a copy since chunk is shared with ring buffer
               melClient?.pushAudioCopy(chunk);
             });
 
@@ -209,18 +194,11 @@ const App: Component = () => {
 
                 let result;
                 if (melClient) {
-                  // Request pre-computed mel features from mel worker
                   const startSample = Math.round(startTime * 16000);
                   const endSample = startSample + audio.length;
-
-                  const melStart = performance.now();
                   const melFeatures = await melClient.getFeatures(startSample, endSample);
-                  const melFetchMs = performance.now() - melStart;
 
                   if (melFeatures) {
-                    // Use pre-computed features → skip preprocessor in inference worker
-                    console.log(`[App] Preprocessor: mel-worker, ${melFeatures.T} frames × ${melFeatures.melBins} bins, fetch ${melFetchMs.toFixed(1)} ms (samples ${startSample}..${endSample})`);
-                    const inferStart = performance.now();
                     result = await workerClient.processV3ChunkWithFeatures(
                       melFeatures.features,
                       melFeatures.T,
@@ -228,25 +206,18 @@ const App: Component = () => {
                       startTime,
                       overlapDur,
                     );
-                    console.log(`[App] Inference (encoder+decoder only): ${(performance.now() - inferStart).toFixed(1)} ms`);
                   } else {
-                    // Mel worker returned null — fall back
-                    console.warn('[App] Preprocessor: FALLBACK (mel worker returned null)');
                     result = await workerClient.processV3Chunk(audio, startTime);
                   }
                 } else {
-                  // No mel worker — use internal preprocessor
-                  console.log('[App] Preprocessor: internal (no mel worker)');
                   result = await workerClient.processV3Chunk(audio, startTime);
                 }
 
                 const duration = performance.now() - start;
-
                 const stride = appStore.triggerInterval();
                 appStore.setRtf(duration / (stride * 1000));
                 appStore.setInferenceLatency(duration);
 
-                // Update buffer metrics
                 if (audioEngine) {
                   const ring = audioEngine.getRingBuffer();
                   appStore.setBufferMetrics({
@@ -292,21 +263,8 @@ const App: Component = () => {
     }
   };
 
-  createEffect(() => {
-    const isRecording = appStore.recordingState() === 'recording';
-    const isV3 = appStore.transcriptionMode() === 'v3-streaming';
-
-    if (isRecording && isV3 && workerClient && audioEngine) {
-      // Handle dynamic config updates if needed
-      // For now, keep it simple as toggleRecording handles initial state
-    }
-  });
-
-  // Renamed to clarify intent: this actually triggers the load
   const loadSelectedModel = async () => {
     if (!workerClient) return;
-    // Don't show overlay here, it should already be open.
-    // But setting it to true doesn't hurt as a safeguard.
     setShowModelOverlay(true);
     try {
       await workerClient.initModel(appStore.selectedModelId());
@@ -314,10 +272,8 @@ const App: Component = () => {
     } catch (e) { }
   };
 
-  // New handler: just opens the modal in selection mode
   const openModelSelection = () => {
     if (!workerClient) return;
-    // Ensure state is clean for selection
     if (appStore.modelState() !== 'loading' && appStore.modelState() !== 'ready') {
       appStore.setModelState('unloaded');
     }
@@ -336,7 +292,7 @@ const App: Component = () => {
   };
 
   return (
-    <div class="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans selection:bg-blue-500/30">
+    <div class="h-screen bg-neu-bg flex overflow-hidden selection:bg-primary/20">
       <ModelLoadingOverlay
         isVisible={showModelOverlay()}
         state={appStore.modelState()}
@@ -351,62 +307,81 @@ const App: Component = () => {
         onClose={() => setShowModelOverlay(false)}
       />
 
-      <div class="flex h-screen overflow-hidden p-4 gap-4">
-        <Sidebar
-          activeTab={activeTab()}
-          onTabChange={setActiveTab}
-          isRecording={isRecording()}
-          onToggleRecording={toggleRecording}
-          isModelReady={isModelReady()}
-          onLoadModel={openModelSelection}
-          modelState={appStore.modelState()}
-          availableDevices={appStore.availableDevices()}
-          selectedDeviceId={appStore.selectedDeviceId()}
-          onDeviceSelect={(id: string) => {
-            appStore.setSelectedDeviceId(id);
-            if (audioEngine) {
-              audioEngine.updateConfig({ deviceId: id });
-            }
-          }}
-          audioLevel={appStore.audioLevel()}
-        />
+      <Sidebar
+        activeTab={activeTab()}
+        onTabChange={setActiveTab}
+        isRecording={isRecording()}
+        onToggleRecording={toggleRecording}
+        isModelReady={isModelReady()}
+        onLoadModel={openModelSelection}
+        modelState={appStore.modelState()}
+        availableDevices={appStore.availableDevices()}
+        selectedDeviceId={appStore.selectedDeviceId()}
+        onDeviceSelect={(id: string) => {
+          appStore.setSelectedDeviceId(id);
+          if (audioEngine) {
+            audioEngine.updateConfig({ deviceId: id });
+          }
+        }}
+        audioLevel={appStore.audioLevel()}
+      />
 
-        <main class="flex-1 flex flex-col gap-4 min-w-0 h-full overflow-hidden">
+      <main class="flex-1 flex flex-col min-w-0 bg-workspace-bg overflow-hidden">
+        <Header isRecording={isRecording()} audioLevel={appStore.audioLevel()} />
+
+        <div class="flex-1 overflow-y-auto relative">
           <Switch>
             <Match when={activeTab() === 'transcript'}>
-              <TranscriptPanel />
+              <div class="px-8 py-10 max-w-5xl mx-auto w-full h-full">
+                <TranscriptionDisplay
+                  confirmedText={appStore.transcript()}
+                  pendingText={appStore.pendingText()}
+                  isRecording={isRecording()}
+                  lcsLength={appStore.mergeInfo().lcsLength}
+                  anchorValid={appStore.mergeInfo().anchorValid}
+                  showConfidence={appStore.transcriptionMode() === 'v3-streaming'}
+                  class="h-full"
+                />
+              </div>
             </Match>
             <Match when={activeTab() === 'settings'}>
-              <div class="flex-1 nm-flat rounded-2xl p-6 overflow-y-auto">
-                <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
-                  <span class="material-icons-round text-blue-500">settings</span>
-                  Settings
-                </h2>
-                <div class="space-y-8">
+              <div class="px-12 py-10 max-w-5xl mx-auto w-full">
+                <h2 class="text-2xl font-extrabold text-[#0f172a] mb-8">System Settings</h2>
+                <div class="nm-flat rounded-3xl p-8 space-y-8">
                   <section>
-                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-400 mb-4">Transcription Engine</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Simplified Settings View for now */}
-                      <p class="text-slate-500 italic">Settings migrated to Worker thread.</p>
-                    </div>
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-400 mb-6">Device Configuration</h3>
+                    <p class="text-slate-600">Model: <span class="font-bold text-primary">{appStore.selectedModelId()}</span></p>
+                    <p class="text-slate-600">Backend: <span class="font-bold text-primary">{appStore.backend().toUpperCase()}</span></p>
                   </section>
                 </div>
               </div>
             </Match>
           </Switch>
+        </div>
 
-          <DebugPanel audioEngine={audioEngineSignal() ?? undefined} />
+        {/* Floating Metrics Block */}
+        <div class="fixed bottom-8 right-12 flex gap-4 z-30">
+          <div class="bg-white/80 backdrop-blur-md px-5 py-3 rounded-2xl border border-slate-200 shadow-xl flex items-center gap-6">
+            <div class="flex flex-col">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">RTF</span>
+              <span class={`text-sm font-bold ${appStore.rtf() > 1 ? 'text-red-500' : 'text-slate-900'}`}>{appStore.rtf().toFixed(2)}</span>
+            </div>
+            <div class="w-px h-6 bg-slate-200"></div>
+            <button
+              onClick={() => appStore.copyTranscript()}
+              class="flex items-center gap-2 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg active:scale-95"
+            >
+              <span class="material-symbols-outlined text-sm">content_copy</span>
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
 
-          <StatusBar
-            isRecording={isRecording()}
-            onToggleRecording={toggleRecording}
-            rtf={appStore.rtf()}
-            latency={appStore.inferenceLatency()}
-          />
-        </main>
-      </div>
+        <DebugPanel audioEngine={audioEngineSignal() ?? undefined} />
+      </main>
     </div>
   );
 };
 
 export default App;
+

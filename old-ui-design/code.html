@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Focused Transcription Interface</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: "#3b82f6", // Electric Blue
+                        "background-light": "#f3f4f6", // Gray-100
+                        "background-dark": "#111827", // Gray-900
+                        "card-light": "#ffffff",
+                        "card-dark": "#1e293b", // Slate-800
+                        "panel-dark": "#0f172a", // Slate-900
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.75rem", // 12px
+                        '3xl': "1.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+        @keyframes wave {
+            0%, 100% { height: 10%; opacity: 0.5; }
+            50% { height: 100%; opacity: 1; }
+        }
+        .waveform-bar {
+            animation: wave 1.2s ease-in-out infinite;
+        }
+        .waveform-bar:nth-child(odd) { animation-duration: 0.8s; }
+        .waveform-bar:nth-child(2n) { animation-duration: 1.1s; }
+        .waveform-bar:nth-child(3n) { animation-duration: 1.3s; }
+        .waveform-bar:nth-child(4n) { animation-duration: 0.9s; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-100 h-screen w-full overflow-hidden flex flex-col transition-colors duration-300 font-sans selection:bg-primary selection:text-white">
+<header class="flex-none p-4 pb-0">
+<div class="bg-white dark:bg-card-dark rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-3 flex items-center justify-between gap-4">
+<div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-900/50 rounded-xl px-4 py-2 border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors w-64">
+<span class="material-icons-round text-gray-500 dark:text-gray-400">mic</span>
+<span class="text-sm font-medium flex-1 truncate">Stereo Mix (Realtek Audio)</span>
+<span class="material-icons-round text-gray-500 text-sm">expand_more</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/20 transition-transform active:scale-95 group">
+<div class="w-4 h-4 bg-white rounded-full group-hover:scale-110 transition-transform"></div>
+</button>
+<button class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors">
+<span class="material-icons-round text-xl">stop</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors">
+<span class="material-icons-round text-xl">settings</span>
+</button>
+</div>
+<div class="flex-1 h-10 flex items-center justify-end gap-[3px] opacity-80 mask-image-linear-to-r">
+<div class="w-1 bg-primary rounded-full h-3 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-5 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-8 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-4 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-6 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-2 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-9 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-5 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-3 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-8 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-4 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-7 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-2 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-5 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-8 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-3 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-6 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-9 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-4 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-7 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-2 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-5 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-3 waveform-bar"></div>
+<div class="w-1 bg-primary rounded-full h-6 waveform-bar"></div>
+</div>
+</div>
+</header>
+<main class="flex-1 flex overflow-hidden p-4 gap-4 relative">
+<section class="flex-1 flex flex-col min-w-0 bg-white dark:bg-card-dark rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700/50 overflow-hidden relative z-10">
+<div class="px-8 py-6 border-b border-gray-100 dark:border-gray-700/50 flex justify-between items-end">
+<div>
+<h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">Live Transcript</h1>
+<p class="text-gray-400 dark:text-gray-500 text-sm mt-1">Session started 00:04:23 ago</p>
+</div>
+<div class="flex gap-2">
+<button class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-primary transition-all">
+<span class="material-icons-round text-xl">content_copy</span>
+<span class="text-[10px] font-medium">Copy</span>
+</button>
+<button class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-primary transition-all">
+<span class="material-icons-round text-xl">ios_share</span>
+<span class="text-[10px] font-medium">Share</span>
+</button>
+<button class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-400 dark:text-gray-500 hover:text-red-400 dark:hover:text-red-400 transition-all">
+<span class="material-icons-round text-xl">delete_outline</span>
+<span class="text-[10px] font-medium">Clear</span>
+</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-8 prose prose-lg dark:prose-invert max-w-none leading-relaxed">
+<p class="text-xl text-gray-600 dark:text-gray-300">
+                    Moved a pattern that would define the next centuries. Political power was fundamentally inseparable from the economic structures that underpinned the newly formed republic. The discourse shifting rapidly towards a centralized model of governance.
+                </p>
+<p class="text-xl text-gray-600 dark:text-gray-300 mt-6 opacity-60">
+<span class="animate-pulse">Listening...</span>
+</p>
+</div>
+</section>
+<div class="flex flex-row-reverse gap-4">
+<nav class="w-20 bg-white dark:bg-card-dark rounded-full shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center py-6 gap-6 z-20">
+<button class="w-12 h-12 rounded-full bg-gray-900 dark:bg-slate-700 text-white flex items-center justify-center mb-4 hover:scale-105 transition-transform">
+<span class="material-icons-round">menu</span>
+</button>
+<div class="flex flex-col gap-4 w-full items-center">
+<button class="nav-item group relative w-12 h-12 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary transition-all">
+<span class="material-icons-round text-2xl">mic_none</span>
+<span class="absolute left-full ml-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">Devices</span>
+</button>
+<button class="nav-item group relative w-12 h-12 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary transition-all">
+<span class="material-icons-round text-2xl">psychology</span>
+<span class="absolute left-full ml-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">AI Services</span>
+</button>
+<button class="nav-item active group relative w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 text-primary">
+<span class="material-icons-round text-2xl">text_fields</span>
+<span class="absolute right-2 top-2 w-2 h-2 bg-primary rounded-full"></span>
+</button>
+<button class="nav-item group relative w-12 h-12 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary transition-all">
+<span class="material-icons-round text-2xl">translate</span>
+</button>
+</div>
+<div class="mt-auto flex flex-col gap-4">
+<button class="group relative w-12 h-12 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary transition-all" onclick="toggleDebug()" title="Toggle Developer Debug">
+<span class="material-icons-round text-2xl">terminal</span>
+</button>
+<button class="group relative w-12 h-12 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary transition-all">
+<span class="material-icons-round text-2xl">settings</span>
+</button>
+</div>
+</nav>
+</div>
+</main>
+<div class="hidden h-64 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-panel-dark transition-all duration-300 flex-col font-mono text-xs overflow-hidden" id="debug-panel">
+<div class="flex items-center justify-between px-4 py-2 bg-gray-200 dark:bg-gray-800 border-b border-gray-300 dark:border-gray-700">
+<div class="flex items-center gap-4">
+<span class="font-bold text-primary">DEVELOPER DEBUG</span>
+<span class="text-gray-500">Session ID: <span class="text-gray-700 dark:text-gray-300">#8291-ALPHA</span></span>
+<span class="px-2 py-0.5 rounded bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400">WebSocket: Connected</span>
+</div>
+<div class="flex gap-4 text-gray-500">
+<span>Latency: 42ms</span>
+<span>Buffer: 1024b</span>
+<button class="hover:text-red-500 transition-colors" onclick="toggleDebug()">
+<span class="material-icons-round text-base align-middle">close</span>
+</button>
+</div>
+</div>
+<div class="flex flex-1 overflow-hidden">
+<div class="w-1/3 border-r border-gray-200 dark:border-gray-700 p-4 overflow-y-auto">
+<h3 class="text-gray-400 uppercase tracking-wider mb-2 font-bold">Token Stream</h3>
+<div class="space-y-1 font-mono">
+<div class="flex justify-between hover:bg-white dark:hover:bg-gray-800 px-1 rounded cursor-pointer">
+<span class="text-blue-600 dark:text-blue-400">TOK_402</span>
+<span class="text-gray-600 dark:text-gray-300">"Voters"</span>
+<span class="text-gray-400">0.98conf</span>
+</div>
+<div class="flex justify-between hover:bg-white dark:hover:bg-gray-800 px-1 rounded cursor-pointer">
+<span class="text-blue-600 dark:text-blue-400">TOK_403</span>
+<span class="text-gray-600 dark:text-gray-300">"ed"</span>
+<span class="text-gray-400">0.45conf</span>
+</div>
+<div class="flex justify-between hover:bg-white dark:hover:bg-gray-800 px-1 rounded cursor-pointer">
+<span class="text-blue-600 dark:text-blue-400">TOK_404</span>
+<span class="text-gray-600 dark:text-gray-300">"a"</span>
+<span class="text-gray-400">0.99conf</span>
+</div>
+<div class="flex justify-between bg-yellow-100 dark:bg-yellow-900/20 px-1 rounded cursor-pointer border-l-2 border-yellow-500">
+<span class="text-blue-600 dark:text-blue-400">TOK_405</span>
+<span class="text-gray-600 dark:text-gray-300">"pattern"</span>
+<span class="text-gray-400">0.92conf</span>
+</div>
+<div class="flex justify-between hover:bg-white dark:hover:bg-gray-800 px-1 rounded cursor-pointer">
+<span class="text-blue-600 dark:text-blue-400">TOK_406</span>
+<span class="text-gray-600 dark:text-gray-300">"that"</span>
+<span class="text-gray-400">0.95conf</span>
+</div>
+</div>
+</div>
+<div class="w-1/3 border-r border-gray-200 dark:border-gray-700 p-4 overflow-y-auto bg-gray-100 dark:bg-[#0d1117]">
+<h3 class="text-gray-400 uppercase tracking-wider mb-2 font-bold">Node Properties</h3>
+<pre class="text-green-600 dark:text-green-400 text-xs">{
+  "entity_id": "pol_power_01",
+  "surface_form": "political power",
+  "category": "ABSTRACT_CONCEPT",
+  "sentiment_score": -0.1,
+  "timing": {
+    "start_ms": 14502,
+    "end_ms": 15200,
+    "duration": 698
+  },
+  "alternatives": [
+    {"word": "political tower", "p": 0.02}
+  ]
+}</pre>
+</div>
+<div class="w-1/3 p-4 flex flex-col">
+<h3 class="text-gray-400 uppercase tracking-wider mb-2 font-bold">System Metrics</h3>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between mb-1">
+<span class="text-gray-500">Token Throughput</span>
+<span class="text-gray-800 dark:text-gray-200">45 t/s</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+<div class="bg-primary h-2 rounded-full" style="width: 70%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-1">
+<span class="text-gray-500">Model Confidence</span>
+<span class="text-gray-800 dark:text-gray-200">88.5%</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+<div class="bg-green-500 h-2 rounded-full" style="width: 88%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-1">
+<span class="text-gray-500">VRAM Usage</span>
+<span class="text-gray-800 dark:text-gray-200">4.2GB / 8GB</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+<div class="bg-yellow-500 h-2 rounded-full" style="width: 52%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+        function toggleDebug() {
+            const panel = document.getElementById('debug-panel');
+            panel.classList.toggle('hidden');
+            panel.classList.toggle('flex');
+            // Re-calc layout just in case
+            if(!panel.classList.contains('hidden')) {
+                window.scrollTo(0, document.body.scrollHeight);
+            }
+        }
+    </script>
+
+</body></html>
