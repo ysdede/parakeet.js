@@ -94,6 +94,13 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
         }
     };
 
+    // --- Pre-allocated ImageData for spectrogram rendering ---
+    // Avoids creating a new ImageData object every spectrogram draw (~10fps),
+    // which caused GC pressure from large short-lived allocations.
+    let cachedSpecImgData: ImageData | null = null;
+    let cachedSpecImgWidth = 0;
+    let cachedSpecImgHeight = 0;
+
     // Store spectrogram data with its time alignment
     let cachedSpecData: {
         features: Float32Array;
@@ -261,7 +268,13 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
 
         if (timeSteps === 0) return;
 
-        const imgData = ctx.createImageData(width, height);
+        // Reuse cached ImageData if dimensions match; allocate only on size change
+        if (!cachedSpecImgData || cachedSpecImgWidth !== width || cachedSpecImgHeight !== height) {
+            cachedSpecImgData = ctx.createImageData(width, height);
+            cachedSpecImgWidth = width;
+            cachedSpecImgHeight = height;
+        }
+        const imgData = cachedSpecImgData;
         const data = imgData.data;
 
         // Scaling factors
