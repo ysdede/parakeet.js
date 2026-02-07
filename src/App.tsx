@@ -4,9 +4,12 @@ import { CompactWaveform, BufferVisualizer, ModelLoadingOverlay, Sidebar, DebugP
 import { AudioEngine } from './lib/audio';
 import { MelWorkerClient } from './lib/audio/MelWorkerClient';
 import { TranscriptionWorkerClient } from './lib/transcription';
-import { HybridVAD, VADRingBuffer } from './lib/vad';
+import { HybridVAD } from './lib/vad';
 import { WindowBuilder } from './lib/transcription/WindowBuilder';
+import { BufferWorkerClient } from './lib/buffer';
+import { TenVADWorkerClient } from './lib/vad/TenVADWorkerClient';
 import type { V4ProcessResult } from './lib/transcription/TranscriptionWorkerClient';
+import type { BufferWorkerConfig, TenVADResult } from './lib/buffer/types';
 
 // Singleton instances
 let audioEngine: AudioEngine | null = null;
@@ -14,6 +17,7 @@ export const [audioEngineSignal, setAudioEngineSignal] = createSignal<AudioEngin
 
 let workerClient: TranscriptionWorkerClient | null = null;
 let melClient: MelWorkerClient | null = null;
+export const [melClientSignal, setMelClientSignal] = createSignal<MelWorkerClient | null>(null);
 let segmentUnsubscribe: (() => void) | null = null;
 let windowUnsubscribe: (() => void) | null = null;
 let melChunkUnsubscribe: (() => void) | null = null;
@@ -21,7 +25,8 @@ let energyPollInterval: number | undefined;
 
 // v4 pipeline instances
 let hybridVAD: HybridVAD | null = null;
-let vadRingBuffer: VADRingBuffer | null = null;
+let bufferClient: BufferWorkerClient | null = null;
+let tenVADClient: TenVADWorkerClient | null = null;
 let windowBuilder: WindowBuilder | null = null;
 let v4TickTimeout: number | undefined;
 let v4TickRunning = false;
@@ -29,6 +34,8 @@ let v4AudioChunkUnsubscribe: (() => void) | null = null;
 let v4MelChunkUnsubscribe: (() => void) | null = null;
 let v4InferenceBusy = false;
 let v4LastInferenceTime = 0;
+// Global sample counter for audio chunks (tracks total samples written to BufferWorker)
+let v4GlobalSampleOffset = 0;
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -137,8 +144,25 @@ const App: Component = () => {
 
   // ---- v4 pipeline tick: periodic window building + inference ----
   let v4TickCount = 0;
+  let v4ModelNotReadyLogged = false;
   const v4Tick = async () => {
-    if (!workerClient || !windowBuilder || !audioEngine || v4InferenceBusy) return;
+    if (!workerClient || !windowBuilder || !audioEngine || !bufferClient || v4InferenceBusy) return;
+
+    // Skip inference if model is not ready (but still allow audio/mel/VAD to process)
+    if (appStore.modelState() !== 'ready') {
+      if (!v4ModelNotReadyLogged) {
+        console.log('[v4Tick] Model not ready yet - audio is being captured and preprocessed');
+        v4ModelNotReadyLogged = true;
+      }
+      return;
+    }
+    // Reset the flag once model becomes ready
+    if (v4ModelNotReadyLogged) {
+      console.log('[v4Tick] Model is now ready - starting inference');
+      v4ModelNotReadyLogged = false;
+      // Initialize the v4 service now that model is ready
+      await workerClient.initV4Service({ debug: false });
+    }
 
     v4TickCount++;
     const now = performance.now();
@@ -146,16 +170,56 @@ const App: Component = () => {
     const minInterval = Math.max(200, appStore.v4InferenceIntervalMs() - 100);
     if (now - v4LastInferenceTime < minInterval) return;
 
-    // Check if there is speech in the pending window (skip silent windows)
-    const hasSpeech = windowBuilder.hasSpeechInPendingWindow();
+    // Check if there is speech via the BufferWorker (async query).
+    // We check both energy and inference VAD layers; either one detecting speech triggers inference.
+    const cursorSample = windowBuilder.getMatureCursorFrame(); // frame === sample in our pipeline
+    const currentSample = v4GlobalSampleOffset;
+    const startSample = cursorSample > 0 ? cursorSample : 0;
+
+    let hasSpeech = false;
+    if (currentSample > startSample) {
+      // Check energy VAD first (always available, low latency)
+      const energyResult = await bufferClient.hasSpeech('energyVad', startSample, currentSample, 0.3);
+
+      // When inference VAD is ready, require BOTH energy AND inference to agree
+      // This prevents false positives from music/noise that has high energy but no speech
+      if (tenVADClient?.isReady()) {
+        const inferenceResult = await bufferClient.hasSpeech('inferenceVad', startSample, currentSample, 0.5);
+        // Require both energy and inference VAD to agree (AND logic)
+        hasSpeech = energyResult.hasSpeech && inferenceResult.hasSpeech;
+      } else {
+        // Fall back to energy-only if inference VAD is not available
+        hasSpeech = energyResult.hasSpeech;
+      }
+    }
+
     if (v4TickCount <= 5 || v4TickCount % 20 === 0) {
       const vadState = appStore.vadState();
-      console.log(`[v4Tick #${v4TickCount}] hasSpeech=${hasSpeech}, vadState=${vadState.hybridState}, energy=${vadState.energy.toFixed(4)}, silero=${(vadState.sileroProbability || 0).toFixed(2)}`);
+      const rb = audioEngine.getRingBuffer();
+      const rbFrame = rb.getCurrentFrame();
+      const rbBase = rb.getBaseFrameOffset();
+      console.log(
+        `[v4Tick #${v4TickCount}] hasSpeech=${hasSpeech}, vadState=${vadState.hybridState}, ` +
+        `energy=${vadState.energy.toFixed(4)}, inferenceVAD=${(vadState.sileroProbability || 0).toFixed(2)}, ` +
+        `samples=[${startSample}:${currentSample}], ` +
+        `ringBuf=[base=${rbBase}, head=${rbFrame}, avail=${rbFrame - rbBase}]`
+      );
+    }
+
+    // Periodic buffer worker state dump (every 40 ticks)
+    if (v4TickCount % 40 === 0 && bufferClient) {
+      try {
+        const state = await bufferClient.getState();
+        const layerSummary = Object.entries(state.layers)
+          .map(([id, l]) => `${id}:${l.fillCount}/${l.maxEntries}@${l.currentSample}`)
+          .join(', ');
+        console.log(`[v4Tick #${v4TickCount}] BufferState: ${layerSummary}`);
+      } catch (_) { /* ignore state query errors */ }
     }
 
     if (!hasSpeech) {
-      // Check for silence-based flush
-      const silenceDuration = windowBuilder.getSilenceTailDuration();
+      // Check for silence-based flush using BufferWorker
+      const silenceDuration = await bufferClient.getSilenceTailDuration('energyVad', 0.3);
       if (silenceDuration >= appStore.v4SilenceFlushSec()) {
         // Flush pending sentence via timeout finalization
         try {
@@ -179,7 +243,14 @@ const App: Component = () => {
     const window = windowBuilder.buildWindow();
     if (!window) {
       if (v4TickCount <= 10 || v4TickCount % 20 === 0) {
-        console.log(`[v4Tick #${v4TickCount}] buildWindow returned null (waiting for min duration)`);
+        const rb = audioEngine.getRingBuffer();
+        const rbHead = rb.getCurrentFrame();
+        const rbBase = rb.getBaseFrameOffset();
+        console.log(
+          `[v4Tick #${v4TickCount}] buildWindow=null, ` +
+          `ringBuf=[base=${rbBase}, head=${rbHead}, avail=${rbHead - rbBase}], ` +
+          `cursor=${windowBuilder.getMatureCursorFrame()}`
+        );
       }
       return;
     }
@@ -287,10 +358,18 @@ const App: Component = () => {
       v4MelChunkUnsubscribe = null;
     }
     hybridVAD = null;
-    vadRingBuffer = null;
+    if (tenVADClient) {
+      tenVADClient.dispose();
+      tenVADClient = null;
+    }
+    if (bufferClient) {
+      bufferClient.dispose();
+      bufferClient = null;
+    }
     windowBuilder = null;
     v4InferenceBusy = false;
     v4LastInferenceTime = 0;
+    v4GlobalSampleOffset = 0;
   };
 
   const toggleRecording = async () => {
@@ -314,6 +393,10 @@ const App: Component = () => {
       }
 
       melClient?.reset();
+      // Don't nullify melClient here, just reset it, but if needed we can set null
+      // Actually we keep the instance if possible, but let's see.
+      // The current logic doesn't clear melClient variable here, only calls .reset()
+      // So signal should remain valid.
       audioEngine?.reset();
       appStore.setAudioLevel(0);
       appStore.stopRecording();
@@ -331,97 +414,133 @@ const App: Component = () => {
         }
 
         const mode = appStore.transcriptionMode();
-        if (isModelReady() && workerClient) {
-          if (mode === 'v4-utterance') {
-            // ---- v4: Utterance-based pipeline ----
 
-            // Initialize merger in worker
+        // v4 mode: Always start audio capture, mel preprocessing, and VAD
+        // Inference only runs when model is ready (checked in v4Tick)
+        if (mode === 'v4-utterance') {
+          // ---- v4: Utterance-based pipeline with BufferWorker + TEN-VAD ----
+
+          // Initialize merger in worker only if model is ready
+          if (isModelReady() && workerClient) {
             await workerClient.initV4Service({ debug: false });
+          }
 
-            // Initialize mel worker
-            if (!melClient) {
-              melClient = new MelWorkerClient();
+          // Initialize mel worker (always needed for preprocessing)
+          if (!melClient) {
+            melClient = new MelWorkerClient();
+            setMelClientSignal(melClient);
+          }
+          try {
+            await melClient.init({ nMels: 128 });
+          } catch (e) {
+            melClient.dispose();
+            melClient = null;
+            setMelClientSignal(null);
+          }
+
+          // Initialize BufferWorker (centralized multi-layer data store)
+          bufferClient = new BufferWorkerClient();
+          const bufferConfig: BufferWorkerConfig = {
+            sampleRate: 16000,
+            layers: {
+              audio: { hopSamples: 1, entryDimension: 1, maxDurationSec: 120 },
+              mel: { hopSamples: 160, entryDimension: 128, maxDurationSec: 120 },
+              energyVad: { hopSamples: 1280, entryDimension: 1, maxDurationSec: 120 },
+              inferenceVad: { hopSamples: 256, entryDimension: 1, maxDurationSec: 120 },
+            },
+          };
+          await bufferClient.init(bufferConfig);
+
+          // Initialize TEN-VAD worker (inference-based VAD)
+          tenVADClient = new TenVADWorkerClient();
+          tenVADClient.onResult((result: TenVADResult) => {
+            if (!bufferClient) return;
+            // Write each hop probability to the inferenceVad layer
+            for (let i = 0; i < result.hopCount; i++) {
+              bufferClient.writeScalar('inferenceVad', result.probabilities[i]);
             }
-            try {
-              await melClient.init({ nMels: 128 });
-            } catch (e) {
-              melClient.dispose();
-              melClient = null;
-            }
-
-            // Feed audio chunks to mel worker
-            v4MelChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
-              melClient?.pushAudioCopy(chunk);
-            });
-
-            // Initialize hybrid VAD
-            hybridVAD = new HybridVAD({
-              sileroThreshold: 0.5,
-              onsetConfirmations: 2,
-              offsetConfirmations: 3,
-              sampleRate: 16000,
-            });
-
-            // Try to load Silero model (non-blocking; falls back to energy-only)
-            hybridVAD.init().catch((err) => {
-              console.warn('[v4] Silero VAD init failed, using energy-only:', err);
-            });
-
-            // Initialize VAD ring buffer (120s at 16kHz, hop=1280 matching AudioWorklet chunk size)
-            vadRingBuffer = new VADRingBuffer(16000, 120, 1280);
-
-            // Initialize window builder
-            windowBuilder = new WindowBuilder(
-              audioEngine.getRingBuffer(),
-              vadRingBuffer,
-              {
-                sampleRate: 16000,
-                minDurationSec: 3.0,
-                maxDurationSec: 30.0,
-                minInitialDurationSec: 1.5,
-                useVadBoundaries: true,
-                vadSilenceThreshold: 0.3,
-                debug: false,
-              }
-            );
-
-            // Process each audio chunk through hybrid VAD
-            v4AudioChunkUnsubscribe = audioEngine.onAudioChunk(async (chunk) => {
-              if (!hybridVAD || !vadRingBuffer) return;
-
-              const vadResult = await hybridVAD.process(chunk);
-
-              // Write VAD probability to ring buffer.
-              // hopSize matches AudioWorklet chunk size (1280), so 1 write per chunk.
-              const prob = vadResult.sileroProbability !== undefined
-                ? vadResult.sileroProbability
-                : (vadResult.isSpeech ? 0.9 : 0.1);
-              vadRingBuffer.write(prob);
-
-              // Update VAD state for UI
+            // Update store with latest probability for UI
+            if (result.hopCount > 0) {
+              const lastProb = result.probabilities[result.hopCount - 1];
+              const currentState = appStore.vadState();
               appStore.setVadState({
-                isSpeech: vadResult.isSpeech,
-                energy: vadResult.energy,
-                snr: vadResult.snr || 0,
-                sileroProbability: vadResult.sileroProbability || 0,
-                hybridState: vadResult.state,
+                ...currentState,
+                sileroProbability: lastProb,
               });
-              appStore.setIsSpeechDetected(vadResult.isSpeech);
+            }
+          });
+          // TEN-VAD init is non-blocking; falls back gracefully if WASM fails
+          tenVADClient.init({ hopSize: 256, threshold: 0.5 }).catch((err) => {
+            console.warn('[v4] TEN-VAD init failed, using energy-only:', err);
+          });
+
+          // Initialize hybrid VAD for energy-based detection (always runs, fast)
+          hybridVAD = new HybridVAD({
+            sileroThreshold: 0.5,
+            onsetConfirmations: 2,
+            offsetConfirmations: 3,
+            sampleRate: 16000,
+          });
+          // Do NOT init Silero in HybridVAD (TEN-VAD replaces it)
+
+          // NOTE: WindowBuilder is created AFTER audioEngine.start() below,
+          // because start() may re-create the internal RingBuffer.
+
+          // Reset global sample counter
+          v4GlobalSampleOffset = 0;
+
+          // Feed audio chunks to mel worker
+          v4MelChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
+            melClient?.pushAudioCopy(chunk);
+          });
+
+          // Process each audio chunk: energy VAD + write to BufferWorker + forward to TEN-VAD
+          v4AudioChunkUnsubscribe = audioEngine.onAudioChunk(async (chunk) => {
+            if (!hybridVAD || !bufferClient) return;
+
+            const chunkOffset = v4GlobalSampleOffset;
+            v4GlobalSampleOffset += chunk.length;
+
+            // 1. Write raw audio to BufferWorker
+            bufferClient.writeAudio(chunk);
+
+            // 2. Run energy VAD (synchronous, fast) and write to BufferWorker
+            const vadResult = await hybridVAD.process(chunk);
+            const energyProb = vadResult.isSpeech ? 0.9 : 0.1;
+            bufferClient.writeScalar('energyVad', energyProb);
+
+            // 3. Forward audio to TEN-VAD worker for inference-based VAD
+            if (tenVADClient?.isReady()) {
+              tenVADClient.process(chunk, chunkOffset);
+            }
+
+            // 4. Update VAD state for UI
+            appStore.setVadState({
+              isSpeech: vadResult.isSpeech,
+              energy: vadResult.energy,
+              snr: vadResult.snr || 0,
+              sileroProbability: vadResult.sileroProbability || 0,
+              hybridState: vadResult.state,
             });
+            appStore.setIsSpeechDetected(vadResult.isSpeech);
+          });
 
-            // Start adaptive inference tick loop (reads interval from appStore)
-            v4TickRunning = true;
-            const scheduleNextTick = () => {
+          // Start adaptive inference tick loop (reads interval from appStore)
+          // Note: v4Tick internally checks if model is ready before running inference
+          v4TickRunning = true;
+          const scheduleNextTick = () => {
+            if (!v4TickRunning) return;
+            v4TickTimeout = window.setTimeout(async () => {
               if (!v4TickRunning) return;
-              v4TickTimeout = window.setTimeout(async () => {
-                if (!v4TickRunning) return;
-                await v4Tick();
-                scheduleNextTick();
-              }, appStore.v4InferenceIntervalMs());
-            };
-            scheduleNextTick();
+              await v4Tick();
+              scheduleNextTick();
+            }, appStore.v4InferenceIntervalMs());
+          };
+          scheduleNextTick();
 
-          } else if (mode === 'v3-streaming') {
+        } else if (isModelReady() && workerClient) {
+          // v3 and v2 modes still require model to be ready
+          if (mode === 'v3-streaming') {
             // ---- v3: Fixed-window token streaming (existing) ----
             const windowDur = appStore.streamingWindow();
             const triggerInt = appStore.triggerInterval();
@@ -436,12 +555,14 @@ const App: Component = () => {
 
             if (!melClient) {
               melClient = new MelWorkerClient();
+              setMelClientSignal(melClient);
             }
             try {
               await melClient.init({ nMels: 128 });
             } catch (e) {
               melClient.dispose();
               melClient = null;
+              setMelClientSignal(null);
             }
 
             melChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
@@ -514,6 +635,25 @@ const App: Component = () => {
         }
 
         await audioEngine.start();
+
+        // Create WindowBuilder AFTER start() so we get the final RingBuffer reference
+        // (AudioEngine.init() re-creates the RingBuffer internally)
+        if (mode === 'v4-utterance') {
+          windowBuilder = new WindowBuilder(
+            audioEngine.getRingBuffer(),
+            null, // No VADRingBuffer; hasSpeech now goes through BufferWorker
+            {
+              sampleRate: 16000,
+              minDurationSec: 3.0,
+              maxDurationSec: 30.0,
+              minInitialDurationSec: 1.5,
+              useVadBoundaries: false, // VAD boundaries now managed by BufferWorker
+              vadSilenceThreshold: 0.3,
+              debug: true, // Enable debug logging for diagnostics
+            }
+          );
+        }
+
         appStore.startRecording();
 
         energyPollInterval = window.setInterval(() => {
@@ -645,7 +785,10 @@ const App: Component = () => {
           </div>
         </div>
 
-        <DebugPanel audioEngine={audioEngineSignal() ?? undefined} />
+        <DebugPanel
+          audioEngine={audioEngineSignal() ?? undefined}
+          melClient={melClientSignal() ?? undefined}
+        />
       </main>
     </div>
   );
