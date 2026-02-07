@@ -148,7 +148,7 @@ export class TranscriptionWorkerClient {
         return this.sendRequest('RESET');
     }
 
-    async finalize(): Promise<TranscriptionResult | TokenStreamResult> {
+    async finalize(): Promise<TranscriptionResult | TokenStreamResult | MergerResult | { text: string }> {
         return this.sendRequest('FINALIZE');
     }
 
