@@ -544,7 +544,7 @@ const App: Component = () => {
           });
 
           // Process each audio chunk: energy VAD + write to BufferWorker + forward to TEN-VAD
-          v4AudioChunkUnsubscribe = audioEngine.onAudioChunk(async (chunk) => {
+          v4AudioChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
             if (!hybridVAD || !bufferClient) return;
 
             const chunkOffset = v4GlobalSampleOffset;
@@ -554,7 +554,7 @@ const App: Component = () => {
             bufferClient.writeAudio(chunk);
 
             // 2. Run energy VAD (synchronous, fast) and write to BufferWorker
-            const vadResult = await hybridVAD.process(chunk);
+            const vadResult = hybridVAD.processEnergyOnly(chunk);
             const energyProb = vadResult.isSpeech ? 0.9 : 0.1;
             bufferClient.writeScalar('energyVad', energyProb);
 

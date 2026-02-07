@@ -152,6 +152,7 @@ export class HybridVAD {
     private updateStateMachine(
         energyResult: VADResult,
         sileroResult: SileroVADResult | null,
+        forceEnergyOnly: boolean = false,
     ): HybridVADResult {
         const prevState = this.state;
         let speechStart = false;
@@ -162,7 +163,7 @@ export class HybridVAD {
 
         // When Silero is not available, use energy-only mode with the same state machine
         // but treat energy decisions as authoritative (no Silero confirmation needed).
-        const energyOnly = !this.sileroReady;
+        const energyOnly = forceEnergyOnly || !this.sileroReady;
 
         switch (this.state) {
             case 'silence': {
@@ -288,6 +289,15 @@ export class HybridVAD {
             snr: energyResult.snr,
             noiseFloor: energyResult.noiseFloor,
         };
+    }
+
+    /**
+     * Synchronous energy-only processing path (no Silero).
+     * Use this when TEN-VAD is active and Silero is disabled.
+     */
+    processEnergyOnly(chunk: Float32Array): HybridVADResult {
+        const energyResult: VADResult = this.energyVAD.process(chunk);
+        return this.updateStateMachine(energyResult, null, true);
     }
 
     /**
