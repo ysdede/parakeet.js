@@ -93,6 +93,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
+    pool: 'forks',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: [...configDefaults.exclude],
     deps: {
