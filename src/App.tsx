@@ -445,11 +445,15 @@ const App: Component = () => {
 
   const toggleRecording = async () => {
     if (isRecording()) {
+      // Update UI immediately so the stop button always takes effect even if cleanup throws
+      if (energyPollInterval) {
+        clearInterval(energyPollInterval);
+        energyPollInterval = undefined;
+      }
+      appStore.stopRecording();
+      appStore.setAudioLevel(0);
+
       try {
-        if (energyPollInterval) {
-          clearInterval(energyPollInterval);
-          energyPollInterval = undefined;
-        }
         audioEngine?.stop();
 
         if (segmentUnsubscribe) segmentUnsubscribe();
@@ -466,11 +470,8 @@ const App: Component = () => {
 
         melClient?.reset();
         audioEngine?.reset();
-        appStore.setAudioLevel(0);
       } catch (err) {
-        console.warn('[App] Error during stop recording:', err);
-      } finally {
-        appStore.stopRecording();
+        console.warn('[App] Error during stop recording cleanup:', err);
       }
     } else {
       try {
@@ -744,6 +745,8 @@ const App: Component = () => {
 
   const loadSelectedModel = async () => {
     if (!workerClient) return;
+    if (appStore.modelState() === 'ready') return;
+    if (appStore.modelState() === 'loading') return;
     setShowModelOverlay(true);
     try {
       await workerClient.initModel(appStore.selectedModelId());
