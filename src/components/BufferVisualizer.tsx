@@ -29,6 +29,7 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
   let parentRef: HTMLDivElement | undefined;
 
   // State
+  const [isDarkSignal, setIsDarkSignal] = createSignal(false);
   const [canvasWidth, setCanvasWidth] = createSignal(0);
   const [waveformData, setWaveformData] = createSignal<Float32Array>(new Float32Array(0));
   const [metrics, setMetrics] = createSignal<AudioMetrics>({
@@ -68,8 +69,8 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     // Clear canvas
     ctx.clearRect(0, 0, width, canvasHeight);
 
-    // Optimized theme detection (no getComputedStyle in loop)
-    const isDarkMode = document.documentElement.classList.contains('dark');
+    // Optimized theme detection (using signal instead of DOM access)
+    const isDarkMode = isDarkSignal();
 
     // Colors (Mechanical Etched Palette) - Cached values
     const bgColor = isDarkMode ? '#1e293b' : '#f1f5f9';
@@ -461,6 +462,18 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     if (canvasRef) {
       ctx = canvasRef.getContext('2d');
     }
+
+    // Setup dark mode observer
+    setIsDarkSignal(document.documentElement.classList.contains('dark'));
+    const themeObserver = new MutationObserver(() => {
+      setIsDarkSignal(document.documentElement.classList.contains('dark'));
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    onCleanup(() => themeObserver.disconnect());
 
     // Setup resize observer
     handleResize();
