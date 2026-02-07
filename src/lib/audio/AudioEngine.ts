@@ -39,9 +39,6 @@ export class AudioEngine implements IAudioEngine {
     private audioProcessor: AudioSegmentProcessor; // Replaces EnergyVAD
     private deviceId: string | null = null;
 
-    // Cache last stats for UI
-    private lastProcessorStats: any = null;
-
     private audioContext: AudioContext | null = null;
     private mediaStream: MediaStream | null = null;
     private workletNode: AudioWorkletNode | null = null;
