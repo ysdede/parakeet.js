@@ -158,13 +158,18 @@ function createAppStore() {
   });
 
 
-  // Network status listeners
+  // Network status listeners (with cleanup to prevent leaks)
   if (typeof window !== 'undefined') {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    onCleanup(() => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    });
   }
 
   // Actions
