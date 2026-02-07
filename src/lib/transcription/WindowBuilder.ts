@@ -322,7 +322,7 @@ export class WindowBuilder {
      * Check if there is speech in the current pending window.
      */
     hasSpeechInPendingWindow(): boolean {
-        if (!this.vadBuffer) return true; // Assume speech if no VAD
+        if (!this.vadBuffer) return true; // Assume speech if no VAD buffer
 
         const endFrame = this.ringBuffer.getCurrentFrame();
         const startFrame = this.matureCursorFrame > 0
