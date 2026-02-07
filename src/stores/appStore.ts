@@ -47,7 +47,7 @@ export interface V4MergerStats {
   utterancesProcessed: number;
 }
 
-function createAppStore() {
+export function createAppStore() {
   // Recording state
   const [recordingState, setRecordingState] = createSignal<RecordingState>('idle');
   const [sessionDuration, setSessionDuration] = createSignal(0);
