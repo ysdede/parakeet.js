@@ -204,7 +204,7 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
                 </div>
               </div>
               <div class={`flex items-center gap-1.5 px-2 py-0.5 bg-white rounded border border-slate-200 transition-opacity duration-300 ${appStore.vadState().sileroProbability > 0 ? 'opacity-100' : 'opacity-0'}`}>
-                <span class="font-bold uppercase text-slate-500 text-[9px]">Silero</span>
+                <span class="font-bold uppercase text-slate-500 text-[9px]">VAD</span>
                 <span class={`font-bold ${appStore.vadState().sileroProbability > 0.5 ? 'text-orange-500' : 'text-slate-400'}`}>
                   {(appStore.vadState().sileroProbability * 100).toFixed(0)}%
                 </span>
@@ -363,17 +363,17 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
             </div>
           </div>
 
-          {/* v4 Silero probability bar */}
+          {/* v4 VAD probability bar */}
           <Show when={isV4()}>
             <div class={`space-y-1 transition-opacity duration-300 ${appStore.vadState().sileroProbability > 0 ? 'opacity-100' : 'opacity-40'}`}>
               <div class="flex justify-between font-bold text-slate-500 uppercase text-[9px]">
-                <span>Silero Prob</span>
+                <span>VAD Prob</span>
                 <span class={appStore.vadState().sileroProbability > appStore.sileroThreshold() ? 'text-orange-500 font-bold' : 'text-slate-400'}>
                   {(appStore.vadState().sileroProbability * 100).toFixed(0)}%
                 </span>
               </div>
               <div class="h-2 w-full bg-slate-200 rounded overflow-hidden relative">
-                <div class="absolute top-0 bottom-0 w-px bg-red-400 z-10" style={{ left: `${appStore.sileroThreshold() * 100}%` }} title="Silero threshold"></div>
+                <div class="absolute top-0 bottom-0 w-px bg-red-400 z-10" style={{ left: `${appStore.sileroThreshold() * 100}%` }} title="VAD threshold"></div>
                 <div
                   class={`h-full transition-all duration-75 ${appStore.vadState().sileroProbability > appStore.sileroThreshold() ? 'bg-orange-400' : 'bg-slate-400'}`}
                   style={{ width: `${Math.min(100, appStore.vadState().sileroProbability * 100)}%` }}
@@ -413,11 +413,11 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
               />
             </div>
 
-            {/* v4: Silero Threshold */}
+            {/* v4: VAD Threshold */}
             <Show when={isV4()}>
               <div class="bg-white p-2 rounded border border-slate-200 space-y-1.5">
                 <div class="flex justify-between font-bold text-slate-500 text-[9px] uppercase">
-                  <span>Silero Threshold</span>
+                  <span>VAD Threshold</span>
                   <span class="text-primary">{(appStore.sileroThreshold() * 100).toFixed(0)}%</span>
                 </div>
                 <input
