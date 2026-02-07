@@ -32,6 +32,7 @@ import {
     normalizeMelFeatures,
     sampleToFrame,
 } from './mel-math';
+import { resampleLinear } from './utils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -116,25 +117,6 @@ function parseWav(buffer: ArrayBuffer): { audio: Float32Array; sampleRate: numbe
     }
 
     return { audio, sampleRate, channels };
-}
-
-/**
- * Resample audio from sourceSR to targetSR using simple linear interpolation.
- * Good enough for tests; real apps use AudioContext.
- */
-function resampleLinear(audio: Float32Array, sourceSR: number, targetSR: number): Float32Array {
-    if (sourceSR === targetSR) return audio;
-    const ratio = sourceSR / targetSR;
-    const outLen = Math.floor(audio.length / ratio);
-    const out = new Float32Array(outLen);
-    for (let i = 0; i < outLen; i++) {
-        const srcIdx = i * ratio;
-        const lo = Math.floor(srcIdx);
-        const hi = Math.min(lo + 1, audio.length - 1);
-        const frac = srcIdx - lo;
-        out[i] = audio[lo] * (1 - frac) + audio[hi] * frac;
-    }
-    return out;
 }
 
 /**
