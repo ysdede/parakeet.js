@@ -456,7 +456,12 @@ const App: Component = () => {
 
         if (workerClient) {
           const final = await workerClient.finalize();
-          const text = (final as any).text || (final as any).fullText || '';
+          let text = '';
+          if ('text' in final && typeof final.text === 'string') {
+            text = final.text;
+          } else if ('fullText' in final && typeof final.fullText === 'string') {
+            text = final.fullText;
+          }
           appStore.setTranscript(text);
           appStore.setPendingText('');
         }
