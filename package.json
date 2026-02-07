@@ -37,7 +37,6 @@
     "parakeet.js": "^1.0.1",
     "solid-js": "^1.9.5",
     "uuid": "^11.1.0",
-    "wavefile": "^11.0.0",
     "wink-eng-lite-web-model": "^1.8.1",
     "wink-nlp": "^2.4.0"
   }
