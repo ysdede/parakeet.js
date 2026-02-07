@@ -355,7 +355,7 @@ export class JsPreprocessor {
    * @param {Float32Array} audio - Mono PCM [-1,1] at 16kHz
    * @returns {{rawMel: Float32Array, nFrames: number, featuresLen: number}}
    */
-  computeRawMel(audio) {
+  computeRawMel(audio, startFrame = 0) {
     const N = audio.length;
     if (N === 0) {
       return { rawMel: new Float32Array(0), nFrames: 0, featuresLen: 0 };
@@ -385,6 +385,7 @@ export class JsPreprocessor {
     }
 
     // STFT + power + mel + log (no normalization)
+    // Initialize with zeros, so skipped frames [0..startFrame-1] are zeroed.
     const rawMel = new Float32Array(this.nMels * nFrames);
     const fftRe = this._fftRe;
     const fftIm = this._fftIm;
@@ -394,7 +395,7 @@ export class JsPreprocessor {
     const nMels = this.nMels;
     const tw = this.twiddles;
 
-    for (let t = 0; t < nFrames; t++) {
+    for (let t = startFrame; t < nFrames; t++) {
       const offset = t * HOP_LENGTH;
       for (let k = 0; k < N_FFT; k++) {
         fftRe[k] = padded[offset + k] * window[k];
@@ -528,17 +529,25 @@ export class IncrementalMelProcessor {
 
     if (!canReuse) {
       // Full computation (no cache or cache invalid)
-      const result = this.preprocessor.process(audio);
-      // Cache raw mel for next call
+      // Optimized: Compute raw mel once, then normalize. Avoids double computation.
       const { rawMel, nFrames, featuresLen } =
         this.preprocessor.computeRawMel(audio);
+
+      const features = this.preprocessor.normalizeFeatures(
+        rawMel,
+        nFrames,
+        featuresLen
+      );
+
+      // Cache raw mel for next call
       this._cachedRawMel = rawMel;
       this._cachedNFrames = nFrames;
       this._cachedAudioLen = N;
       this._cachedFeaturesLen = featuresLen;
 
       return {
-        ...result,
+        features,
+        length: featuresLen,
         cached: false,
         cachedFrames: 0,
         newFrames: featuresLen,
@@ -555,11 +564,12 @@ export class IncrementalMelProcessor {
       Math.min(prefixFrames - this.boundaryFrames, this._cachedFeaturesLen)
     );
 
-    // Compute full mel for this audio
+    // Compute only new frames (starting from safeFrames)
+    // The prefix [0..safeFrames-1] will be zero-filled in rawMel
     const { rawMel, nFrames, featuresLen } =
-      this.preprocessor.computeRawMel(audio);
+      this.preprocessor.computeRawMel(audio, safeFrames);
 
-    // Replace first safeFrames with cached values (they're identical)
+    // Fill the zeroed prefix with cached values
     if (safeFrames > 0 && this._cachedRawMel) {
       for (let m = 0; m < this.nMels; m++) {
         const srcBase = m * this._cachedNFrames;
