@@ -12,6 +12,47 @@ interface LayeredBufferVisualizerProps {
 
 const MEL_BINS = 128; // Standard for this app
 
+// Pre-computed 256-entry RGB lookup table for GoldWave-style colormap.
+// Built once at module load; indexed by Math.round(intensity * 255).
+// Colormap: black -> blue -> purple -> green -> yellow -> orange -> red.
+const COLORMAP_LUT = (() => {
+    const stops: [number, number, number, number][] = [
+        [0, 0, 0, 0],       // black
+        [0.12, 0, 0, 180],  // blue
+        [0.30, 120, 0, 160], // purple
+        [0.48, 0, 180, 80],  // green
+        [0.65, 220, 220, 0], // yellow
+        [0.82, 255, 140, 0], // orange
+        [1, 255, 0, 0],      // red
+    ];
+    // 256 entries * 3 channels (R, G, B) packed into a Uint8Array
+    const lut = new Uint8Array(256 * 3);
+    for (let i = 0; i < 256; i++) {
+        const intensity = i / 255;
+        let r = 0, g = 0, b = 0;
+        for (let s = 0; s < stops.length - 1; s++) {
+            const [t0, r0, g0, b0] = stops[s];
+            const [t1, r1, g1, b1] = stops[s + 1];
+            if (intensity >= t0 && intensity <= t1) {
+                const t = (intensity - t0) / (t1 - t0);
+                r = Math.round(r0 + t * (r1 - r0));
+                g = Math.round(g0 + t * (g1 - g0));
+                b = Math.round(b0 + t * (b1 - b0));
+                break;
+            }
+        }
+        if (intensity >= stops[stops.length - 1][0]) {
+            const last = stops[stops.length - 1];
+            r = last[1]; g = last[2]; b = last[3];
+        }
+        const base = i * 3;
+        lut[base] = r;
+        lut[base + 1] = g;
+        lut[base + 2] = b;
+    }
+    return lut;
+})();
+
 export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = (props) => {
     let canvasRef: HTMLCanvasElement | undefined;
     let ctx: CanvasRenderingContext2D | null = null;
@@ -172,14 +213,8 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
         width: number,
         height: number
     ) => {
-        // Map features to canvas
-        // features is [timeSteps * melBins] (row-major or col-major?)
-        // Usually [time][mel] in many libs, but PyTorch/ONNX might be [mel][time].
-        // Parakeet/NeMo usually uses [B, D, T]. 
-        // Let's try to interpret as [melBins, T] (vertical columns are time, rows are freq)
-        // or [T, melBins] (rows are time).
-
-        // Let's assume [T, melBins] so features[t * melBins + m].
+        // features layout: [melBins, T] (mel-major, flattened from [mel, time])
+        // So features[m * timeSteps + t].
 
         if (timeSteps === 0) return;
 
@@ -195,63 +230,21 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
             if (t >= timeSteps) break;
 
             for (let y = 0; y < height; y++) {
-                // y=0 is top (high freq?), y=height is bottom (low freq).
-                // Spectrograms usually have low freq at bottom.
-                // So y canvas 0 -> mel high. y canvas height -> mel 0.
+                // y=0 is top (high freq), y=height is bottom (low freq).
                 const m = Math.floor((height - 1 - y) * freqScale);
                 if (m >= melBins) continue;
 
-                // Access feature value
-                // Assuming row-major [time][mel] -> features[t * melBins + m]
-                // If col-major [mel][time] -> features[m * timeSteps + t]
-
-                // Most likely [melBins * timeSteps] flattened from [mel, time].
-                // Let's try features[m * timeSteps + t].
-
                 const val = features[m * timeSteps + t];
 
-                // Normalize for visualization (log mel stats typically -10 to 0 or so, or normalized)
-                // NeMo features are usually normalized (mean 0, std 1). Map roughly -2 to 2 -> 0..1.
-                const intensity = Math.max(0, Math.min(1, (val + 2.0) / 4.0));
-
-                // GoldWave-style colormap: black -> blue -> purple -> green -> yellow -> orange -> red
-                // High energy speech (formants) in yellow, orange, red; medium in green; low in blue/purple.
-                const stops: [number, number, number, number][] = [
-                    [0, 0, 0, 0],       // black
-                    [0.12, 0, 0, 180],  // blue
-                    [0.30, 120, 0, 160], // purple
-                    [0.48, 0, 180, 80],  // green
-                    [0.65, 220, 220, 0], // yellow
-                    [0.82, 255, 140, 0], // orange
-                    [1, 255, 0, 0],      // red
-                ];
-                let r = 0, g = 0, b = 0;
-                for (let i = 0; i < stops.length - 1; i++) {
-                    const [t0, r0, g0, b0] = stops[i];
-                    const [t1, r1, g1, b1] = stops[i + 1];
-                    if (intensity >= t0 && intensity <= t1) {
-                        const t = (intensity - t0) / (t1 - t0);
-                        r = Math.round(r0 + t * (r1 - r0));
-                        g = Math.round(g0 + t * (g1 - g0));
-                        b = Math.round(b0 + t * (b1 - b0));
-                        break;
-                    }
-                }
-                if (intensity <= stops[0][0]) {
-                    r = stops[0][1];
-                    g = stops[0][2];
-                    b = stops[0][3];
-                } else if (intensity >= stops[stops.length - 1][0]) {
-                    const last = stops[stops.length - 1];
-                    r = last[1];
-                    g = last[2];
-                    b = last[3];
-                }
+                // Normalize: NeMo features are mean 0, std 1. Map -2..2 -> 0..1.
+                // Clamp and convert to 0-255 LUT index in one step.
+                const lutIdx = Math.max(0, Math.min(255, ((val + 2.0) * 63.75) | 0));
+                const lutBase = lutIdx * 3;
 
                 const idx = (y * width + x) * 4;
-                data[idx] = r;
-                data[idx + 1] = g;
-                data[idx + 2] = b;
+                data[idx] = COLORMAP_LUT[lutBase];
+                data[idx + 1] = COLORMAP_LUT[lutBase + 1];
+                data[idx + 2] = COLORMAP_LUT[lutBase + 2];
                 data[idx + 3] = 255;
             }
         }

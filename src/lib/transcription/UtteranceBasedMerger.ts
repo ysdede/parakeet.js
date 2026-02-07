@@ -112,6 +112,15 @@ interface SentenceDetectionResult {
     usedPreciseTimestamps: boolean;
 }
 
+// ---- Retention limits ----
+// Utterances only participate in recent sentence detection; old ones can be pruned.
+// Mature sentences older than the retention window are already persisted in the
+// store's transcript string, so they serve no further functional role.
+const MAX_UTTERANCES = 20;
+const MAX_MATURE_SENTENCES = 50;
+// For duplicate detection, only scan the most recent N mature sentences.
+const DEDUP_SCAN_WINDOW = 10;
+
 // ---- Implementation ----
 
 export class UtteranceBasedMerger {
@@ -208,6 +217,10 @@ export class UtteranceBasedMerger {
         };
 
         this.utterances.push(utterance);
+        // Prune old utterances to bound memory; only recent ones matter for detection
+        if (this.utterances.length > MAX_UTTERANCES) {
+            this.utterances = this.utterances.slice(-MAX_UTTERANCES);
+        }
         this.currentUtteranceText = utterance_text.trim();
         this.stats.utterancesProcessed++;
 
@@ -412,17 +425,28 @@ export class UtteranceBasedMerger {
                     sentenceEndingWord,
                 };
 
-                // Check for duplicates
-                const existingSentence = this.matureSentences.find(
-                    existing =>
+                // Check for duplicates (bounded scan of most recent entries only)
+                const dedupStart = Math.max(0, this.matureSentences.length - DEDUP_SCAN_WINDOW);
+                let existingSentence: MergerSentence | undefined;
+                for (let d = this.matureSentences.length - 1; d >= dedupStart; d--) {
+                    const existing = this.matureSentences[d];
+                    if (
                         existing.text === matureSentence.text &&
                         Math.abs((existing.wordEndTime ?? 0) - (matureSentence.wordEndTime ?? 0)) < 0.1
-                );
+                    ) {
+                        existingSentence = existing;
+                        break;
+                    }
+                }
 
                 if (!existingSentence) {
                     matureSentences.push(matureSentence);
                     this.matureSentences.push(matureSentence);
                     this.stats.matureSentencesCreated++;
+                    // Prune old mature sentences to bound memory
+                    if (this.matureSentences.length > MAX_MATURE_SENTENCES) {
+                        this.matureSentences = this.matureSentences.slice(-MAX_MATURE_SENTENCES);
+                    }
                 } else {
                     matureSentences.push(existingSentence);
                 }
@@ -578,17 +602,28 @@ export class UtteranceBasedMerger {
             return null;
         }
 
-        // Avoid duplicates
-        const exists = this.matureSentences.find(
-            existing =>
+        // Avoid duplicates (bounded scan of recent entries only)
+        const dedupStart = Math.max(0, this.matureSentences.length - DEDUP_SCAN_WINDOW);
+        let exists = false;
+        for (let d = this.matureSentences.length - 1; d >= dedupStart; d--) {
+            const existing = this.matureSentences[d];
+            if (
                 existing.text === candidate.text &&
                 Math.abs((existing.wordEndTime ?? 0) - (candidate.wordEndTime ?? 0)) < 0.1
-        );
+            ) {
+                exists = true;
+                break;
+            }
+        }
 
         if (!exists) {
             const matured: MergerSentence = { ...candidate, isMature: true };
             this.matureSentences.push(matured);
             this.stats.matureSentencesCreated++;
+            // Prune old mature sentences to bound memory
+            if (this.matureSentences.length > MAX_MATURE_SENTENCES) {
+                this.matureSentences = this.matureSentences.slice(-MAX_MATURE_SENTENCES);
+            }
             this.updateMatureCursor([matured], candidate.wordEndTime || 0);
             if (this.config.debug) {
                 console.log(
