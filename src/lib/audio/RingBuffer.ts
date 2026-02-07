@@ -82,6 +82,44 @@ export class RingBuffer implements IRingBuffer {
         return result;
     }
 
+    /**
+     * Read samples from [startFrame, endFrame) into a caller-supplied buffer.
+     * Zero-allocation: writes into `dest` starting at offset 0.
+     * Returns the number of samples actually written (may be less than
+     * dest.length if the requested range is shorter).
+     * @throws RangeError if data has been overwritten or is in the future.
+     */
+    readInto(startFrame: number, endFrame: number, dest: Float32Array): number {
+        if (startFrame < 0) throw new RangeError('startFrame must be non-negative');
+        if (endFrame <= startFrame) return 0;
+
+        const baseFrame = this.getBaseFrameOffset();
+        if (startFrame < baseFrame) {
+            throw new RangeError(
+                `Requested frame ${startFrame} has been overwritten. Oldest available: ${baseFrame}`
+            );
+        }
+
+        if (endFrame > this.currentFrame) {
+            throw new RangeError(
+                `Requested frame ${endFrame} is in the future. Latest available: ${this.currentFrame}`
+            );
+        }
+
+        const length = endFrame - startFrame;
+        const readPos = startFrame % this.maxFrames;
+        const remainingAtEnd = this.maxFrames - readPos;
+
+        if (length <= remainingAtEnd) {
+            dest.set(this.buffer.subarray(readPos, readPos + length));
+        } else {
+            dest.set(this.buffer.subarray(readPos, this.maxFrames));
+            dest.set(this.buffer.subarray(0, length - remainingAtEnd), remainingAtEnd);
+        }
+
+        return length;
+    }
+
     getCurrentFrame(): number {
         return this.currentFrame;
     }

@@ -36,10 +36,9 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       </div>
 
       <nav class="flex flex-col gap-6 items-center w-full px-2">
-        {/* Record Button */}
+        {/* Record Button - Always enabled, recording works even before model is loaded */}
         <button
           onClick={() => props.onToggleRecording()}
-          disabled={!props.isModelReady}
           class={`neu-circle-btn transition-all active:scale-95 ${props.isRecording ? 'text-red-500 active' : 'text-slate-500'}`}
           title={props.isRecording ? "Stop Recording" : "Start Recording"}
         >
