@@ -20,14 +20,17 @@ export class RingBuffer implements IRingBuffer {
      * Append PCM frames to the buffer.
      */
     write(chunk: Float32Array): void {
-        const chunkLength = chunk.length;
+        let chunkLength = chunk.length;
+        let dataToWrite = chunk;
 
         // If chunk is larger than buffer (unlikely but handle it), only take the end
         if (chunkLength > this.maxFrames) {
             const start = chunkLength - this.maxFrames;
-            this.buffer.set(chunk.subarray(start));
-            this.currentFrame += chunkLength;
-            return;
+            dataToWrite = chunk.subarray(start);
+            // Advance frame counter for the skipped part
+            this.currentFrame += start;
+            // Now we only write maxFrames
+            chunkLength = this.maxFrames;
         }
 
         const writePos = this.currentFrame % this.maxFrames;
@@ -35,11 +38,11 @@ export class RingBuffer implements IRingBuffer {
 
         if (chunkLength <= remainingSpace) {
             // Single operation
-            this.buffer.set(chunk, writePos);
+            this.buffer.set(dataToWrite, writePos);
         } else {
             // Wrap around
-            this.buffer.set(chunk.subarray(0, remainingSpace), writePos);
-            this.buffer.set(chunk.subarray(remainingSpace), 0);
+            this.buffer.set(dataToWrite.subarray(0, remainingSpace), writePos);
+            this.buffer.set(dataToWrite.subarray(remainingSpace), 0);
         }
 
         this.currentFrame += chunkLength;
