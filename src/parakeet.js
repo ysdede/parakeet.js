@@ -11,7 +11,7 @@ import { JsPreprocessor, IncrementalMelProcessor } from './mel.js';
  * NOTE: This is an *early* scaffold – the `transcribe` method is TODO.
  */
 export class ParakeetModel {
-  constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s) => s, onnxPreprocessor = null, nMels }) {
+  constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s) => s, onnxPreprocessor = null, nMels, maxIncrementalCacheSize = 50 }) {
     this.tokenizer = tokenizer;
     this.encoderSession = encoderSession;
     this.joinerSession = joinerSession;
@@ -60,6 +60,7 @@ export class ParakeetModel {
     // keyed by a caller-provided cacheKey. This lets us skip decoding the
     // left-context on subsequent calls when the prefix is unchanged.
     this._incrementalCache = new Map();
+    this.maxIncrementalCacheSize = maxIncrementalCacheSize;
   }
 
   /**
@@ -386,6 +387,14 @@ export class ParakeetModel {
   }
 
   /**
+   * Clear the incremental decoder state cache.
+   * This releases memory used by cached decoder states.
+   */
+  clearIncrementalCache() {
+    this._incrementalCache.clear();
+  }
+
+  /**
    * Get the time stride per encoder frame in seconds.
    * This is useful for converting frame indices to timestamps.
    * @returns {number} Time stride in seconds (typically 0.08s for 8x subsampling @ 10ms)
@@ -608,6 +617,10 @@ export class ParakeetModel {
         effectiveTimeOffset = timeOffset + prefixFrames * TIME_STRIDE;  // Preserve caller's timeOffset base
         decoderState = this._restoreDecoderState(cached.state);
         if (debug) console.log(`[Parakeet] Incremental cache hit: skipping ${prefixFrames}/${Tenc} frames (${(prefixFrames/Tenc*100).toFixed(0)}%)`);
+
+        // LRU update: move to end
+        this._incrementalCache.delete(inc.cacheKey);
+        this._incrementalCache.set(inc.cacheKey, cached);
       }
     }
     let emittedTokens = 0;
@@ -700,6 +713,16 @@ export class ParakeetModel {
       // Capture decoder state at end of prefix when decoding from frame 0
       if (inc && inc.cacheKey && !prefixStateCaptured && t >= prefixFrames) {
         const snap = this._snapshotDecoderState(decoderState);
+
+        // Enforce cache limit (LRU eviction)
+        if (!this._incrementalCache.has(inc.cacheKey) && this._incrementalCache.size >= this.maxIncrementalCacheSize) {
+          const oldestKey = this._incrementalCache.keys().next().value;
+          this._incrementalCache.delete(oldestKey);
+        }
+        // Update/Insert (moves to end)
+        if (this._incrementalCache.has(inc.cacheKey)) {
+          this._incrementalCache.delete(inc.cacheKey);
+        }
         this._incrementalCache.set(inc.cacheKey, { state: snap, prefixFrames, D });
         prefixStateCaptured = true;
       }
