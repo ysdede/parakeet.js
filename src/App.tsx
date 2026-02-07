@@ -782,13 +782,24 @@ const App: Component = () => {
               <span class="material-symbols-outlined text-[14px]">content_copy</span>
               <span>Copy</span>
             </button>
+            <div class="w-px h-5 bg-slate-200"></div>
+            <button
+              onClick={() => appStore.setShowDebugPanel(!appStore.showDebugPanel())}
+              class={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all shadow-md active:scale-95 active:shadow-sm ${appStore.showDebugPanel() ? 'bg-slate-700 text-white hover:bg-slate-800' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
+              title={appStore.showDebugPanel() ? 'Hide debug panel (improves performance)' : 'Show debug panel'}
+            >
+              <span class="material-symbols-outlined text-[14px]">{appStore.showDebugPanel() ? 'bug_report' : 'bug_report'}</span>
+              <span>{appStore.showDebugPanel() ? 'Debug' : 'Debug'}</span>
+            </button>
           </div>
         </div>
 
-        <DebugPanel
-          audioEngine={audioEngineSignal() ?? undefined}
-          melClient={melClientSignal() ?? undefined}
-        />
+        <Show when={appStore.showDebugPanel()}>
+          <DebugPanel
+            audioEngine={audioEngineSignal() ?? undefined}
+            melClient={melClientSignal() ?? undefined}
+          />
+        </Show>
       </main>
     </div>
   );

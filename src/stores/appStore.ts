@@ -140,6 +140,9 @@ function createAppStore() {
   const [v4SilenceFlushSec, setV4SilenceFlushSec] = createSignal(1.0); // Silence duration to flush pending sentence
   const [sileroThreshold, setSileroThreshold] = createSignal(0.5); // Silero VAD probability threshold
 
+  // UI state
+  const [showDebugPanel, setShowDebugPanel] = createSignal(true);
+
   // v4 Utterance-based state
   const [matureText, setMatureText] = createSignal('');
   const [immatureText, setImmatureText] = createSignal('');
@@ -260,6 +263,8 @@ function createAppStore() {
     v4InferenceIntervalMs,
     v4SilenceFlushSec,
     sileroThreshold,
+    // UI state
+    showDebugPanel,
     // v4 state
     matureText,
     immatureText,
@@ -297,6 +302,8 @@ function createAppStore() {
     setTriggerInterval,
     setEnergyThreshold,
     setFrameStride,
+    // UI setters
+    setShowDebugPanel,
     // v4 setters
     setV4InferenceIntervalMs,
     setV4SilenceFlushSec,
