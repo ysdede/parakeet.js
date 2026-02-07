@@ -223,14 +223,50 @@ export class AudioEngine implements IAudioEngine {
                 class CaptureProcessor extends AudioWorkletProcessor {
                     constructor(options) {
                         super(options);
-                        const sr = (options?.processorOptions?.sampleRate) || 16000;
-                        this.bufferSize = Math.round(${windowDuration} * sr);
+                        const opts = options?.processorOptions || {};
+                        this.inputSampleRate = opts.inputSampleRate || 16000;
+                        this.targetSampleRate = opts.targetSampleRate || this.inputSampleRate;
+                        this.ratio = this.inputSampleRate / this.targetSampleRate;
+                        this.bufferSize = Math.round(${windowDuration} * this.inputSampleRate);
                         this.buffer = new Float32Array(this.bufferSize);
                         this.index = 0;
                         this._lastLog = 0;
                     }
 
-                    process(inputs, outputs) {
+                    _emitChunk() {
+                        let out;
+                        let maxAbs = 0;
+
+                        if (this.targetSampleRate === this.inputSampleRate) {
+                            out = new Float32Array(this.bufferSize);
+                            for (let i = 0; i < this.bufferSize; i++) {
+                                const v = this.buffer[i];
+                                out[i] = v;
+                                const a = v < 0 ? -v : v;
+                                if (a > maxAbs) maxAbs = a;
+                            }
+                        } else {
+                            const outLength = Math.floor(this.bufferSize / this.ratio);
+                            out = new Float32Array(outLength);
+                            for (let i = 0; i < outLength; i++) {
+                                const srcIndex = i * this.ratio;
+                                const srcIndexFloor = Math.floor(srcIndex);
+                                const srcIndexCeil = Math.min(srcIndexFloor + 1, this.bufferSize - 1);
+                                const t = srcIndex - srcIndexFloor;
+                                const v = this.buffer[srcIndexFloor] * (1 - t) + this.buffer[srcIndexCeil] * t;
+                                out[i] = v;
+                                const a = v < 0 ? -v : v;
+                                if (a > maxAbs) maxAbs = a;
+                            }
+                        }
+
+                        this.port.postMessage(
+                            { type: 'audio', samples: out, sampleRate: this.targetSampleRate, maxAbs },
+                            [out.buffer]
+                        );
+                    }
+
+                    process(inputs) {
                         const input = inputs[0];
                         if (!input || !input[0]) return true;
                         
@@ -241,8 +277,7 @@ export class AudioEngine implements IAudioEngine {
                             this.buffer[this.index++] = channelData[i];
                             
                             if (this.index >= this.bufferSize) {
-                                // Send buffer
-                                this.port.postMessage(this.buffer.slice());
+                                this._emitChunk();
                                 this.index = 0;
                                 
                                 // Debug log every ~5 seconds
@@ -278,11 +313,13 @@ export class AudioEngine implements IAudioEngine {
         if (this.workletNode) this.workletNode.disconnect();
 
         this.workletNode = new AudioWorkletNode(this.audioContext, 'capture-processor', {
-            processorOptions: { sampleRate: this.deviceSampleRate },
+            processorOptions: { inputSampleRate: this.deviceSampleRate, targetSampleRate: this.targetSampleRate },
         });
         this.workletNode.port.onmessage = (event: MessageEvent<any>) => {
-            if (event.data instanceof Float32Array) {
-                this.handleAudioChunk(event.data);
+            if (event.data?.type === 'audio' && event.data.samples instanceof Float32Array) {
+                this.handleAudioChunk(event.data.samples, event.data.maxAbs, event.data.sampleRate);
+            } else if (event.data instanceof Float32Array) {
+                this.handleAudioChunk(event.data, undefined, this.deviceSampleRate);
             } else if (event.data?.type === 'log') {
                 console.log(event.data.message);
             }
@@ -461,9 +498,13 @@ export class AudioEngine implements IAudioEngine {
         this.sourceNode = null;
     }
 
-    private handleAudioChunk(rawChunk: Float32Array): void {
-        // 0. Resample from device rate to target rate (e.g., 48kHz -> 16kHz)
-        const chunk = resampleLinear(rawChunk, this.deviceSampleRate, this.targetSampleRate);
+    private handleAudioChunk(rawChunk: Float32Array, precomputedMaxAbs?: number, chunkSampleRate?: number): void {
+        // 0. Ensure chunk is at target sample rate (resample only if needed)
+        const sampleRate = chunkSampleRate ?? this.targetSampleRate;
+        const needsResample = sampleRate !== this.targetSampleRate;
+        const chunk = needsResample
+            ? resampleLinear(rawChunk, sampleRate, this.targetSampleRate)
+            : rawChunk;
 
         // 0.5. Notify audio chunk subscribers (e.g., mel worker)
         for (const cb of this.audioChunkCallbacks) {
@@ -471,10 +512,12 @@ export class AudioEngine implements IAudioEngine {
         }
 
         // Calculate chunk energy (Peak Amplitude) + SMA for VAD compatibility
-        let maxAbs = 0;
-        for (let i = 0; i < chunk.length; i++) {
-            const abs = Math.abs(chunk[i]);
-            if (abs > maxAbs) maxAbs = abs;
+        let maxAbs = (!needsResample && precomputedMaxAbs !== undefined) ? precomputedMaxAbs : 0;
+        if (precomputedMaxAbs === undefined || needsResample) {
+            for (let i = 0; i < chunk.length; i++) {
+                const abs = Math.abs(chunk[i]);
+                if (abs > maxAbs) maxAbs = abs;
+            }
         }
 
         // SMA Smoothing (matching Parakeet-UI logic)
