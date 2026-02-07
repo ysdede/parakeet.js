@@ -503,11 +503,6 @@ export class AudioEngine implements IAudioEngine {
             ? resampleLinear(rawChunk, sampleRate, this.targetSampleRate)
             : rawChunk;
 
-        // 0.5. Notify audio chunk subscribers (e.g., mel worker)
-        for (const cb of this.audioChunkCallbacks) {
-            cb(chunk);
-        }
-
         // Calculate chunk energy (Peak Amplitude) + SMA for VAD compatibility
         let maxAbs = (!needsResample && precomputedMaxAbs !== undefined) ? precomputedMaxAbs : 0;
         if (precomputedMaxAbs === undefined || needsResample) {
@@ -533,11 +528,10 @@ export class AudioEngine implements IAudioEngine {
             console.debug(`[AudioEngine] Energy threshold crossed: ${energy.toFixed(6)} > ${this.config.energyThreshold} = ${isSpeech}`);
         }
 
-        // 1. Write resampled audio to ring buffer FIRST
-        // This is crucial so that when the processor detects a segment (possibly with lookback),
-        // the data is already available in the ring buffer.
-        const endFrame = this.ringBuffer.getCurrentFrame() + chunk.length;
+        // 1. Write to ring buffer before any callbacks can transfer the chunk.
         this.ringBuffer.write(chunk);
+
+        const endFrame = this.ringBuffer.getCurrentFrame();
 
         // 2. Process VAD on resampled audio
         // The processor uses its own internal history for lookback, but we pull full audio from ring buffer later.
@@ -637,7 +631,13 @@ export class AudioEngine implements IAudioEngine {
         // 6. Fixed-window streaming (v3 token streaming mode)
         this.processWindowCallbacks(endFrame);
 
-        // 7. Notify visualization subscribers
+        // 7. Notify audio chunk subscribers AFTER internal processing.
+        // Callbacks may transfer the chunk's buffer; do not use `chunk` after this.
+        for (const cb of this.audioChunkCallbacks) {
+            cb(chunk);
+        }
+
+        // 8. Notify visualization subscribers
         this.notifyVisualizationUpdate();
     }
 
