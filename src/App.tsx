@@ -360,18 +360,18 @@ const App: Component = () => {
         </div>
 
         {/* Floating Metrics Block */}
-        <div class="fixed bottom-8 right-12 flex gap-4 z-30">
-          <div class="bg-white/80 backdrop-blur-md px-5 py-3 rounded-2xl border border-slate-200 shadow-xl flex items-center gap-6">
+        <div class="fixed top-24 right-8 flex gap-4 z-30">
+          <div class="bg-white/90 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-200 shadow-lg flex items-center gap-4 transition-all hover:shadow-xl hover:bg-white">
             <div class="flex flex-col">
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">RTF</span>
-              <span class={`text-sm font-bold ${appStore.rtf() > 1 ? 'text-red-500' : 'text-slate-900'}`}>{appStore.rtf().toFixed(2)}</span>
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">RTF</span>
+              <span class={`text-xs font-bold ${appStore.rtf() > 1 ? 'text-red-500' : 'text-slate-900'}`}>{appStore.rtf().toFixed(2)}</span>
             </div>
-            <div class="w-px h-6 bg-slate-200"></div>
+            <div class="w-px h-5 bg-slate-200"></div>
             <button
               onClick={() => appStore.copyTranscript()}
-              class="flex items-center gap-2 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg active:scale-95"
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-[10px] font-bold rounded-lg hover:bg-blue-600 transition-all shadow-md active:scale-95 active:shadow-sm"
             >
-              <span class="material-symbols-outlined text-sm">content_copy</span>
+              <span class="material-symbols-outlined text-[14px]">content_copy</span>
               <span>Copy</span>
             </button>
           </div>
