@@ -1,3 +1,4 @@
+export * from './LayeredBufferVisualizer';
 export * from './Sidebar';
 export * from './StatusBar';
 export * from './TranscriptionDisplay';
