@@ -67,6 +67,8 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
     // State for last fetch to throttle spectrogram updates
     let lastSpecFetchTime = 0;
     const SPEC_FETCH_INTERVAL = 100; // Update spectrogram every 100ms (10fps)
+    const DRAW_INTERVAL_MS = 33; // Throttle full redraw to ~30fps
+    let lastDrawTime = 0;
 
     // --- Cached layout dimensions (updated via ResizeObserver, NOT per-frame) ---
     // Avoids getBoundingClientRect() every animation frame which forces synchronous
@@ -164,11 +166,17 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
         }
     });
 
-    const loop = () => {
+    const loop = (now: number = performance.now()) => {
         if (!ctx || !canvasRef || !props.audioEngine) {
             animationFrameId = requestAnimationFrame(loop);
             return;
         }
+
+        if (now - lastDrawTime < DRAW_INTERVAL_MS) {
+            animationFrameId = requestAnimationFrame(loop);
+            return;
+        }
+        lastDrawTime = now;
 
         // Use cached dimensions (updated by ResizeObserver / DPR watcher)
         const dpr = cachedDpr;
@@ -203,7 +211,6 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
 
         // 1. Spectrogram (async fetch with stored alignment)
         if (props.melClient && specCtx && specCanvas) {
-            const now = performance.now();
             if (now - lastSpecFetchTime > SPEC_FETCH_INTERVAL) {
                 lastSpecFetchTime = now;
 
