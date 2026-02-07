@@ -37,6 +37,7 @@ export interface AudioEngineConfig {
 
     // Advanced VAD properties matching parakeet-ui
     lookbackDuration?: number;
+    overlapDuration?: number;
     speechHangover?: number;
     minEnergyIntegral?: number;
     minEnergyPerSecond?: number;
