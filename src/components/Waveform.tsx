@@ -23,6 +23,7 @@ export const Waveform: Component<WaveformProps> = (props) => {
   let canvasRef: HTMLCanvasElement | undefined;
   let ctx: CanvasRenderingContext2D | null = null;
   let animationId: number | undefined;
+  let resizeObserver: ResizeObserver | null = null;
 
   // Persistent bar heights array (mutated in-place, no allocations per frame)
   let bars: Float32Array = new Float32Array(0);
@@ -31,6 +32,25 @@ export const Waveform: Component<WaveformProps> = (props) => {
   let lastDrawTime = 0;
   const DRAW_INTERVAL_MS = 33;
 
+  // Cache CSS color; refresh occasionally to avoid per-frame style recalcs
+  let primaryColor = '#14b8a6';
+  let lastColorCheck = 0;
+  const COLOR_CHECK_INTERVAL_MS = 1000;
+
+  const updateCanvasSize = () => {
+    if (!canvasRef) return;
+    const parent = canvasRef.parentElement;
+    if (!parent) return;
+    const rect = parent.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const nextW = Math.floor(rect.width * dpr);
+    const nextH = Math.floor(rect.height * dpr);
+    if (canvasRef.width !== nextW || canvasRef.height !== nextH) {
+      canvasRef.width = nextW;
+      canvasRef.height = nextH;
+    }
+  };
+
   const animate = (now: number) => {
     animationId = requestAnimationFrame(animate);
 
@@ -38,6 +58,11 @@ export const Waveform: Component<WaveformProps> = (props) => {
     lastDrawTime = now;
 
     if (!ctx || !canvasRef) return;
+
+    if (now - lastColorCheck > COLOR_CHECK_INTERVAL_MS) {
+      lastColorCheck = now;
+      primaryColor = getComputedStyle(canvasRef).getPropertyValue('--color-primary').trim() || '#14b8a6';
+    }
 
     const n = count();
 
@@ -70,16 +95,14 @@ export const Waveform: Component<WaveformProps> = (props) => {
     const gap = 2;
     const barWidth = Math.max(1, (w - gap * (n - 1)) / n);
     const recording = props.isRecording;
-
-    // Read CSS variable for primary color (fallback to teal)
-    // Done once per frame, not per bar
-    const primaryColor = getComputedStyle(canvasRef).getPropertyValue('--color-primary').trim() || '#14b8a6';
+    const alphaBase = recording ? 0.4 : 0.1;
+    const alphaRange = recording ? 0.4 : 0;
 
     for (let i = 0; i < n; i++) {
       const barH = Math.max(2, bars[i] * h);
       const x = i * (barWidth + gap);
       const y = h - barH;
-      const alpha = recording ? 0.4 + bars[i] * 0.4 : 0.1;
+      const alpha = alphaBase + bars[i] * alphaRange;
 
       ctx.globalAlpha = alpha * 0.8; // match the container's opacity-80
       ctx.fillStyle = primaryColor;
@@ -102,21 +125,25 @@ export const Waveform: Component<WaveformProps> = (props) => {
 
   onMount(() => {
     if (canvasRef) {
-      // Size canvas to container
-      const parent = canvasRef.parentElement;
-      if (parent) {
-        const rect = parent.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        canvasRef.width = Math.floor(rect.width * dpr);
-        canvasRef.height = Math.floor(rect.height * dpr);
-      }
+      updateCanvasSize();
       ctx = canvasRef.getContext('2d', { alpha: true });
+      primaryColor = getComputedStyle(canvasRef).getPropertyValue('--color-primary').trim() || '#14b8a6';
+
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+          updateCanvasSize();
+          lastColorCheck = 0;
+        });
+        resizeObserver.observe(canvasRef.parentElement ?? canvasRef);
+      }
     }
     animationId = requestAnimationFrame(animate);
   });
 
   onCleanup(() => {
     if (animationId) cancelAnimationFrame(animationId);
+    resizeObserver?.disconnect();
+    resizeObserver = null;
   });
 
   return (
