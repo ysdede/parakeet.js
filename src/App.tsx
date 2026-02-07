@@ -4,6 +4,7 @@ import { CompactWaveform, BufferVisualizer, ModelLoadingOverlay, Sidebar, DebugP
 import { AudioEngine } from './lib/audio';
 import { MelWorkerClient } from './lib/audio/MelWorkerClient';
 import { TranscriptionWorkerClient } from './lib/transcription';
+import { formatDuration } from './utils/time';
 
 // Singleton instances
 let audioEngine: AudioEngine | null = null;
@@ -15,13 +16,6 @@ let segmentUnsubscribe: (() => void) | null = null;
 let windowUnsubscribe: (() => void) | null = null;
 let melChunkUnsubscribe: (() => void) | null = null;
 let energyPollInterval: number | undefined;
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
 
 const Header: Component<{ isRecording: boolean, audioLevel: number }> = (props) => {
   return (
