@@ -75,6 +75,18 @@ export class TenVADWorkerClient {
     }
 
     /**
+     * Send an audio chunk by transferring ownership of the buffer.
+     * The caller must not reuse `samples` after calling this.
+     */
+    processTransfer(samples: Float32Array, globalSampleOffset: number): void {
+        if (!this.ready) return;
+        this.worker.postMessage(
+            { type: 'PROCESS', payload: { samples, globalSampleOffset } },
+            [samples.buffer]
+        );
+    }
+
+    /**
      * Reset internal state (accumulator, VAD model state).
      */
     async reset(): Promise<void> {

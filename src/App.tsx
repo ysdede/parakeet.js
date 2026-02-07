@@ -511,10 +511,14 @@ const App: Component = () => {
             if (!bufferClient) return;
             // Batch-write hop probabilities to inferenceVad (single worker message)
             if (result.hopCount > 0) {
-              bufferClient.writeBatch('inferenceVad', result.probabilities, result.globalSampleOffset);
+              const lastProb = result.probabilities[result.hopCount - 1];
+              if (bufferClient.writeBatchTransfer) {
+                bufferClient.writeBatchTransfer('inferenceVad', result.probabilities, result.globalSampleOffset);
+              } else {
+                bufferClient.writeBatch('inferenceVad', result.probabilities, result.globalSampleOffset);
+              }
 
               // Update UI at most once per frame with the latest probability
-              const lastProb = result.probabilities[result.hopCount - 1];
               scheduleSileroUpdate(lastProb);
             }
           });
@@ -538,10 +542,8 @@ const App: Component = () => {
           // Reset global sample counter
           v4GlobalSampleOffset = 0;
 
-          // Feed audio chunks to mel worker
-          v4MelChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
-            melClient?.pushAudioCopy(chunk);
-          });
+          // Feed audio chunks to mel worker from the main v4 audio handler below
+          v4MelChunkUnsubscribe = null;
 
           // Process each audio chunk: energy VAD + write to BufferWorker + forward to TEN-VAD
           v4AudioChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
@@ -550,17 +552,17 @@ const App: Component = () => {
             const chunkOffset = v4GlobalSampleOffset;
             v4GlobalSampleOffset += chunk.length;
 
-            // 1. Write raw audio to BufferWorker
-            bufferClient.writeAudio(chunk);
-
-            // 2. Run energy VAD (synchronous, fast) and write to BufferWorker
+            // 1. Run energy VAD (synchronous, fast) and write to BufferWorker
             const vadResult = hybridVAD.processEnergyOnly(chunk);
             const energyProb = vadResult.isSpeech ? 0.9 : 0.1;
             bufferClient.writeScalar('energyVad', energyProb);
 
-            // 3. Forward audio to TEN-VAD worker for inference-based VAD
+            // 2. Forward audio to mel worker (copy, keep chunk for TEN-VAD transfer)
+            melClient?.pushAudioCopy(chunk);
+
+            // 3. Forward audio to TEN-VAD worker for inference-based VAD (transfer, no copy)
             if (tenVADClient?.isReady()) {
-              tenVADClient.process(chunk, chunkOffset);
+              tenVADClient.processTransfer(chunk, chunkOffset);
             }
 
             // 4. Update VAD state for UI
