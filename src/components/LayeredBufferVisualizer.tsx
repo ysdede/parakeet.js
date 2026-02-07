@@ -258,24 +258,15 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
         ctx.putImageData(imgData, 0, 0);
     };
 
+    // Fixed gain so typical mic levels are visible; avoids jumps from per-buffer scaling
+    const WAVEFORM_GAIN = 4;
+
     const drawWaveform = (ctx: CanvasRenderingContext2D, data: Float32Array, width: number, height: number, offsetY: number) => {
         if (data.length === 0) return;
 
         const step = Math.ceil(data.length / width);
+        const amp = (height / 2) * WAVEFORM_GAIN;
         const centerY = offsetY + height / 2;
-        const halfH = height / 2;
-
-        // Compute global min/max so we scale the waveform to fill the strip (not assume -1..1)
-        let dataMin = 1;
-        let dataMax = -1;
-        const sampleStep = Math.max(1, Math.floor(data.length / 5000));
-        for (let i = 0; i < data.length; i += sampleStep) {
-            const s = data[i];
-            if (s < dataMin) dataMin = s;
-            if (s > dataMax) dataMax = s;
-        }
-        const range = dataMax - dataMin || 1;
-        const scale = halfH / (range / 2);
 
         ctx.strokeStyle = '#4ade80'; // Green
         ctx.lineWidth = 1;
@@ -297,11 +288,10 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
             }
 
             if (hasData) {
-                const mid = (dataMin + dataMax) / 2;
-                const yMin = centerY - (min - mid) * scale;
-                const yMax = centerY - (max - mid) * scale;
-                ctx.moveTo(x, yMin);
-                ctx.lineTo(x, yMax);
+                const yMin = centerY - min * amp;
+                const yMax = centerY - max * amp;
+                ctx.moveTo(x, Math.max(offsetY, Math.min(offsetY + height, yMin)));
+                ctx.lineTo(x, Math.max(offsetY, Math.min(offsetY + height, yMax)));
             }
         }
         ctx.stroke();
