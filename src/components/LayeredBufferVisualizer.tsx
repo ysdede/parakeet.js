@@ -68,8 +68,31 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
     let lastSpecFetchTime = 0;
     const SPEC_FETCH_INTERVAL = 100; // Update spectrogram every 100ms (10fps)
 
-    // Store last known DPR to handle zoom changes
-    let lastDpr = 1;
+    // --- Cached layout dimensions (updated via ResizeObserver, NOT per-frame) ---
+    // Avoids getBoundingClientRect() every animation frame which forces synchronous
+    // layout reflow and was the #1 perf bottleneck (1.5s layout-shift clusters).
+    let cachedPhysicalWidth = 0;
+    let cachedPhysicalHeight = 0;
+    let cachedDpr = window.devicePixelRatio || 1;
+    let resizeObserver: ResizeObserver | null = null;
+    let dprMediaQuery: MediaQueryList | null = null;
+
+    /** Recompute physical canvas dimensions from cached logical size + DPR. */
+    const updateCanvasDimensions = (logicalW: number, logicalH: number) => {
+        cachedDpr = window.devicePixelRatio || 1;
+        cachedPhysicalWidth = Math.floor(logicalW * cachedDpr);
+        cachedPhysicalHeight = Math.floor(logicalH * cachedDpr);
+
+        // Resize canvases immediately so next frame uses correct size
+        if (canvasRef && (canvasRef.width !== cachedPhysicalWidth || canvasRef.height !== cachedPhysicalHeight)) {
+            canvasRef.width = cachedPhysicalWidth;
+            canvasRef.height = cachedPhysicalHeight;
+        }
+        if (specCanvas && (specCanvas.width !== cachedPhysicalWidth || specCanvas.height !== cachedPhysicalHeight)) {
+            specCanvas.width = cachedPhysicalWidth;
+            specCanvas.height = cachedPhysicalHeight;
+        }
+    };
 
     // Store spectrogram data with its time alignment
     let cachedSpecData: {
@@ -83,9 +106,38 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
     onMount(() => {
         if (canvasRef) {
             ctx = canvasRef.getContext('2d', { alpha: false });
+
+            // Use ResizeObserver to cache dimensions instead of per-frame getBoundingClientRect
+            resizeObserver = new ResizeObserver((entries) => {
+                for (const entry of entries) {
+                    // contentRect gives CSS-pixel (logical) dimensions without forcing layout
+                    const cr = entry.contentRect;
+                    updateCanvasDimensions(cr.width, cr.height);
+                }
+            });
+            resizeObserver.observe(canvasRef);
+
+            // Watch for DPR changes (browser zoom, display change)
+            const setupDprWatch = () => {
+                dprMediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+                const onDprChange = () => {
+                    if (canvasRef) {
+                        const rect = canvasRef.getBoundingClientRect(); // one-time on zoom change only
+                        updateCanvasDimensions(rect.width, rect.height);
+                    }
+                    // Re-register for the next change at the new DPR
+                    setupDprWatch();
+                };
+                dprMediaQuery.addEventListener('change', onDprChange, { once: true });
+            };
+            setupDprWatch();
+
+            // Initial dimensions (one-time)
+            const rect = canvasRef.getBoundingClientRect();
+            updateCanvasDimensions(rect.width, rect.height);
         }
 
-        // Create offscreen canvas 
+        // Create offscreen canvas
         specCanvas = document.createElement('canvas');
         specCtx = specCanvas.getContext('2d', { alpha: false });
 
@@ -94,6 +146,10 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
 
     onCleanup(() => {
         cancelAnimationFrame(animationFrameId);
+        if (resizeObserver) {
+            resizeObserver.disconnect();
+            resizeObserver = null;
+        }
     });
 
     const loop = () => {
@@ -102,27 +158,14 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
             return;
         }
 
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvasRef.getBoundingClientRect();
+        // Use cached dimensions (updated by ResizeObserver / DPR watcher)
+        const dpr = cachedDpr;
+        const width = cachedPhysicalWidth;
+        const height = cachedPhysicalHeight;
 
-        // Logical size
-        const logicalWidth = rect.width;
-        const logicalHeight = rect.height;
-
-        // Physical size
-        const width = Math.floor(logicalWidth * dpr);
-        const height = Math.floor(logicalHeight * dpr);
-
-        // Resize if needed (avoid clearing if size hasn't changed)
-        if (canvasRef.width !== width || canvasRef.height !== height) {
-            canvasRef.width = width;
-            canvasRef.height = height;
-        }
-
-        // Initialize offscreen if needed
-        if (specCanvas && (specCanvas.width !== width || specCanvas.height !== height)) {
-            specCanvas.width = width;
-            specCanvas.height = height;
+        if (width === 0 || height === 0) {
+            animationFrameId = requestAnimationFrame(loop);
+            return;
         }
 
         // Colors
