@@ -5,6 +5,7 @@ import { getModelDisplayName, MODELS } from './components/ModelLoadingOverlay';
 import { AudioEngine } from './lib/audio';
 import { MelWorkerClient } from './lib/audio/MelWorkerClient';
 import { TranscriptionWorkerClient } from './lib/transcription';
+import { formatDuration } from './utils/time';
 import { HybridVAD } from './lib/vad';
 import { WindowBuilder } from './lib/transcription/WindowBuilder';
 import { BufferWorkerClient } from './lib/buffer';
@@ -23,7 +24,6 @@ let segmentUnsubscribe: (() => void) | null = null;
 let windowUnsubscribe: (() => void) | null = null;
 let melChunkUnsubscribe: (() => void) | null = null;
 let energyPollInterval: number | undefined;
-
 // v4 pipeline instances
 let hybridVAD: HybridVAD | null = null;
 let bufferClient: BufferWorkerClient | null = null;
@@ -91,13 +91,6 @@ const scheduleVadStateUpdate = (next: {
     pendingVadState = null;
   });
 };
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
 
 interface ModelOption { id: string; name: string; desc?: string }
 
