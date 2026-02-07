@@ -850,9 +850,9 @@ const App: Component = () => {
         {/* Floating Metrics Block */}
         <div class="fixed top-24 right-8 flex gap-4 z-30">
           <div class="bg-white/90 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-200 shadow-lg flex items-center gap-4 transition-all hover:shadow-xl hover:bg-white">
-            <div class="flex flex-col">
-              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">RTF</span>
-              <span class={`text-xs font-bold ${appStore.rtf() > 1 ? 'text-red-500' : 'text-slate-900'}`}>{appStore.rtf().toFixed(2)}</span>
+            <div class="flex flex-col items-center min-w-[2rem]">
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter w-full text-center">RTFx</span>
+              <span class={`text-xs font-bold tabular-nums min-w-[3ch] text-center ${appStore.rtfxAverage() > 0 && appStore.rtfxAverage() < 5 ? 'text-red-500' : appStore.rtfxAverage() >= 10 ? 'text-emerald-600' : appStore.rtfxAverage() >= 5 ? 'text-green-600' : 'text-slate-900'}`}>{appStore.rtfxAverage() > 0 ? Math.round(appStore.rtfxAverage()) : '–'}</span>
             </div>
             <div class="w-px h-5 bg-slate-200"></div>
             <button
