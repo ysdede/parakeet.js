@@ -4,6 +4,9 @@ import { CompactWaveform, BufferVisualizer, ModelLoadingOverlay, Sidebar, DebugP
 import { AudioEngine } from './lib/audio';
 import { MelWorkerClient } from './lib/audio/MelWorkerClient';
 import { TranscriptionWorkerClient } from './lib/transcription';
+import { HybridVAD, VADRingBuffer } from './lib/vad';
+import { WindowBuilder } from './lib/transcription/WindowBuilder';
+import type { V4ProcessResult } from './lib/transcription/TranscriptionWorkerClient';
 
 // Singleton instances
 let audioEngine: AudioEngine | null = null;
@@ -15,6 +18,17 @@ let segmentUnsubscribe: (() => void) | null = null;
 let windowUnsubscribe: (() => void) | null = null;
 let melChunkUnsubscribe: (() => void) | null = null;
 let energyPollInterval: number | undefined;
+
+// v4 pipeline instances
+let hybridVAD: HybridVAD | null = null;
+let vadRingBuffer: VADRingBuffer | null = null;
+let windowBuilder: WindowBuilder | null = null;
+let v4TickTimeout: number | undefined;
+let v4TickRunning = false;
+let v4AudioChunkUnsubscribe: (() => void) | null = null;
+let v4MelChunkUnsubscribe: (() => void) | null = null;
+let v4InferenceBusy = false;
+let v4LastInferenceTime = 0;
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -116,9 +130,168 @@ const App: Component = () => {
 
   onCleanup(() => {
     if (energyPollInterval) clearInterval(energyPollInterval);
+    cleanupV4Pipeline();
     melClient?.dispose();
     workerClient?.dispose();
   });
+
+  // ---- v4 pipeline tick: periodic window building + inference ----
+  let v4TickCount = 0;
+  const v4Tick = async () => {
+    if (!workerClient || !windowBuilder || !audioEngine || v4InferenceBusy) return;
+
+    v4TickCount++;
+    const now = performance.now();
+    // Use the store's configurable inference interval (minus a small margin for the tick jitter)
+    const minInterval = Math.max(200, appStore.v4InferenceIntervalMs() - 100);
+    if (now - v4LastInferenceTime < minInterval) return;
+
+    // Check if there is speech in the pending window (skip silent windows)
+    const hasSpeech = windowBuilder.hasSpeechInPendingWindow();
+    if (v4TickCount <= 5 || v4TickCount % 20 === 0) {
+      const vadState = appStore.vadState();
+      console.log(`[v4Tick #${v4TickCount}] hasSpeech=${hasSpeech}, vadState=${vadState.hybridState}, energy=${vadState.energy.toFixed(4)}, silero=${(vadState.sileroProbability || 0).toFixed(2)}`);
+    }
+
+    if (!hasSpeech) {
+      // Check for silence-based flush
+      const silenceDuration = windowBuilder.getSilenceTailDuration();
+      if (silenceDuration >= appStore.v4SilenceFlushSec()) {
+        // Flush pending sentence via timeout finalization
+        try {
+          const flushResult = await workerClient.v4FinalizeTimeout();
+          if (flushResult) {
+            appStore.setMatureText(flushResult.matureText);
+            appStore.setImmatureText(flushResult.immatureText);
+            appStore.setMatureCursorTime(flushResult.matureCursorTime);
+            appStore.setTranscript(flushResult.fullText);
+            // Advance window builder cursor
+            windowBuilder.advanceMatureCursorByTime(flushResult.matureCursorTime);
+          }
+        } catch (err) {
+          console.error('[v4Tick] Flush error:', err);
+        }
+      }
+      return;
+    }
+
+    // Build window from cursor to current position
+    const window = windowBuilder.buildWindow();
+    if (!window) {
+      if (v4TickCount <= 10 || v4TickCount % 20 === 0) {
+        console.log(`[v4Tick #${v4TickCount}] buildWindow returned null (waiting for min duration)`);
+      }
+      return;
+    }
+
+    console.log(`[v4Tick #${v4TickCount}] Window [${window.startFrame}:${window.endFrame}] ${window.durationSeconds.toFixed(2)}s (initial=${window.isInitial})`);
+
+    v4InferenceBusy = true;
+    v4LastInferenceTime = now;
+
+    try {
+      const inferenceStart = performance.now();
+
+      // Get mel features for the window
+      let features: { features: Float32Array; T: number; melBins: number } | null = null;
+      if (melClient) {
+        features = await melClient.getFeatures(window.startFrame, window.endFrame);
+      }
+
+      if (!features) {
+        v4InferenceBusy = false;
+        return;
+      }
+
+      // Calculate time offset for absolute timestamps
+      const timeOffset = window.startFrame / 16000;
+
+      // Calculate incremental cache parameters
+      const cursorFrame = windowBuilder.getMatureCursorFrame();
+      const prefixSeconds = cursorFrame > 0 ? (window.startFrame - cursorFrame) / 16000 : 0;
+
+      const result: V4ProcessResult = await workerClient.processV4ChunkWithFeatures({
+        features: features.features,
+        T: features.T,
+        melBins: features.melBins,
+        timeOffset,
+        endTime: window.endFrame / 16000,
+        segmentId: `v4_${Date.now()}`,
+        incrementalCache: prefixSeconds > 0 ? {
+          cacheKey: 'v4-stream',
+          prefixSeconds,
+        } : undefined,
+      });
+
+      const inferenceMs = performance.now() - inferenceStart;
+
+      // Update UI state
+      appStore.setMatureText(result.matureText);
+      appStore.setImmatureText(result.immatureText);
+      appStore.setTranscript(result.fullText);
+      appStore.setPendingText(result.immatureText);
+      appStore.setInferenceLatency(inferenceMs);
+
+      // Update RTF
+      const audioDurationMs = window.durationSeconds * 1000;
+      appStore.setRtf(inferenceMs / audioDurationMs);
+
+      // Advance cursor if merger advanced it
+      if (result.matureCursorTime > windowBuilder.getMatureCursorTime()) {
+        appStore.setMatureCursorTime(result.matureCursorTime);
+        windowBuilder.advanceMatureCursorByTime(result.matureCursorTime);
+        windowBuilder.markSentenceEnd(Math.round(result.matureCursorTime * 16000));
+      }
+
+      // Update stats
+      appStore.setV4MergerStats({
+        sentencesFinalized: result.matureSentenceCount,
+        cursorUpdates: result.stats?.matureCursorUpdates || 0,
+        utterancesProcessed: result.stats?.utterancesProcessed || 0,
+      });
+
+      // Update buffer metrics
+      const ring = audioEngine.getRingBuffer();
+      appStore.setBufferMetrics({
+        fillRatio: ring.getFillCount() / ring.getSize(),
+        latencyMs: (ring.getFillCount() / 16000) * 1000,
+      });
+
+      // Update metrics
+      if (result.metrics) {
+        appStore.setSystemMetrics({
+          throughput: 0,
+          modelConfidence: 0,
+        });
+      }
+    } catch (err: any) {
+      console.error('[v4Tick] Inference error:', err);
+    } finally {
+      v4InferenceBusy = false;
+    }
+  };
+
+  // ---- Cleanup v4 pipeline resources ----
+  const cleanupV4Pipeline = () => {
+    v4TickRunning = false;
+    if (v4TickTimeout) {
+      clearTimeout(v4TickTimeout);
+      v4TickTimeout = undefined;
+    }
+    if (v4AudioChunkUnsubscribe) {
+      v4AudioChunkUnsubscribe();
+      v4AudioChunkUnsubscribe = null;
+    }
+    if (v4MelChunkUnsubscribe) {
+      v4MelChunkUnsubscribe();
+      v4MelChunkUnsubscribe = null;
+    }
+    hybridVAD = null;
+    vadRingBuffer = null;
+    windowBuilder = null;
+    v4InferenceBusy = false;
+    v4LastInferenceTime = 0;
+  };
 
   const toggleRecording = async () => {
     if (isRecording()) {
@@ -131,6 +304,7 @@ const App: Component = () => {
       if (segmentUnsubscribe) segmentUnsubscribe();
       if (windowUnsubscribe) windowUnsubscribe();
       if (melChunkUnsubscribe) melChunkUnsubscribe();
+      cleanupV4Pipeline();
 
       if (workerClient) {
         const final = await workerClient.finalize();
@@ -158,7 +332,97 @@ const App: Component = () => {
 
         const mode = appStore.transcriptionMode();
         if (isModelReady() && workerClient) {
-          if (mode === 'v3-streaming') {
+          if (mode === 'v4-utterance') {
+            // ---- v4: Utterance-based pipeline ----
+
+            // Initialize merger in worker
+            await workerClient.initV4Service({ debug: false });
+
+            // Initialize mel worker
+            if (!melClient) {
+              melClient = new MelWorkerClient();
+            }
+            try {
+              await melClient.init({ nMels: 128 });
+            } catch (e) {
+              melClient.dispose();
+              melClient = null;
+            }
+
+            // Feed audio chunks to mel worker
+            v4MelChunkUnsubscribe = audioEngine.onAudioChunk((chunk) => {
+              melClient?.pushAudioCopy(chunk);
+            });
+
+            // Initialize hybrid VAD
+            hybridVAD = new HybridVAD({
+              sileroThreshold: 0.5,
+              onsetConfirmations: 2,
+              offsetConfirmations: 3,
+              sampleRate: 16000,
+            });
+
+            // Try to load Silero model (non-blocking; falls back to energy-only)
+            hybridVAD.init().catch((err) => {
+              console.warn('[v4] Silero VAD init failed, using energy-only:', err);
+            });
+
+            // Initialize VAD ring buffer (120s at 16kHz, hop=1280 matching AudioWorklet chunk size)
+            vadRingBuffer = new VADRingBuffer(16000, 120, 1280);
+
+            // Initialize window builder
+            windowBuilder = new WindowBuilder(
+              audioEngine.getRingBuffer(),
+              vadRingBuffer,
+              {
+                sampleRate: 16000,
+                minDurationSec: 3.0,
+                maxDurationSec: 30.0,
+                minInitialDurationSec: 1.5,
+                useVadBoundaries: true,
+                vadSilenceThreshold: 0.3,
+                debug: false,
+              }
+            );
+
+            // Process each audio chunk through hybrid VAD
+            v4AudioChunkUnsubscribe = audioEngine.onAudioChunk(async (chunk) => {
+              if (!hybridVAD || !vadRingBuffer) return;
+
+              const vadResult = await hybridVAD.process(chunk);
+
+              // Write VAD probability to ring buffer.
+              // hopSize matches AudioWorklet chunk size (1280), so 1 write per chunk.
+              const prob = vadResult.sileroProbability !== undefined
+                ? vadResult.sileroProbability
+                : (vadResult.isSpeech ? 0.9 : 0.1);
+              vadRingBuffer.write(prob);
+
+              // Update VAD state for UI
+              appStore.setVadState({
+                isSpeech: vadResult.isSpeech,
+                energy: vadResult.energy,
+                snr: vadResult.snr || 0,
+                sileroProbability: vadResult.sileroProbability || 0,
+                hybridState: vadResult.state,
+              });
+              appStore.setIsSpeechDetected(vadResult.isSpeech);
+            });
+
+            // Start adaptive inference tick loop (reads interval from appStore)
+            v4TickRunning = true;
+            const scheduleNextTick = () => {
+              if (!v4TickRunning) return;
+              v4TickTimeout = window.setTimeout(async () => {
+                if (!v4TickRunning) return;
+                await v4Tick();
+                scheduleNextTick();
+              }, appStore.v4InferenceIntervalMs());
+            };
+            scheduleNextTick();
+
+          } else if (mode === 'v3-streaming') {
+            // ---- v3: Fixed-window token streaming (existing) ----
             const windowDur = appStore.streamingWindow();
             const triggerInt = appStore.triggerInterval();
             const overlapDur = Math.max(1.0, windowDur - triggerInt);
@@ -235,6 +499,7 @@ const App: Component = () => {
               }
             );
           } else {
+            // ---- v2: Per-utterance (existing) ----
             await workerClient.initService({ sampleRate: 16000 });
             segmentUnsubscribe = audioEngine.onSpeechSegment(async (segment) => {
               if (workerClient) {
@@ -254,7 +519,10 @@ const App: Component = () => {
         energyPollInterval = window.setInterval(() => {
           if (audioEngine) {
             appStore.setAudioLevel(audioEngine.getCurrentEnergy());
-            appStore.setIsSpeechDetected(audioEngine.isSpeechActive());
+            // Only set speech detected here for non-v4 modes (v4 handles it in VAD callback)
+            if (appStore.transcriptionMode() !== 'v4-utterance') {
+              appStore.setIsSpeechDetected(audioEngine.isSpeechActive());
+            }
           }
         }, 100);
       } catch (err: any) {
@@ -334,8 +602,8 @@ const App: Component = () => {
             <Match when={activeTab() === 'transcript'}>
               <div class="px-8 py-10 max-w-5xl mx-auto w-full h-full">
                 <TranscriptionDisplay
-                  confirmedText={appStore.transcript()}
-                  pendingText={appStore.pendingText()}
+                  confirmedText={appStore.transcriptionMode() === 'v4-utterance' ? appStore.matureText() : appStore.transcript()}
+                  pendingText={appStore.transcriptionMode() === 'v4-utterance' ? appStore.immatureText() : appStore.pendingText()}
                   isRecording={isRecording()}
                   lcsLength={appStore.mergeInfo().lcsLength}
                   anchorValid={appStore.mergeInfo().anchorValid}

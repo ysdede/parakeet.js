@@ -20,8 +20,8 @@ export interface SystemMetrics {
   vramUsage?: string;
 }
 
-/** Transcription mode: v2 (per-utterance VAD) or v3 (overlapping windows + LCS merge) */
-export type TranscriptionMode = 'v2-utterance' | 'v3-streaming';
+/** Transcription mode: v2 (per-utterance VAD), v3 (overlapping windows + LCS merge), v4 (utterance-based merger) */
+export type TranscriptionMode = 'v2-utterance' | 'v3-streaming' | 'v4-utterance';
 
 /** Merge info for v3 streaming mode */
 export interface MergeInfo {
@@ -29,6 +29,22 @@ export interface MergeInfo {
   anchorValid: boolean;
   chunkCount: number;
   anchorTokens?: string[];
+}
+
+/** VAD state for UI display */
+export interface VADState {
+  isSpeech: boolean;
+  energy: number;
+  snr: number;
+  sileroProbability: number;
+  hybridState: string;
+}
+
+/** Merger stats for v4 mode */
+export interface V4MergerStats {
+  sentencesFinalized: number;
+  cursorUpdates: number;
+  utterancesProcessed: number;
 }
 
 function createAppStore() {
@@ -70,8 +86,8 @@ function createAppStore() {
     modelConfidence: 0,
   });
 
-  // v3 Transcription mode toggle
-  const [transcriptionMode, setTranscriptionMode] = createSignal<TranscriptionMode>('v3-streaming');
+  // Transcription mode toggle (v4-utterance is the new default)
+  const [transcriptionMode, setTranscriptionMode] = createSignal<TranscriptionMode>('v4-utterance');
   const [mergeInfo, setMergeInfo] = createSignal<MergeInfo>({
     lcsLength: 0,
     anchorValid: false,
@@ -96,6 +112,28 @@ function createAppStore() {
   const [energyThreshold, setEnergyThreshold] = createSignal(0.08);
   // Decoder frame stride: 1 = full precision, 2 = halves decoder steps (faster, coarser timestamps)
   const [frameStride, setFrameStride] = createSignal(1);
+
+  // v4 Pipeline config
+  const [v4InferenceIntervalMs, setV4InferenceIntervalMs] = createSignal(480); // Transcription tick frequency in ms (320-8000)
+  const [v4SilenceFlushSec, setV4SilenceFlushSec] = createSignal(1.0); // Silence duration to flush pending sentence
+  const [sileroThreshold, setSileroThreshold] = createSignal(0.5); // Silero VAD probability threshold
+
+  // v4 Utterance-based state
+  const [matureText, setMatureText] = createSignal('');
+  const [immatureText, setImmatureText] = createSignal('');
+  const [matureCursorTime, setMatureCursorTime] = createSignal(0);
+  const [vadState, setVadState] = createSignal<VADState>({
+    isSpeech: false,
+    energy: 0,
+    snr: 0,
+    sileroProbability: 0,
+    hybridState: 'silence',
+  });
+  const [v4MergerStats, setV4MergerStats] = createSignal<V4MergerStats>({
+    sentencesFinalized: 0,
+    cursorUpdates: 0,
+    utterancesProcessed: 0,
+  });
 
 
   // Network status listeners
@@ -189,6 +227,16 @@ function createAppStore() {
     triggerInterval,
     energyThreshold,
     frameStride,
+    // v4 config
+    v4InferenceIntervalMs,
+    v4SilenceFlushSec,
+    sileroThreshold,
+    // v4 state
+    matureText,
+    immatureText,
+    matureCursorTime,
+    vadState,
+    v4MergerStats,
 
     // Setters (for internal use)
     setRecordingState,
@@ -220,6 +268,15 @@ function createAppStore() {
     setTriggerInterval,
     setEnergyThreshold,
     setFrameStride,
+    // v4 setters
+    setV4InferenceIntervalMs,
+    setV4SilenceFlushSec,
+    setSileroThreshold,
+    setMatureText,
+    setImmatureText,
+    setMatureCursorTime,
+    setVadState,
+    setV4MergerStats,
 
     // Actions
     startRecording,
