@@ -1,9 +1,12 @@
-import { Component, createMemo, For, Show, createSignal, onCleanup } from 'solid-js';
+import { Component, createMemo, For, Show, createSignal, onCleanup, createEffect } from 'solid-js';
 import { appStore, type TranscriptionMode } from '../stores/appStore';
 import type { AudioEngine } from '../lib/audio/types';
+import type { MelWorkerClient } from '../lib/audio/MelWorkerClient';
+import { LayeredBufferVisualizer } from './LayeredBufferVisualizer';
 
 interface DebugPanelProps {
   audioEngine?: AudioEngine;
+  melClient?: MelWorkerClient;
 }
 
 const MODES: { id: TranscriptionMode; label: string; short: string }[] = [
@@ -22,6 +25,15 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
 
   let startY = 0;
   let startHeight = 0;
+  let scrollContainer: HTMLDivElement | undefined;
+
+  // Auto-scroll to bottom of finalized sentences
+  createEffect(() => {
+    appStore.matureText(); // Track dependency
+    if (scrollContainer) {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    }
+  });
 
   const handleMouseDown = (e: MouseEvent) => {
     setIsResizing(true);
@@ -92,11 +104,10 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
             <For each={MODES}>
               {(mode) => (
                 <button
-                  class={`flex-1 px-1 py-1 rounded text-[9px] font-bold uppercase tracking-wide border transition-all ${
-                    appStore.transcriptionMode() === mode.id
-                      ? 'bg-primary text-white border-primary shadow-sm'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                  } ${isRecording() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  class={`flex-1 px-1 py-1 rounded text-[9px] font-bold uppercase tracking-wide border transition-all ${appStore.transcriptionMode() === mode.id
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    } ${isRecording() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   onClick={() => {
                     if (!isRecording()) {
                       appStore.setTranscriptionMode(mode.id);
@@ -186,16 +197,16 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
             <div class="flex items-center gap-3">
               <div class="flex items-center gap-1.5 px-2 py-0.5 bg-white rounded border border-slate-200">
                 <div class={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${appStore.vadState().isSpeech ? 'bg-orange-500 animate-pulse' : 'bg-slate-300'}`} />
-                <span class="font-bold uppercase text-slate-500 tracking-wide">{appStore.vadState().hybridState}</span>
-              </div>
-              <Show when={appStore.vadState().sileroProbability > 0}>
-                <div class="flex items-center gap-1.5 px-2 py-0.5 bg-white rounded border border-slate-200">
-                  <span class="font-bold uppercase text-slate-500 text-[9px]">Silero</span>
-                  <span class={`font-bold ${appStore.vadState().sileroProbability > 0.5 ? 'text-orange-500' : 'text-slate-400'}`}>
-                    {(appStore.vadState().sileroProbability * 100).toFixed(0)}%
-                  </span>
+                <div class="w-24 overflow-hidden text-ellipsis whitespace-nowrap">
+                  <span class="font-bold uppercase text-slate-500 tracking-wide">{appStore.vadState().hybridState}</span>
                 </div>
-              </Show>
+              </div>
+              <div class={`flex items-center gap-1.5 px-2 py-0.5 bg-white rounded border border-slate-200 transition-opacity duration-300 ${appStore.vadState().sileroProbability > 0 ? 'opacity-100' : 'opacity-0'}`}>
+                <span class="font-bold uppercase text-slate-500 text-[9px]">Silero</span>
+                <span class={`font-bold ${appStore.vadState().sileroProbability > 0.5 ? 'text-orange-500' : 'text-slate-400'}`}>
+                  {(appStore.vadState().sileroProbability * 100).toFixed(0)}%
+                </span>
+              </div>
             </div>
           </Show>
         </div>
@@ -210,7 +221,10 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
                   <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
                   Finalized Sentences
                 </h4>
-                <div class="p-2 border border-emerald-100 bg-emerald-50/30 rounded min-h-[36px]">
+                <div
+                  ref={scrollContainer}
+                  class="p-2 border border-emerald-100 bg-emerald-50/30 rounded h-32 overflow-y-auto resize-y"
+                >
                   <Show when={appStore.matureText()} fallback={
                     <span class="text-slate-400 italic text-[10px] opacity-50">No finalized sentences yet...</span>
                   }>
@@ -309,6 +323,16 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
               Legacy per-utterance mode. Segments are transcribed individually.
             </div>
           </Show>
+
+          {/* New Layered Buffer Visualizer */}
+          <div class="pt-2 border-t border-slate-200">
+            <LayeredBufferVisualizer
+              audioEngine={props.audioEngine}
+              melClient={props.melClient}
+              height={120} // Compact height
+              windowDuration={8.0}
+            />
+          </div>
         </div>
       </div>
 
@@ -316,9 +340,7 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
       <div class="w-64 flex flex-col p-3 gap-2.5 border-l border-slate-200 bg-slate-50/50">
         <div class="flex items-center justify-between pb-2 border-b border-slate-200">
           <span class="font-bold tracking-wider uppercase text-slate-500">Signal & Config</span>
-          <Show when={appStore.isSpeechDetected()}>
-            <span class="font-bold text-white bg-orange-500 px-1.5 py-px rounded text-[9px] animate-pulse">VAD</span>
-          </Show>
+          <span class={`font-bold text-white bg-orange-500 px-1.5 py-px rounded text-[9px] transition-opacity duration-100 ${appStore.isSpeechDetected() ? 'opacity-100 animate-pulse' : 'opacity-0'}`}>VAD</span>
         </div>
 
         <div class="space-y-2.5 flex-1 overflow-y-auto">
@@ -340,8 +362,8 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
           </div>
 
           {/* v4 Silero probability bar */}
-          <Show when={isV4() && appStore.vadState().sileroProbability > 0}>
-            <div class="space-y-1">
+          <Show when={isV4()}>
+            <div class={`space-y-1 transition-opacity duration-300 ${appStore.vadState().sileroProbability > 0 ? 'opacity-100' : 'opacity-40'}`}>
               <div class="flex justify-between font-bold text-slate-500 uppercase text-[9px]">
                 <span>Silero Prob</span>
                 <span class={appStore.vadState().sileroProbability > appStore.sileroThreshold() ? 'text-orange-500 font-bold' : 'text-slate-400'}>
@@ -358,9 +380,9 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
             </div>
           </Show>
 
-          {/* SNR indicator (when available) */}
-          <Show when={isV4() && appStore.vadState().snr !== 0}>
-            <div class="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200">
+          {/* SNR indicator */}
+          <Show when={isV4()}>
+            <div class={`flex justify-between items-center bg-white p-1.5 rounded border border-slate-200 transition-opacity duration-300 ${appStore.vadState().snr !== 0 ? 'opacity-100' : 'opacity-40'}`}>
               <span class="font-bold text-[9px] text-slate-500 uppercase">SNR</span>
               <span class={`font-bold text-[10px] ${appStore.vadState().snr > 3 ? 'text-green-600' : 'text-slate-400'}`}>
                 {appStore.vadState().snr.toFixed(1)} dB
@@ -473,7 +495,7 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
             <Show when={isV4()}>
               <div class="bg-white border border-slate-200 rounded p-1.5 text-center">
                 <div class="text-[7px] font-bold text-slate-400 uppercase mb-px">State</div>
-                <div class={`text-[10px] font-bold ${appStore.vadState().isSpeech ? 'text-orange-500' : 'text-slate-500'}`}>
+                <div class={`text-[10px] font-bold whitespace-nowrap w-24 overflow-hidden text-ellipsis mx-auto ${appStore.vadState().isSpeech ? 'text-orange-500' : 'text-slate-500'}`}>
                   {appStore.vadState().hybridState}
                 </div>
               </div>
