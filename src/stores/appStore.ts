@@ -5,7 +5,7 @@
  * Manages recording state, model status, and transcript.
  */
 
-import { createSignal, createRoot, onCleanup } from 'solid-js';
+import { createSignal, createMemo, createRoot, onCleanup } from 'solid-js';
 import type { RecordingState, ModelState, BackendType } from '../types';
 
 export interface DebugToken {
@@ -79,7 +79,18 @@ function createAppStore() {
   const [isOnline, setIsOnline] = createSignal(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   // Debug metrics
-  const [inferenceLatency, setInferenceLatency] = createSignal(0);
+  const [inferenceLatency, setInferenceLatencyInternal] = createSignal(0);
+  const [latencySamples, setLatencySamples] = createSignal<number[]>([]);
+  const LATENCY_SAMPLE_SIZE = 5;
+  const setInferenceLatency = (v: number) => {
+    setInferenceLatencyInternal(v);
+    setLatencySamples(prev => [...prev.slice(1 - LATENCY_SAMPLE_SIZE), v]);
+  };
+  const inferenceLatencyAverage = createMemo(() => {
+    const s = latencySamples();
+    if (s.length === 0) return inferenceLatency();
+    return s.reduce((sum, x) => sum + x, 0) / s.length;
+  });
   const [debugTokens, setDebugTokens] = createSignal<DebugToken[]>([]);
   const [systemMetrics, setSystemMetrics] = createSignal<SystemMetrics>({
     throughput: 0,
@@ -96,7 +107,18 @@ function createAppStore() {
   });
 
   // Performance Telemetry
-  const [rtf, setRtf] = createSignal(0); // Real-Time Factor (Inference/AudioDuration)
+  const [rtf, setRtfInternal] = createSignal(0); // Real-Time Factor (Inference/AudioDuration)
+  const [rtfSamples, setRtfSamples] = createSignal<number[]>([]); // Last N RTF values for RTFx average
+  const RTF_SAMPLE_SIZE = 10;
+  const setRtf = (v: number) => {
+    setRtfInternal(v);
+    setRtfSamples(prev => [...prev.slice(1 - RTF_SAMPLE_SIZE), v]);
+  };
+  const rtfxAverage = createMemo(() => {
+    const s = rtfSamples().filter(r => r > 0);
+    if (s.length === 0) return 0;
+    return s.reduce((sum, r) => sum + 1 / r, 0) / s.length;
+  });
   const [bufferMetrics, setBufferMetrics] = createSignal({
     fillRatio: 0,
     latencyMs: 0,
@@ -215,7 +237,9 @@ function createAppStore() {
     isOfflineReady,
     isOnline,
     inferenceLatency,
+    inferenceLatencyAverage,
     rtf,
+    rtfxAverage,
     bufferMetrics,
     debugTokens,
     systemMetrics,

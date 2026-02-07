@@ -62,10 +62,10 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
   });
 
   const rtfColor = createMemo(() => {
-    const val = appStore.rtf();
-    if (val === 0) return 'text-slate-400';
-    if (val < 0.5) return 'text-green-600 font-bold';
-    if (val < 0.9) return 'text-orange-500 font-bold';
+    const rtfx = appStore.rtfxAverage();
+    if (rtfx === 0) return 'text-slate-400';
+    if (rtfx >= 2) return 'text-green-600 font-bold';
+    if (rtfx >= 1) return 'text-orange-500 font-bold';
     return 'text-red-500 font-bold';
   });
 
@@ -126,12 +126,14 @@ export const DebugPanel: Component<DebugPanelProps> = (props) => {
         {/* Performance Metrics */}
         <div class="grid grid-cols-2 gap-1.5">
           <div class="bg-white border border-slate-200 rounded p-1.5 flex flex-col items-center justify-center">
-            <span class="font-bold text-slate-400 uppercase tracking-tight text-[8px] mb-0.5">RTF</span>
-            <span class={`text-xs ${rtfColor()}`}>{appStore.rtf().toFixed(3)}x</span>
+            <span class="font-bold text-slate-400 uppercase tracking-tight text-[8px] mb-0.5">RTFx</span>
+            <span class={`text-xs ${rtfColor()}`}>
+              {appStore.rtfxAverage() > 0 ? Math.round(appStore.rtfxAverage()) : '–'}
+            </span>
           </div>
           <div class="bg-white border border-slate-200 rounded p-1.5 flex flex-col items-center justify-center">
             <span class="font-bold text-slate-400 uppercase tracking-tight text-[8px] mb-0.5">Latency</span>
-            <span class="text-xs font-bold text-slate-700">{appStore.inferenceLatency().toFixed(0)}ms</span>
+            <span class="text-xs font-bold text-slate-700">{Math.round(appStore.inferenceLatencyAverage())}ms</span>
           </div>
         </div>
 
