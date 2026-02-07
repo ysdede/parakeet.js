@@ -51,6 +51,9 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
 
   let animationFrameId: number | undefined;
   let resizeObserver: ResizeObserver | null = null;
+  let needsRedraw = true;
+  let lastDrawTime = 0;
+  const DRAW_INTERVAL_MS = 33;
 
   // Draw function
   const draw = () => {
@@ -384,7 +387,12 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     }
 
     if (visible()) {
-      draw();
+      const now = performance.now();
+      if (needsRedraw && now - lastDrawTime >= DRAW_INTERVAL_MS) {
+        lastDrawTime = now;
+        needsRedraw = false;
+        draw();
+      }
       animationFrameId = requestAnimationFrame(drawLoop);
     } else {
       // When not visible, check less frequently to save CPU
@@ -404,6 +412,7 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
         // Refetch visualization data for new width
         if (props.audioEngine && visible()) {
           setWaveformData(props.audioEngine.getVisualizationData(newWidth));
+          needsRedraw = true;
           // Note: can't update bufferEndTime here easily without calling another method on engine,
           // but next update loop will catch it.
         }
@@ -430,6 +439,7 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
 
           // Fetch segments for visualization
           setSegments(engine.getSegmentsForVisualization());
+          needsRedraw = true;
         } else {
           // Still update metrics even when not visible
           setMetrics(newMetrics);
@@ -437,6 +447,13 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
       });
 
       onCleanup(() => sub());
+    }
+  });
+
+  // Mark for redraw when visibility toggles
+  createEffect(() => {
+    if (visible()) {
+      needsRedraw = true;
     }
   });
 
