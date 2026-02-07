@@ -853,22 +853,69 @@ export class AudioEngine implements IAudioEngine {
 
     private getVisualizationDataFromRaw(targetWidth: number): Float32Array {
         if (!this.visualizationBuffer) return new Float32Array(0);
+        const buffer = this.visualizationBuffer;
         const bufferLength = this.visualizationBufferSize;
         const pos = this.visualizationBufferPosition;
         const samplesPerPoint = bufferLength / targetWidth;
         const subsampledBuffer = new Float32Array(targetWidth * 2);
 
-        for (let i = 0; i < targetWidth; i++) {
-            const rangeStart = i * samplesPerPoint;
-            const rangeEnd = (i + 1) * samplesPerPoint;
-            let minVal = 0, maxVal = 0, first = true;
+        // Logical index s maps to physical index:
+        // if s < wrapS: pos + s
+        // else: s - wrapS (which is s - (bufferLength - pos) = s + pos - bufferLength)
+        const wrapS = bufferLength - pos;
 
-            for (let s = Math.floor(rangeStart); s < Math.floor(rangeEnd); s++) {
-                const circularIdx = (pos + s) % bufferLength;
-                const val = this.visualizationBuffer[circularIdx];
-                if (first) { minVal = val; maxVal = val; first = false; }
-                else { if (val < minVal) minVal = val; if (val > maxVal) maxVal = val; }
+        for (let i = 0; i < targetWidth; i++) {
+            const startS = Math.floor(i * samplesPerPoint);
+            const endS = Math.floor((i + 1) * samplesPerPoint);
+
+            let minVal = 0;
+            let maxVal = 0;
+            let first = true;
+
+            // Part 1: Before wrap (Logical indices < wrapS)
+            // Physical indices: pos + s
+            const end1 = (endS < wrapS) ? endS : wrapS;
+            if (startS < end1) {
+                let p = pos + startS;
+                const pEnd = pos + end1;
+
+                if (first && p < pEnd) {
+                    const val = buffer[p];
+                    minVal = val;
+                    maxVal = val;
+                    first = false;
+                    p++;
+                }
+
+                for (; p < pEnd; p++) {
+                    const val = buffer[p];
+                    if (val < minVal) minVal = val;
+                    else if (val > maxVal) maxVal = val;
+                }
             }
+
+            // Part 2: After wrap (Logical indices >= wrapS)
+            // Physical indices: s - wrapS
+            const start2 = (startS > wrapS) ? startS : wrapS;
+            if (start2 < endS) {
+                let p = start2 - wrapS;
+                const pEnd = endS - wrapS;
+
+                if (first && p < pEnd) {
+                    const val = buffer[p];
+                    minVal = val;
+                    maxVal = val;
+                    first = false;
+                    p++;
+                }
+
+                for (; p < pEnd; p++) {
+                    const val = buffer[p];
+                    if (val < minVal) minVal = val;
+                    else if (val > maxVal) maxVal = val;
+                }
+            }
+
             subsampledBuffer[i * 2] = minVal;
             subsampledBuffer[i * 2 + 1] = maxVal;
         }
