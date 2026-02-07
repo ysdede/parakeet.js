@@ -1,0 +1,744 @@
+{
+  "trace_file": "trace_boncuk-tracing.json",
+  "total_events": 1161562,
+  "trace_duration_s": 93.4,
+  "thread_ids": {
+    "renderer_pid": 76416,
+    "main_tid": 71168,
+    "compositor_tid": 70772,
+    "audio_worklet_tid": 76740,
+    "worker_tids": [
+      47784,
+      69636,
+      75196,
+      75496
+    ],
+    "gpu_pid": 73564,
+    "audio_service_pid": 76712
+  },
+  "process_names": {
+    "76416": "Renderer",
+    "70280": "Renderer",
+    "72424": "Browser",
+    "72048": "Renderer",
+    "7900": "Service: video_capture.mojom.VideoCaptureService",
+    "15584": "Service: storage.mojom.StorageService",
+    "73564": "GPU Process",
+    "75436": "Renderer",
+    "75844": "Service: network.mojom.NetworkService",
+    "76188": "Service: tracing.mojom.TracingService",
+    "76712": "Service: audio.mojom.AudioService"
+  },
+  "thread_activity": [
+    {
+      "label": "Main Thread",
+      "total_dur_ms": 10001.8
+    },
+    {
+      "label": "Compositor",
+      "total_dur_ms": 6912.6
+    },
+    {
+      "label": "Worker-47784",
+      "total_dur_ms": 804.1
+    },
+    {
+      "label": "Worker-75496",
+      "total_dur_ms": 709.0
+    },
+    {
+      "label": "Worker-75196",
+      "total_dur_ms": 570.9
+    },
+    {
+      "label": "AudioWorklet",
+      "total_dur_ms": 353.7
+    },
+    {
+      "label": "Worker-69636",
+      "total_dur_ms": 71.8
+    }
+  ],
+  "main_thread": {
+    "label": "Main Thread",
+    "event_count": 152356,
+    "total_dur_ms": 10001.8,
+    "top_names": [
+      {
+        "name": "ThreadControllerImpl::RunTask",
+        "count": 8375,
+        "total_ms": 1999.0,
+        "max_ms": 11.86
+      },
+      {
+        "name": "ProxyMain::BeginMainFrame",
+        "count": 1646,
+        "total_ms": 1559.6,
+        "max_ms": 11.86
+      },
+      {
+        "name": "WebFrameWidgetImpl::UpdateLifecycle",
+        "count": 1647,
+        "total_ms": 680.3,
+        "max_ms": 9.63
+      },
+      {
+        "name": "v8.callFunction",
+        "count": 3694,
+        "total_ms": 404.6,
+        "max_ms": 4.84
+      },
+      {
+        "name": "LocalFrameView::UpdateStyleAndLayout",
+        "count": 10276,
+        "total_ms": 382.5,
+        "max_ms": 7.76
+      },
+      {
+        "name": "LocalFrameView::RunStyleAndLayoutLifecyclePhases",
+        "count": 2028,
+        "total_ms": 374.1,
+        "max_ms": 7.82
+      },
+      {
+        "name": "Blink.Style.UpdateTime",
+        "count": 1647,
+        "total_ms": 315.9,
+        "max_ms": 3.21
+      },
+      {
+        "name": "UpdateLayoutTree",
+        "count": 1647,
+        "total_ms": 305.9,
+        "max_ms": 3.2
+      },
+      {
+        "name": "WebFrameWidgetImpl::BeginMainFrame",
+        "count": 1646,
+        "total_ms": 294.0,
+        "max_ms": 0.91
+      },
+      {
+        "name": "Blink.Animate.UpdateTime",
+        "count": 1646,
+        "total_ms": 283.0,
+        "max_ms": 0.9
+      },
+      {
+        "name": "Document::updateStyle",
+        "count": 1647,
+        "total_ms": 279.5,
+        "max_ms": 3.04
+      },
+      {
+        "name": "PageAnimator::serviceScriptedAnimations",
+        "count": 1646,
+        "total_ms": 272.2,
+        "max_ms": 0.9
+      },
+      {
+        "name": "Document::recalcStyle",
+        "count": 1647,
+        "total_ms": 232.0,
+        "max_ms": 2.96
+      },
+      {
+        "name": "AsyncTask Run",
+        "count": 2778,
+        "total_ms": 199.1,
+        "max_ms": 0.64
+      },
+      {
+        "name": "FrameRequestCallbackCollection::ExecuteFrameCallbacks",
+        "count": 1646,
+        "total_ms": 192.5,
+        "max_ms": 0.83
+      }
+    ]
+  },
+  "main_thread_long_tasks": [],
+  "compositor": {
+    "label": "Compositor",
+    "event_count": 196635,
+    "total_dur_ms": 6912.6,
+    "top_names": [
+      {
+        "name": "ThreadControllerImpl::RunTask",
+        "count": 28017,
+        "total_ms": 1624.8,
+        "max_ms": 3.01
+      },
+      {
+        "name": "Graphics.Pipeline",
+        "count": 4964,
+        "total_ms": 804.5,
+        "max_ms": 2.89
+      },
+      {
+        "name": "ProxyImpl::ScheduledActionDraw",
+        "count": 1646,
+        "total_ms": 485.7,
+        "max_ms": 2.91
+      },
+      {
+        "name": "MainFrame.Draw",
+        "count": 1646,
+        "total_ms": 480.5,
+        "max_ms": 2.91
+      },
+      {
+        "name": "SimpleWatcher::OnHandleReady",
+        "count": 5726,
+        "total_ms": 381.3,
+        "max_ms": 0.31
+      },
+      {
+        "name": "Receive mojo message",
+        "count": 6803,
+        "total_ms": 343.5,
+        "max_ms": 0.29
+      },
+      {
+        "name": "ProxyImpl::ReadyToCommit",
+        "count": 1039,
+        "total_ms": 299.9,
+        "max_ms": 0.53
+      },
+      {
+        "name": "LayerTreeHostImpl::CommitComplete",
+        "count": 1039,
+        "total_ms": 206.5,
+        "max_ms": 0.36
+      },
+      {
+        "name": "LayerTreeHostImpl::PrepareToDraw",
+        "count": 1646,
+        "total_ms": 168.0,
+        "max_ms": 0.29
+      },
+      {
+        "name": "ExternalBeginFrameSource::OnBeginFrame",
+        "count": 1659,
+        "total_ms": 159.9,
+        "max_ms": 0.27
+      },
+      {
+        "name": "LayerTreeImpl::UpdateDrawProperties",
+        "count": 2903,
+        "total_ms": 158.1,
+        "max_ms": 0.22
+      },
+      {
+        "name": "Scheduler::BeginFrame",
+        "count": 1659,
+        "total_ms": 139.6,
+        "max_ms": 0.25
+      },
+      {
+        "name": "TileManager::PrepareTiles",
+        "count": 1653,
+        "total_ms": 135.9,
+        "max_ms": 0.24
+      },
+      {
+        "name": "TileManager::CheckForCompletedTasksAndIssueSignals",
+        "count": 2519,
+        "total_ms": 134.2,
+        "max_ms": 1.29
+      },
+      {
+        "name": "Scheduler::BeginImplFrame",
+        "count": 1659,
+        "total_ms": 123.6,
+        "max_ms": 0.24
+      }
+    ]
+  },
+  "workers": [
+    {
+      "label": "Worker-47784",
+      "event_count": 1930,
+      "total_dur_ms": 804.1,
+      "top_names": [
+        {
+          "name": "ThreadControllerImpl::RunTask",
+          "count": 387,
+          "total_ms": 399.2,
+          "max_ms": 1.58
+        },
+        {
+          "name": "v8.callFunction",
+          "count": 385,
+          "total_ms": 388.9,
+          "max_ms": 1.54
+        },
+        {
+          "name": "SerializedScriptValueFactory::create",
+          "count": 384,
+          "total_ms": 8.8,
+          "max_ms": 0.18
+        },
+        {
+          "name": "SerializedScriptValueFactory::deserialize",
+          "count": 384,
+          "total_ms": 4.5,
+          "max_ms": 0.04
+        },
+        {
+          "name": "MinorGC",
+          "count": 1,
+          "total_ms": 1.0,
+          "max_ms": 0.96
+        },
+        {
+          "name": "V8.GCScavenger",
+          "count": 1,
+          "total_ms": 0.9,
+          "max_ms": 0.92
+        },
+        {
+          "name": "SequenceManager::DoIdleWork",
+          "count": 385,
+          "total_ms": 0.8,
+          "max_ms": 0.01
+        },
+        {
+          "name": "TimerBase::run",
+          "count": 1,
+          "total_ms": 0.1,
+          "max_ms": 0.09
+        },
+        {
+          "name": "AsyncTask Run",
+          "count": 1,
+          "total_ms": 0.1,
+          "max_ms": 0.08
+        },
+        {
+          "name": "SequenceManagerImpl::MaybeReclaimMemory",
+          "count": 1,
+          "total_ms": 0.0,
+          "max_ms": 0.01
+        }
+      ]
+    },
+    {
+      "label": "Worker-69636",
+      "event_count": 3508,
+      "total_dur_ms": 71.8,
+      "top_names": [
+        {
+          "name": "ThreadControllerImpl::RunTask",
+          "count": 855,
+          "total_ms": 39.1,
+          "max_ms": 0.11
+        },
+        {
+          "name": "v8.callFunction",
+          "count": 855,
+          "total_ms": 21.2,
+          "max_ms": 0.08
+        },
+        {
+          "name": "SerializedScriptValueFactory::deserialize",
+          "count": 855,
+          "total_ms": 9.1,
+          "max_ms": 0.05
+        },
+        {
+          "name": "SequenceManager::DoIdleWork",
+          "count": 855,
+          "total_ms": 1.7,
+          "max_ms": 0.01
+        },
+        {
+          "name": "SerializedScriptValueFactory::create",
+          "count": 87,
+          "total_ms": 0.8,
+          "max_ms": 0.03
+        },
+        {
+          "name": "SequenceManagerImpl::MaybeReclaimMemory",
+          "count": 1,
+          "total_ms": 0.0,
+          "max_ms": 0.01
+        }
+      ]
+    },
+    {
+      "label": "Worker-75196",
+      "event_count": 18265,
+      "total_dur_ms": 570.9,
+      "top_names": [
+        {
+          "name": "ThreadControllerImpl::RunTask",
+          "count": 659,
+          "total_ms": 189.3,
+          "max_ms": 11.41
+        },
+        {
+          "name": "CommandBufferHelper::Flush",
+          "count": 3322,
+          "total_ms": 79.3,
+          "max_ms": 0.09
+        },
+        {
+          "name": "CommandBufferProxyImpl::Flush",
+          "count": 3322,
+          "total_ms": 63.0,
+          "max_ms": 0.08
+        },
+        {
+          "name": "v8.callFunction",
+          "count": 34,
+          "total_ms": 44.6,
+          "max_ms": 1.75
+        },
+        {
+          "name": "MinorGC",
+          "count": 70,
+          "total_ms": 38.5,
+          "max_ms": 2.99
+        },
+        {
+          "name": "V8.GCScavenger",
+          "count": 70,
+          "total_ms": 35.4,
+          "max_ms": 2.94
+        },
+        {
+          "name": "MajorGC",
+          "count": 7,
+          "total_ms": 34.2,
+          "max_ms": 7.2
+        },
+        {
+          "name": "V8.GCFinalizeMC",
+          "count": 7,
+          "total_ms": 33.9,
+          "max_ms": 7.16
+        },
+        {
+          "name": "V8.GCIncrementalMarking",
+          "count": 236,
+          "total_ms": 19.8,
+          "max_ms": 1.95
+        },
+        {
+          "name": "CommandBuffer::OrderingBarrier",
+          "count": 6666,
+          "total_ms": 11.5,
+          "max_ms": 0.03
+        },
+        {
+          "name": "SerializedScriptValueFactory::deserialize",
+          "count": 33,
+          "total_ms": 6.2,
+          "max_ms": 0.31
+        },
+        {
+          "name": "GpuChannel::Flush",
+          "count": 3345,
+          "total_ms": 4.3,
+          "max_ms": 0.01
+        },
+        {
+          "name": "Receive mojo message",
+          "count": 135,
+          "total_ms": 3.7,
+          "max_ms": 0.11
+        },
+        {
+          "name": "RunPendingMicrotask",
+          "count": 135,
+          "total_ms": 3.3,
+          "max_ms": 0.04
+        },
+        {
+          "name": "V8.GCIncrementalMarkingStart",
+          "count": 7,
+          "total_ms": 1.8,
+          "max_ms": 0.33
+        }
+      ]
+    },
+    {
+      "label": "Worker-75496",
+      "event_count": 1821,
+      "total_dur_ms": 709.0,
+      "top_names": [
+        {
+          "name": "ThreadControllerImpl::RunTask",
+          "count": 498,
+          "total_ms": 354.9,
+          "max_ms": 3.35
+        },
+        {
+          "name": "v8.callFunction",
+          "count": 417,
+          "total_ms": 335.7,
+          "max_ms": 3.33
+        },
+        {
+          "name": "SerializedScriptValueFactory::deserialize",
+          "count": 417,
+          "total_ms": 5.4,
+          "max_ms": 0.1
+        },
+        {
+          "name": "MajorGC",
+          "count": 3,
+          "total_ms": 4.2,
+          "max_ms": 1.87
+        },
+        {
+          "name": "V8.GCFinalizeMCReduceMemory",
+          "count": 2,
+          "total_ms": 2.3,
+          "max_ms": 1.46
+        },
+        {
+          "name": "V8.GCIncrementalMarking",
+          "count": 24,
+          "total_ms": 1.9,
+          "max_ms": 0.22
+        },
+        {
+          "name": "V8.GCFinalizeMC",
+          "count": 1,
+          "total_ms": 1.8,
+          "max_ms": 1.82
+        },
+        {
+          "name": "SequenceManager::DoIdleWork",
+          "count": 422,
+          "total_ms": 1.1,
+          "max_ms": 0.01
+        },
+        {
+          "name": "V8.GCIncrementalMarkingStart",
+          "count": 3,
+          "total_ms": 0.8,
+          "max_ms": 0.32
+        },
+        {
+          "name": "SerializedScriptValueFactory::create",
+          "count": 33,
+          "total_ms": 0.8,
+          "max_ms": 0.04
+        },
+        {
+          "name": "SequenceManagerImpl::MaybeReclaimMemory",
+          "count": 1,
+          "total_ms": 0.0,
+          "max_ms": 0.01
+        }
+      ]
+    }
+  ],
+  "worker_inference": {
+    "47784": {
+      "js_calls": 385,
+      "duration_ms": {
+        "avg": 1.01,
+        "max": 1.54,
+        "total": 388.9
+      },
+      "interval_ms": {
+        "avg": 81.6,
+        "max": 120.8,
+        "p50": 80.1
+      }
+    },
+    "69636": {
+      "js_calls": 855,
+      "duration_ms": {
+        "avg": 0.02,
+        "max": 0.08,
+        "total": 21.2
+      },
+      "interval_ms": {
+        "avg": 36.7,
+        "max": 119.7,
+        "p50": 3.1
+      }
+    },
+    "75196": {
+      "js_calls": 34,
+      "duration_ms": {
+        "avg": 1.31,
+        "max": 1.75,
+        "total": 44.6
+      },
+      "interval_ms": {
+        "avg": 909.6,
+        "max": 2818.1,
+        "p50": 790.8
+      }
+    },
+    "75496": {
+      "js_calls": 417,
+      "duration_ms": {
+        "avg": 0.81,
+        "max": 3.33,
+        "total": 335.7
+      },
+      "interval_ms": {
+        "avg": 75.3,
+        "max": 120.7,
+        "p50": 79.9
+      }
+    }
+  },
+  "gc": {
+    "count": 499,
+    "total_ms": 202.5,
+    "by_thread": {
+      "75196": {
+        "count": 397,
+        "total_ms": 163.6,
+        "max_ms": 7.2
+      },
+      "75496": {
+        "count": 33,
+        "total_ms": 11.1,
+        "max_ms": 1.87
+      },
+      "71168": {
+        "count": 67,
+        "total_ms": 25.9,
+        "max_ms": 2.03
+      },
+      "47784": {
+        "count": 2,
+        "total_ms": 1.9,
+        "max_ms": 0.96
+      }
+    }
+  },
+  "webgpu": {
+    "count": 3315,
+    "time_span_s": 30.9,
+    "rate_per_s": 107.2,
+    "total_ms": 4233.3,
+    "percentiles": {
+      "p50_us": 479,
+      "p90_us": 3517,
+      "p95_us": 4628,
+      "p99_us": 6371,
+      "max_us": 8963
+    },
+    "histogram": {
+      "lt_100us": 156,
+      "100_500us": 1562,
+      "500_1ms": 403,
+      "1_5ms": 1077,
+      "5_50ms": 117,
+      "gt_50ms": 0
+    },
+    "burst_count": 61,
+    "burst_sizes": {
+      "min": 6,
+      "max": 35,
+      "avg": 15.1
+    },
+    "high_dur_gt5ms": 117
+  },
+  "audioworklet": {
+    "callback_count": 3070,
+    "estimated_buffer_samples": 490947,
+    "task_duration": {
+      "avg_us": 86,
+      "max_us": 194,
+      "p99_us": 174
+    },
+    "interval": {
+      "avg_us": 10228,
+      "max_us": 42429,
+      "stddev_us": 2753
+    },
+    "jitter_vs_expected": {
+      "expected_us": 10000,
+      "avg_us": 872,
+      "max_us": 32429,
+      "p99_us": 10180
+    },
+    "late_callbacks_gt_expected_x1_5": 34,
+    "very_late_callbacks_gt_expected_x3": 29
+  },
+  "frames": {
+    "draw_count": 1646,
+    "effective_fps": 52.5,
+    "interval_ms": {
+      "avg": 19.0,
+      "max": 485.7,
+      "min": 1.4
+    },
+    "janky_frames_gt_2x_avg": 39,
+    "total_frames": 1646
+  },
+  "wasm": [
+    {
+      "dur_ms": 1.4,
+      "name": "ThreadPool_RunTask",
+      "tid": 74212,
+      "src_func": "void v8::internal::wasm::(anonymous namespace)::CompilationStateImpl::InitCompil"
+    },
+    {
+      "dur_ms": 0.88,
+      "name": "ThreadPool_RunTask",
+      "tid": 74212,
+      "src_func": "void v8::internal::wasm::(anonymous namespace)::CompilationStateImpl::InitCompil"
+    },
+    {
+      "dur_ms": 0.01,
+      "name": "ThreadControllerImpl::RunTask",
+      "tid": 75196,
+      "src_func": "void v8::internal::wasm::WasmEngine::LogCode(base::Vector<WasmCode *>)"
+    },
+    {
+      "dur_ms": 0.01,
+      "name": "ThreadControllerImpl::RunTask",
+      "tid": 75196,
+      "src_func": "void v8::internal::wasm::WasmEngine::LogCode(base::Vector<WasmCode *>)"
+    }
+  ],
+  "message_passing": {
+    "47784": {
+      "serialize_ms": 8.8,
+      "serialize_count": 384,
+      "deserialize_ms": 4.5,
+      "deserialize_count": 384
+    },
+    "69636": {
+      "serialize_ms": 0.8,
+      "serialize_count": 87,
+      "deserialize_ms": 9.1,
+      "deserialize_count": 855
+    },
+    "71168": {
+      "serialize_ms": 22.2,
+      "serialize_count": 1689,
+      "deserialize_ms": 14.2,
+      "deserialize_count": 928
+    },
+    "75196": {
+      "serialize_ms": 1.2,
+      "serialize_count": 34,
+      "deserialize_ms": 6.2,
+      "deserialize_count": 33
+    },
+    "75496": {
+      "serialize_ms": 0.8,
+      "serialize_count": 33,
+      "deserialize_ms": 5.4,
+      "deserialize_count": 417
+    },
+    "76740": {
+      "serialize_ms": 9.7,
+      "serialize_count": 390,
+      "deserialize_ms": 0.0,
+      "deserialize_count": 0
+    }
+  }
+}

@@ -1,0 +1,25 @@
+Trace Duration: 31429159.94ms (31429.16s)
+
+--- Deep Dive Analysis ---
+
+[AudioWorklet Analysis] Thread 76416:76740 (Realtime AudioWorklet thread)
+  No 'process' events found in AudioWorklet thread.
+  Top events:  [
+  [ 'v8.callFunction', 11512 ],
+  [ 'ThreadControllerImpl::RunTask', 3070 ],
+  [ 'SequenceManager::DoIdleWork', 3070 ],
+  [ 'SerializedScriptValueFactory::create', 390 ],
+  [ 'thread_name', 1 ]
+]
+
+[Background Worker Long Tasks]
+  ThreadPoolForegroundWorker (72424:69296): ThreadPool_RunTask took 338.57ms
+    Args: {"src_file":"components/sync/engine/sync_scheduler_impl.cc","src_func":"TrySyncCycleJob","src_line":...
+  ThreadPoolSingleThreadCOMSTASharedForegroundBlocking0 (72424:74208): ThreadPool_RunTask took 110.64ms
+    Args: {"chrome_task_annotator":{"delay_policy":"FLEXIBLE_NO_SOONER","task_delay_us":500000},"src_file":"se...
+  ThreadPoolSingleThreadCOMSTASharedForegroundBlocking0 (72424:74208): ThreadPool_RunTask took 93.48ms
+    Args: {"chrome_task_annotator":{"delay_policy":"FLEXIBLE_NO_SOONER","task_delay_us":500000},"src_file":"se...
+  ThreadPoolSingleThreadCOMSTASharedForegroundBlocking0 (72424:74208): ThreadPool_RunTask took 117.47ms
+    Args: {"chrome_task_annotator":{"delay_policy":"FLEXIBLE_NO_SOONER","task_delay_us":500000},"src_file":"se...
+
+[WebGPU/GPU Activity] 231712 events
