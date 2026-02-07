@@ -134,7 +134,6 @@ export class AudioEngine implements IAudioEngine {
             silenceThreshold: this.config.minSilenceDuration,
             maxSegmentDuration: this.config.maxSegmentDuration,
             lookbackDuration: this.config.lookbackDuration,
-            speechHangover: this.config.speechHangover,
             maxSilenceWithinSpeech: this.config.maxSilenceWithinSpeech,
             endingSpeechTolerance: this.config.endingSpeechTolerance,
             snrThreshold: 3.0,
