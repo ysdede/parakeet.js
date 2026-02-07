@@ -97,6 +97,18 @@ export class BufferWorkerClient {
     }
 
     /**
+     * Write a batch of entries to a layer by transferring ownership of the buffer.
+     * The caller must not reuse `data` after calling this.
+     */
+    writeBatchTransfer(layer: LayerId, data: Float32Array, globalSampleOffset?: number): void {
+        if (!this.ready) return;
+        this.worker.postMessage(
+            { type: 'WRITE_BATCH', payload: { layer, data, globalSampleOffset } },
+            [data.buffer]
+        );
+    }
+
+    /**
      * Write raw audio samples. Fire-and-forget with buffer transfer.
      */
     writeAudio(samples: Float32Array): void {
