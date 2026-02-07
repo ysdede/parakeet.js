@@ -1,4 +1,4 @@
-import { Component, Show, For } from 'solid-js';
+import { Component, Show, For, createEffect } from 'solid-js';
 
 interface ModelLoadingOverlayProps {
     isVisible: boolean;
@@ -14,10 +14,14 @@ interface ModelLoadingOverlayProps {
     onClose?: () => void;
 }
 
-const MODELS = [
+export const MODELS = [
     { id: 'parakeet-tdt-0.6b-v2', name: 'Parakeet v2', desc: 'English optimized' },
     { id: 'parakeet-tdt-0.6b-v3', name: 'Parakeet v3', desc: 'Multilingual Streaming' },
 ];
+
+export function getModelDisplayName(id: string): string {
+    return (MODELS.find((m) => m.id === id)?.name ?? id) || 'Unknown model';
+}
 
 export const ModelLoadingOverlay: Component<ModelLoadingOverlayProps> = (props) => {
     const progressWidth = () => `${Math.max(0, Math.min(100, props.progress))}%`;
@@ -30,9 +34,29 @@ export const ModelLoadingOverlay: Component<ModelLoadingOverlayProps> = (props) 
         }
     };
 
+    const handleClose = () => props.onClose?.();
+
+    createEffect(() => {
+        if (!props.isVisible || !props.onClose) return;
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                props.onClose?.();
+            }
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    });
+
     return (
         <Show when={props.isVisible}>
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-md">
+            <div
+                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-md"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="model-overlay-title"
+                onClick={(e) => e.target === e.currentTarget && handleClose()}
+            >
                 <input
                     type="file"
                     multiple
@@ -43,11 +67,13 @@ export const ModelLoadingOverlay: Component<ModelLoadingOverlayProps> = (props) 
 
                 <div class="w-full max-w-lg mx-4">
                     <div class="relative nm-flat rounded-[40px] overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
-                        {/* Close Button */}
-                        <Show when={props.onClose && props.state === 'unloaded'}>
+                        {/* Close Button - show whenever onClose is provided so user can dismiss in any state */}
+                        <Show when={props.onClose}>
                             <button
-                                onClick={() => props.onClose?.()}
+                                type="button"
+                                onClick={handleClose}
                                 class="absolute top-8 right-8 neu-square-btn text-slate-400 hover:text-red-500 transition-all z-10"
+                                aria-label="Close"
                             >
                                 <span class="material-symbols-outlined text-xl">close</span>
                             </button>
@@ -66,7 +92,7 @@ export const ModelLoadingOverlay: Component<ModelLoadingOverlayProps> = (props) 
                                 </Show>
                             </div>
 
-                            <h2 class="text-3xl font-extrabold text-slate-800 tracking-tight">
+                            <h2 id="model-overlay-title" class="text-3xl font-extrabold text-slate-800 tracking-tight">
                                 {props.state === 'unloaded' ? 'Engine Selection' :
                                     props.state === 'error' ? 'Loading Failed' : 'Model Installation'}
                             </h2>
