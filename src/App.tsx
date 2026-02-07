@@ -39,6 +39,14 @@ let v4GlobalSampleOffset = 0;
 // Throttle UI updates from TEN-VAD to at most once per frame
 let pendingSileroProb: number | null = null;
 let sileroUpdateScheduled = false;
+let pendingVadState: {
+  isSpeech: boolean;
+  energy: number;
+  snr: number;
+  hybridState: string;
+  sileroProbability?: number;
+} | null = null;
+let vadUpdateScheduled = false;
 
 const scheduleSileroUpdate = (prob: number) => {
   pendingSileroProb = prob;
@@ -52,6 +60,34 @@ const scheduleSileroUpdate = (prob: number) => {
       ...currentState,
       sileroProbability: pendingSileroProb,
     });
+  });
+};
+
+const scheduleVadStateUpdate = (next: {
+  isSpeech: boolean;
+  energy: number;
+  snr: number;
+  hybridState: string;
+  sileroProbability?: number;
+}) => {
+  pendingVadState = next;
+  if (vadUpdateScheduled) return;
+  vadUpdateScheduled = true;
+  requestAnimationFrame(() => {
+    vadUpdateScheduled = false;
+    if (!pendingVadState) return;
+    const currentState = appStore.vadState();
+    const sileroProbability =
+      pendingVadState.sileroProbability !== undefined
+        ? pendingVadState.sileroProbability
+        : currentState.sileroProbability;
+    appStore.setVadState({
+      ...currentState,
+      ...pendingVadState,
+      sileroProbability,
+    });
+    appStore.setIsSpeechDetected(pendingVadState.isSpeech);
+    pendingVadState = null;
   });
 };
 
@@ -528,14 +564,16 @@ const App: Component = () => {
             }
 
             // 4. Update VAD state for UI
-            appStore.setVadState({
+            const sileroProbability = tenVADClient?.isReady()
+              ? undefined
+              : (vadResult.sileroProbability || 0);
+            scheduleVadStateUpdate({
               isSpeech: vadResult.isSpeech,
               energy: vadResult.energy,
               snr: vadResult.snr || 0,
-              sileroProbability: vadResult.sileroProbability || 0,
               hybridState: vadResult.state,
+              ...(sileroProbability !== undefined ? { sileroProbability } : {}),
             });
-            appStore.setIsSpeechDetected(vadResult.isSpeech);
           });
 
           // Start adaptive inference tick loop (reads interval from appStore)
