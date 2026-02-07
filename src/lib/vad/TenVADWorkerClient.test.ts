@@ -33,16 +33,17 @@ describe('TenVADWorkerClient', () => {
     });
 
     it('should reject init when worker returns ERROR (e.g. WASM unavailable)', async () => {
-        await expect(client.init()).rejects.toThrow();
+        // Use invalid URL so fetch fails quickly (no local server in test env)
+        await expect(client.init({ wasmPath: 'https://invalid.invalid/' })).rejects.toThrow();
         expect(client.isReady()).toBe(false);
-    });
+    }, 15000);
 
     it('should not call process when not ready', async () => {
-        await expect(client.init()).rejects.toThrow();
+        await expect(client.init({ wasmPath: 'https://invalid.invalid/' })).rejects.toThrow();
         const samples = new Float32Array(256);
         expect(() => client.process(samples, 0)).not.toThrow();
         expect(client.isReady()).toBe(false);
-    });
+    }, 15000);
 
     it('should accept onResult callback without throwing', () => {
         const results: TenVADResult[] = [];
