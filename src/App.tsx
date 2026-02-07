@@ -36,6 +36,24 @@ let v4InferenceBusy = false;
 let v4LastInferenceTime = 0;
 // Global sample counter for audio chunks (tracks total samples written to BufferWorker)
 let v4GlobalSampleOffset = 0;
+// Throttle UI updates from TEN-VAD to at most once per frame
+let pendingSileroProb: number | null = null;
+let sileroUpdateScheduled = false;
+
+const scheduleSileroUpdate = (prob: number) => {
+  pendingSileroProb = prob;
+  if (sileroUpdateScheduled) return;
+  sileroUpdateScheduled = true;
+  requestAnimationFrame(() => {
+    sileroUpdateScheduled = false;
+    if (pendingSileroProb === null) return;
+    const currentState = appStore.vadState();
+    appStore.setVadState({
+      ...currentState,
+      sileroProbability: pendingSileroProb,
+    });
+  });
+};
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -455,18 +473,13 @@ const App: Component = () => {
           tenVADClient = new TenVADWorkerClient();
           tenVADClient.onResult((result: TenVADResult) => {
             if (!bufferClient) return;
-            // Write each hop probability to the inferenceVad layer
-            for (let i = 0; i < result.hopCount; i++) {
-              bufferClient.writeScalar('inferenceVad', result.probabilities[i]);
-            }
-            // Update store with latest probability for UI
+            // Batch-write hop probabilities to inferenceVad (single worker message)
             if (result.hopCount > 0) {
+              bufferClient.writeBatch('inferenceVad', result.probabilities, result.globalSampleOffset);
+
+              // Update UI at most once per frame with the latest probability
               const lastProb = result.probabilities[result.hopCount - 1];
-              const currentState = appStore.vadState();
-              appStore.setVadState({
-                ...currentState,
-                sileroProbability: lastProb,
-              });
+              scheduleSileroUpdate(lastProb);
             }
           });
           // TEN-VAD init is non-blocking; falls back gracefully if WASM fails
