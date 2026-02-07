@@ -101,6 +101,11 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
     let cachedSpecImgWidth = 0;
     let cachedSpecImgHeight = 0;
 
+    // --- Pre-allocated waveform read buffer ---
+    // Avoids allocating a new Float32Array(~128000) every animation frame.
+    // Grows only when the required size exceeds current capacity.
+    let waveformReadBuf: Float32Array | null = null;
+
     // Store spectrogram data with its time alignment
     let cachedSpecData: {
         features: Float32Array;
@@ -232,15 +237,27 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
             }
         }
 
-        // 2. Waveform (sync with current time window)
+        // 2. Waveform (sync with current time window, zero-allocation read)
         try {
             const startSample = Math.floor(startTime * sampleRate);
             const endSample = Math.floor(currentTime * sampleRate);
+            const neededLen = endSample - startSample;
 
             const baseFrame = ringBuffer.getBaseFrameOffset();
-            if (startSample >= baseFrame) {
-                const audioData = ringBuffer.read(startSample, endSample);
-                drawWaveform(ctx, audioData, width, waveHeight, waveY);
+            if (startSample >= baseFrame && neededLen > 0) {
+                // Use readInto if available (zero-alloc), fall back to read()
+                if (ringBuffer.readInto) {
+                    // Grow the pre-allocated buffer only when capacity is insufficient
+                    if (!waveformReadBuf || waveformReadBuf.length < neededLen) {
+                        waveformReadBuf = new Float32Array(neededLen);
+                    }
+                    const written = ringBuffer.readInto(startSample, endSample, waveformReadBuf);
+                    // Pass a subarray view (no copy) of the exact length
+                    drawWaveform(ctx, waveformReadBuf.subarray(0, written), width, waveHeight, waveY);
+                } else {
+                    const audioData = ringBuffer.read(startSample, endSample);
+                    drawWaveform(ctx, audioData, width, waveHeight, waveY);
+                }
             }
         } catch (e) {
             // Data likely overwritten or not available
