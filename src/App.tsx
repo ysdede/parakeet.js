@@ -1,6 +1,7 @@
 import { Component, Show, For, Switch, Match, createSignal, onMount, onCleanup, createEffect } from 'solid-js';
 import { appStore } from './stores/appStore';
 import { CompactWaveform, BufferVisualizer, ModelLoadingOverlay, Sidebar, DebugPanel, StatusBar, TranscriptionDisplay } from './components';
+import { getModelDisplayName, MODELS } from './components/ModelLoadingOverlay';
 import { AudioEngine } from './lib/audio';
 import { MelWorkerClient } from './lib/audio/MelWorkerClient';
 import { TranscriptionWorkerClient } from './lib/transcription';
@@ -98,7 +99,17 @@ function formatDuration(seconds: number): string {
   return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-const Header: Component<{ isRecording: boolean, audioLevel: number }> = (props) => {
+interface ModelOption { id: string; name: string; desc?: string }
+
+const Header: Component<{
+  isRecording: boolean;
+  audioLevel: number;
+  modelLabel: () => string;
+  models: ModelOption[];
+  selectedModelId: () => string;
+  onModelSelect: (id: string) => void;
+  isModelLoading: boolean;
+}> = (props) => {
   return (
     <header class="bg-white border-b border-slate-200 shrink-0 z-10 transition-all duration-300">
       <div class="px-8 h-20 flex items-center justify-between">
@@ -117,11 +128,17 @@ const Header: Component<{ isRecording: boolean, audioLevel: number }> = (props) 
           </div>
 
           <div class="flex items-center gap-8 border-l border-slate-100 pl-10">
-            <div class="flex flex-col">
+            <div class="flex flex-col gap-0.5">
               <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Model</span>
-              <span class="text-sm font-bold text-slate-700 capitalize">
-                {appStore.selectedModelId().split('-').slice(0, 2).join(' ')}
-              </span>
+              <select
+                class="text-sm font-bold text-slate-700 bg-transparent border border-slate-200 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-[140px]"
+                value={props.selectedModelId()}
+                onInput={(e) => props.onModelSelect((e.target as HTMLSelectElement).value)}
+                disabled={props.isModelLoading}
+              >
+                <For each={props.models}>{(m) => <option value={m.id}>{m.name}</option>}</For>
+              </select>
+              <span class="text-[10px] text-slate-500">{props.modelLabel()}</span>
             </div>
             <div class="flex flex-col">
               <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inference</span>
@@ -428,32 +445,33 @@ const App: Component = () => {
 
   const toggleRecording = async () => {
     if (isRecording()) {
-      if (energyPollInterval) {
-        clearInterval(energyPollInterval);
-        energyPollInterval = undefined;
+      try {
+        if (energyPollInterval) {
+          clearInterval(energyPollInterval);
+          energyPollInterval = undefined;
+        }
+        audioEngine?.stop();
+
+        if (segmentUnsubscribe) segmentUnsubscribe();
+        if (windowUnsubscribe) windowUnsubscribe();
+        if (melChunkUnsubscribe) melChunkUnsubscribe();
+        cleanupV4Pipeline();
+
+        if (workerClient) {
+          const final = await workerClient.finalize();
+          const text = (final as any).text || (final as any).fullText || '';
+          appStore.setTranscript(text);
+          appStore.setPendingText('');
+        }
+
+        melClient?.reset();
+        audioEngine?.reset();
+        appStore.setAudioLevel(0);
+      } catch (err) {
+        console.warn('[App] Error during stop recording:', err);
+      } finally {
+        appStore.stopRecording();
       }
-      audioEngine?.stop();
-
-      if (segmentUnsubscribe) segmentUnsubscribe();
-      if (windowUnsubscribe) windowUnsubscribe();
-      if (melChunkUnsubscribe) melChunkUnsubscribe();
-      cleanupV4Pipeline();
-
-      if (workerClient) {
-        const final = await workerClient.finalize();
-        const text = (final as any).text || (final as any).fullText || '';
-        appStore.setTranscript(text);
-        appStore.setPendingText('');
-      }
-
-      melClient?.reset();
-      // Don't nullify melClient here, just reset it, but if needed we can set null
-      // Actually we keep the instance if possible, but let's see.
-      // The current logic doesn't clear melClient variable here, only calls .reset()
-      // So signal should remain valid.
-      audioEngine?.reset();
-      appStore.setAudioLevel(0);
-      appStore.stopRecording();
     } else {
       try {
         if (!audioEngine) {
@@ -774,7 +792,7 @@ const App: Component = () => {
         isRecording={isRecording()}
         onToggleRecording={toggleRecording}
         isModelReady={isModelReady()}
-        onLoadModel={openModelSelection}
+        onLoadModel={() => loadSelectedModel()}
         modelState={appStore.modelState()}
         availableDevices={appStore.availableDevices()}
         selectedDeviceId={appStore.selectedDeviceId()}
@@ -788,7 +806,15 @@ const App: Component = () => {
       />
 
       <main class="flex-1 flex flex-col min-w-0 bg-workspace-bg overflow-hidden">
-        <Header isRecording={isRecording()} audioLevel={appStore.audioLevel()} />
+        <Header
+          isRecording={isRecording()}
+          audioLevel={appStore.audioLevel()}
+          modelLabel={() => appStore.modelState() === 'ready' ? getModelDisplayName(appStore.selectedModelId()) : 'Not loaded'}
+          models={MODELS}
+          selectedModelId={appStore.selectedModelId}
+          onModelSelect={(id) => appStore.setSelectedModelId(id)}
+          isModelLoading={appStore.modelState() === 'loading'}
+        />
 
         <div class="flex-1 overflow-y-auto relative">
           <Switch>

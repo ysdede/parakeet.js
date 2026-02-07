@@ -1,4 +1,4 @@
-import { Component, For, Show, createSignal } from 'solid-js';
+import { Component, For, Show, createEffect, createSignal, onCleanup } from 'solid-js';
 
 interface SidebarProps {
   activeTab: string;
@@ -20,15 +20,36 @@ interface SidebarProps {
 
 export const Sidebar: Component<SidebarProps> = (props) => {
   const [showDevices, setShowDevices] = createSignal(false);
+  let triggerContainerRef: HTMLDivElement | undefined;
+  let popoverRef: HTMLDivElement | undefined;
+
+  createEffect(() => {
+    if (!showDevices()) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerContainerRef?.contains(target) || popoverRef?.contains(target)) return;
+      setShowDevices(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowDevices(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    onCleanup(() => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    });
+  });
 
   return (
     <aside class="w-20 min-w-[80px] bg-neu-bg flex flex-col items-center py-6 h-full border-r border-sidebar-border/30">
-      {/* Power Button - Reflects System Readiness */}
+      {/* Power Button - Reflects System Readiness; disabled when model already loaded or loading */}
       <div class="mb-8 relative">
         <button
-          onClick={() => props.onLoadModel()}
-          class="neu-circle-btn text-slate-600 transition-all active:scale-95"
-          title={props.isModelReady ? "Model Loaded" : "Load Model"}
+          onClick={() => !props.isModelReady && props.modelState !== 'loading' && props.onLoadModel()}
+          disabled={props.isModelReady || props.modelState === 'loading'}
+          class="neu-circle-btn text-slate-600 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100"
+          title={props.modelState === 'loading' ? "Loading..." : props.isModelReady ? "Model Loaded" : "Load Model"}
         >
           <span class="material-symbols-outlined text-xl">power_settings_new</span>
           <span class={`status-led ${props.isModelReady ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-slate-300'}`}></span>
@@ -57,7 +78,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         </button>
 
         {/* Device Selection Popover Trigger */}
-        <div class="relative">
+        <div class="relative" ref={(el) => { triggerContainerRef = el; }}>
           <button
             class={`neu-square-btn transition-all active:scale-95 ${showDevices() ? 'active' : 'text-slate-500'}`}
             onClick={() => setShowDevices(!showDevices())}
@@ -68,7 +89,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
           {/* Device Selection Popover */}
           <Show when={showDevices()}>
-            <div class="absolute left-full bottom-0 ml-6 w-64 nm-flat rounded-[32px] p-4 z-50 animate-in fade-in slide-in-from-left-2 duration-200">
+            <div ref={(el) => { popoverRef = el; }} class="absolute left-full bottom-0 ml-6 w-64 nm-flat rounded-[32px] p-4 z-50 animate-in fade-in slide-in-from-left-2 duration-200">
               <div class="text-[9px] font-black text-slate-400 p-2 uppercase tracking-widest mb-2 border-b border-slate-200">Mechanical_Input</div>
               <div class="flex flex-col gap-1 max-h-64 overflow-y-auto pr-1">
                 <For each={props.availableDevices}>
