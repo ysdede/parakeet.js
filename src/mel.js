@@ -353,9 +353,10 @@ export class JsPreprocessor {
    * Used for incremental mel computation in streaming mode.
    *
    * @param {Float32Array} audio - Mono PCM [-1,1] at 16kHz
+   * @param {number} [startFrame=0] - Frame index to start computation from (0 to nFrames-1). Frames before this are left as zero.
    * @returns {{rawMel: Float32Array, nFrames: number, featuresLen: number}}
    */
-  computeRawMel(audio) {
+  computeRawMel(audio, startFrame = 0) {
     const N = audio.length;
     if (N === 0) {
       return { rawMel: new Float32Array(0), nFrames: 0, featuresLen: 0 };
@@ -394,7 +395,7 @@ export class JsPreprocessor {
     const nMels = this.nMels;
     const tw = this.twiddles;
 
-    for (let t = 0; t < nFrames; t++) {
+    for (let t = startFrame; t < nFrames; t++) {
       const offset = t * HOP_LENGTH;
       for (let k = 0; k < N_FFT; k++) {
         fftRe[k] = padded[offset + k] * window[k];
@@ -528,17 +529,24 @@ export class IncrementalMelProcessor {
 
     if (!canReuse) {
       // Full computation (no cache or cache invalid)
-      const result = this.preprocessor.process(audio);
-      // Cache raw mel for next call
       const { rawMel, nFrames, featuresLen } =
         this.preprocessor.computeRawMel(audio);
+
+      const features = this.preprocessor.normalizeFeatures(
+        rawMel,
+        nFrames,
+        featuresLen
+      );
+
+      // Cache raw mel for next call
       this._cachedRawMel = rawMel;
       this._cachedNFrames = nFrames;
       this._cachedAudioLen = N;
       this._cachedFeaturesLen = featuresLen;
 
       return {
-        ...result,
+        features,
+        length: featuresLen,
         cached: false,
         cachedFrames: 0,
         newFrames: featuresLen,
@@ -555,9 +563,9 @@ export class IncrementalMelProcessor {
       Math.min(prefixFrames - this.boundaryFrames, this._cachedFeaturesLen)
     );
 
-    // Compute full mel for this audio
+    // Compute mel for this audio, skipping the prefix we will reuse
     const { rawMel, nFrames, featuresLen } =
-      this.preprocessor.computeRawMel(audio);
+      this.preprocessor.computeRawMel(audio, safeFrames);
 
     // Replace first safeFrames with cached values (they're identical)
     if (safeFrames > 0 && this._cachedRawMel) {
