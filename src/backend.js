@@ -50,9 +50,10 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
   // Set up WASM paths first (needed for all backends)
   if (!ort.env.wasm.wasmPaths) {
     // Derive version from the ONNX Runtime environment
-    const ver = ort.env.versions?.common;
-    if (!ver) {
-      throw new Error('Parakeet.js: Unable to automatically detect onnxruntime-web version for WASM configuration. Please manually set `ort.env.wasm.wasmPaths`.');
+    const fallbackVer = '1.22.0-dev.20250409-89f8206ba4';
+    const ver = ort.env.versions?.common || fallbackVer;
+    if (!ort.env.versions?.common) {
+      console.warn('Parakeet.js: Could not auto-detect onnxruntime-web version. Using fallback version; set ort.env.wasm.wasmPaths manually for best results.');
     }
     ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ver}/dist/`;
   }

@@ -4,7 +4,11 @@
   "description": "NVIDIA Parakeet speech recognition for the browser (WebGPU/WASM) powered by ONNX Runtime Web.",
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./parakeet": "./src/parakeet.js",
+    "./hub": "./src/hub.js",
+    "./models": "./src/models.js",
+    "./mel": "./src/mel.js"
   },
   "files": [
     "src",
