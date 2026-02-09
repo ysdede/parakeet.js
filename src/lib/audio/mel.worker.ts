@@ -58,6 +58,10 @@ let melFilterbank: Float32Array;
 let hannWindow: Float64Array;
 let twiddles: { cos: Float64Array; sin: Float64Array };
 
+// Logging throttle for getFeatures (avoid console spam)
+let lastGetFeaturesLogTime = 0;
+const GET_FEATURES_LOG_INTERVAL = 5000; // Log every 5 seconds max
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Initialization
 // ═══════════════════════════════════════════════════════════════════════════
@@ -271,8 +275,13 @@ function getFeatures(startFrame: number, endFrame: number, normalize: boolean = 
     // Optionally normalize (ASR requires normalized; visualizer uses raw for fixed dB scale)
     const features = normalize ? normalizeMelFeatures(raw, nMels, T) : raw;
 
-    const elapsed = performance.now() - t0;
-    console.log(`[MelWorker] getFeatures: frames ${sf}..${ef} (${T} frames, ${(T * HOP_LENGTH / 16000).toFixed(2)}s), normalize=${normalize}, ${elapsed.toFixed(1)} ms, buf [${baseFrame}..${computedFrames})`);
+    // Throttled logging to avoid console spam (was causing noticeable CPU overhead)
+    const now = performance.now();
+    if (now - lastGetFeaturesLogTime > GET_FEATURES_LOG_INTERVAL) {
+        lastGetFeaturesLogTime = now;
+        const elapsed = now - t0;
+        console.log(`[MelWorker] getFeatures: frames ${sf}..${ef} (${T} frames, ${(T * HOP_LENGTH / 16000).toFixed(2)}s), normalize=${normalize}, ${elapsed.toFixed(1)} ms, buf [${baseFrame}..${computedFrames})`);
+    }
 
     return { features, T, melBins: nMels };
 }
