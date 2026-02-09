@@ -178,6 +178,13 @@ const model = await ParakeetModel.fromUrls({
 });
 ```
 
+If you want smaller startup in non-bundled ESM environments, import only what you need via subpath exports:
+
+```js
+import { ParakeetModel } from 'parakeet.js/parakeet';
+// or: import { fromHub } from 'parakeet.js/hub';
+```
+
 ### Quick Start: English Model (v2)
 
 ```js
@@ -283,6 +290,8 @@ const result = await model.transcribe(audio, 16000, {
 ```
 
 The cache stores decoder state at the prefix boundary. On the next call with the same `cacheKey`, frames up to `prefixSeconds` are skipped, reducing decoder time by **~80%** for typical overlap ratios.
+
+You can tune the cache size with `maxIncrementalCacheSize` (default `50`) when constructing the model. Increase it for many concurrent streams to avoid LRU evictions; in `debug` mode, evictions are logged to help with tuning.
 
 Call `model.resetIncrementalCache()` when starting a new recording session.
 

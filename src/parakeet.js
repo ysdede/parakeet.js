@@ -267,6 +267,8 @@ export class ParakeetModel {
     const totalDim = logits.dims[3];
     const data = logits.data;
 
+    // subarray(): zero-copy view into joiner output buffer.
+    // Do NOT mutate tokenLogits/durLogits without copying first (.slice()).
     const tokenLogits = data.subarray(0, vocab);
     const durLogits = data.subarray(vocab, totalDim);
 
@@ -716,6 +718,9 @@ export class ParakeetModel {
         // Enforce cache limit (LRU eviction)
         if (!this._incrementalCache.has(inc.cacheKey) && this._incrementalCache.size >= this.maxIncrementalCacheSize) {
           const oldestKey = this._incrementalCache.keys().next().value;
+          if (debug) {
+            console.log(`[Parakeet] Incremental cache full (${this.maxIncrementalCacheSize}); evicting oldest entry: ${oldestKey}`);
+          }
           this._incrementalCache.delete(oldestKey);
         }
         // Update/Insert (moves to end)
