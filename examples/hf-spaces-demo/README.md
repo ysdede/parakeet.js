@@ -27,6 +27,7 @@ This is the unified demo application for parakeet.js, optimized for **Hugging Fa
 - **WebGPU & WASM**: High-performance GPU acceleration with CPU fallback.
 - **Real-time Metrics**: Track RTF, encoding, and decoding times live.
 - **Local & Remote Testing**: Test with built-in samples or upload your own.
+- **Version Display**: Shows the active `parakeet.js` version/source and the loaded `onnxruntime-web` runtime version.
 
 ## 🛠 Development
 

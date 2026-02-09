@@ -423,6 +423,7 @@ All demos share the same modern UI with:
 - **Quick Test**: Load random samples from HuggingFace speech datasets
 - **Reference Text**: Compare transcription against ground truth
 - **Dark Mode**: Automatic theme toggle
+- **Version Display**: Shows the active `parakeet.js` version/source and the loaded `onnxruntime-web` runtime version
 
 ### Speech Dataset Utilities (Demo Only)
 
