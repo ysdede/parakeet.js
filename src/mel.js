@@ -604,10 +604,7 @@ export class IncrementalMelProcessor {
    * Clear the cache (e.g., on recording restart).
    */
   clear() {
-    this._cachedRawMel = null;
-    this._cachedNFrames = 0;
-    this._cachedAudioLen = 0;
-    this._cachedFeaturesLen = 0;
+    this.reset();
   }
 }
 
