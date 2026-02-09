@@ -23,6 +23,9 @@ export class ParakeetTokenizer {
       console.warn('[ParakeetTokenizer] Blank token <blk> not found in vocabulary, defaulting to 1024');
       this.blankId = 1024;
     }
+
+    // Pre-compute sanitized tokens (replace SentencePiece marker with space)
+    this.sanitizedTokens = this.id2token.map(t => t ? t.replace(/\u2581/g, ' ') : t);
   }
 
   static async fromUrl(tokensUrl) {
@@ -48,11 +51,10 @@ export class ParakeetTokenizer {
     // First pass: convert tokens to text with ▁ → space
     const tokens = [];
     for (const id of ids) {
-      const token = this.id2token[id];
+      if (id === this.blankId) continue;
+      const token = this.sanitizedTokens[id];
       if (token === undefined) continue;
-      if (token === this.blankToken) continue;
-      // Replace SentencePiece marker with space (matching Python vocab loading)
-      tokens.push(token.replace(/\u2581/g, ' '));
+      tokens.push(token);
     }
     
     // Join all tokens
