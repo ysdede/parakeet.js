@@ -127,6 +127,7 @@ export default function App() {
   const [verboseLog, setVerboseLog] = useState(false);
   const [frameStride, setFrameStride] = useState(1);
   const [dumpDetail, setDumpDetail] = useState(false);
+  const [enableProfiling, setEnableProfiling] = useState(true);
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -233,7 +234,8 @@ export default function App() {
       const res = await modelRef.current.transcribe(sample.pcm, 16000, {
         returnTimestamps: true,
         returnConfidences: true,
-        frameStride
+        frameStride,
+        enableProfiling
       });
       console.timeEnd('Transcribe-Sample');
 
@@ -318,7 +320,7 @@ export default function App() {
         const decoded = await audioCtx.decodeAudioData(buf);
         const pcm = decoded.getChannelData(0);
 
-        const { utterance_text } = await modelRef.current.transcribe(pcm, 16000);
+        const { utterance_text } = await modelRef.current.transcribe(pcm, 16000, { enableProfiling });
         const normalize = (str) => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
 
         if (normalize(utterance_text).includes(normalize(expectedText))) {
@@ -361,7 +363,8 @@ export default function App() {
       const res = await modelRef.current.transcribe(pcm, 16_000, {
         returnTimestamps: true,
         returnConfidences: true,
-        frameStride
+        frameStride,
+        enableProfiling
       });
       console.timeEnd(`Transcribe-${file.name}`);
 
@@ -612,6 +615,23 @@ export default function App() {
                       />
                       <label
                         htmlFor="log"
+                        className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 dark:bg-gray-700 cursor-pointer"
+                      ></label>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Enable profiling</span>
+                    <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                      <input
+                        type="checkbox"
+                        checked={enableProfiling}
+                        onChange={e => setEnableProfiling(e.target.checked)}
+                        className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 dark:border-gray-600 checked:right-0"
+                        id="profiling"
+                      />
+                      <label
+                        htmlFor="profiling"
                         className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 dark:bg-gray-700 cursor-pointer"
                       ></label>
                     </div>

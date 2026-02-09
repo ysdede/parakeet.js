@@ -239,108 +239,13 @@ export class JsPreprocessor {
    * @returns {{features: Float32Array, length: number}}
    */
   process(audio) {
-    const N = audio.length;
-    if (N === 0) {
-      return { features: new Float32Array(0), length: 0 };
-    }
-
-    // ─── 1. Pre-emphasis (in float32, matching ONNX) ──────────────────
-    // x[0] unchanged, x[n] = x[n] - 0.97 * x[n-1]
-    const preemph = new Float32Array(N);
-    preemph[0] = audio[0];
-    for (let i = 1; i < N; i++) {
-      preemph[i] = audio[i] - PREEMPH * audio[i - 1];
-    }
-
-    // ─── 2. Zero-pad: N_FFT/2 on each side ───────────────────────────
-    // Matches: op.Pad(waveforms, [0, 256, 0, 256])
-    const pad = N_FFT >> 1; // 256
-    const paddedLen = N + 2 * pad;
-    // Copy to Float64Array (matching ONNX's CastLike to float64 before STFT)
-    const padded = new Float64Array(paddedLen);
-    for (let i = 0; i < N; i++) {
-      padded[pad + i] = preemph[i]; // float32 → float64 promotion
-    }
-
-    // ─── 3. Compute frame counts ─────────────────────────────────────
-    const nFrames = Math.floor((paddedLen - N_FFT) / HOP_LENGTH) + 1;
-    const featuresLen = Math.floor(N / HOP_LENGTH); // valid frames (matches ONNX)
+    const { rawMel, nFrames, featuresLen } = this.computeRawMel(audio);
 
     if (featuresLen === 0) {
       return { features: new Float32Array(0), length: 0 };
     }
 
-    // ─── 4. STFT + Power + Mel + Log ─────────────────────────────────
-    // Output: [nMels, nFrames] row-major matching ONNX's [1, nMels, T]
-    const melFeatures = new Float32Array(this.nMels * nFrames);
-    const fftRe = this._fftRe;
-    const fftIm = this._fftIm;
-    const powerBuf = this._powerBuf;
-    const window = this.hannWindow;
-    const fb = this.melFilterbank;
-    const nMels = this.nMels;
-    const tw = this.twiddles;
-
-    for (let t = 0; t < nFrames; t++) {
-      const offset = t * HOP_LENGTH;
-
-      // a) Window the frame (float64 × float64)
-      for (let k = 0; k < N_FFT; k++) {
-        fftRe[k] = padded[offset + k] * window[k];
-        fftIm[k] = 0;
-      }
-
-      // b) 512-point FFT (float64)
-      fft(fftRe, fftIm, N_FFT, tw);
-
-      // c) Power spectrum → Float32 (matches ONNX CastLike to float32)
-      for (let k = 0; k < N_FREQ_BINS; k++) {
-        powerBuf[k] = fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k];
-      }
-
-      // d) Mel filterbank multiply + log
-      for (let m = 0; m < nMels; m++) {
-        let melVal = 0;
-        const fbOff = m * N_FREQ_BINS;
-        for (let k = 0; k < N_FREQ_BINS; k++) {
-          melVal += powerBuf[k] * fb[fbOff + k];
-        }
-        melFeatures[m * nFrames + t] = Math.log(melVal + LOG_ZERO_GUARD);
-      }
-    }
-
-    // ─── 5. Per-feature normalization (Bessel-corrected) ──────────────
-    // Matches: normalize(x, lens) in nemo.py
-    // For each mel bin: mean over valid frames, var/(N-1), then standardize
-    // Output compact [nMels, featuresLen] so features.length / length === nMels (integer)
-    const features = new Float32Array(nMels * featuresLen);
-    for (let m = 0; m < nMels; m++) {
-      const srcBase = m * nFrames;
-      const dstBase = m * featuresLen;
-
-      // Mean
-      let sum = 0;
-      for (let t = 0; t < featuresLen; t++) {
-        sum += melFeatures[srcBase + t];
-      }
-      const mean = sum / featuresLen;
-
-      // Variance with Bessel correction (N-1)
-      let varSum = 0;
-      for (let t = 0; t < featuresLen; t++) {
-        const d = melFeatures[srcBase + t] - mean;
-        varSum += d * d;
-      }
-      const invStd =
-        featuresLen > 1
-          ? 1.0 / (Math.sqrt(varSum / (featuresLen - 1)) + 1e-5)
-          : 0; // single frame → zero output (matches ONNX div-by-zero → Inf → 0)
-
-      // Normalize and copy into compact output
-      for (let t = 0; t < featuresLen; t++) {
-        features[dstBase + t] = (melFeatures[srcBase + t] - mean) * invStd;
-      }
-    }
+    const features = this.normalizeFeatures(rawMel, nFrames, featuresLen);
 
     return {
       features,
@@ -353,9 +258,10 @@ export class JsPreprocessor {
    * Used for incremental mel computation in streaming mode.
    *
    * @param {Float32Array} audio - Mono PCM [-1,1] at 16kHz
+   * @param {number} [startFrame=0] - Frame index to start computation from (0 to nFrames-1). Frames before this are left as zero.
    * @returns {{rawMel: Float32Array, nFrames: number, featuresLen: number}}
    */
-  computeRawMel(audio) {
+  computeRawMel(audio, startFrame = 0) {
     const N = audio.length;
     if (N === 0) {
       return { rawMel: new Float32Array(0), nFrames: 0, featuresLen: 0 };
@@ -394,7 +300,7 @@ export class JsPreprocessor {
     const nMels = this.nMels;
     const tw = this.twiddles;
 
-    for (let t = 0; t < nFrames; t++) {
+    for (let t = startFrame; t < nFrames; t++) {
       const offset = t * HOP_LENGTH;
       for (let k = 0; k < N_FFT; k++) {
         fftRe[k] = padded[offset + k] * window[k];
@@ -528,17 +434,24 @@ export class IncrementalMelProcessor {
 
     if (!canReuse) {
       // Full computation (no cache or cache invalid)
-      const result = this.preprocessor.process(audio);
-      // Cache raw mel for next call
       const { rawMel, nFrames, featuresLen } =
         this.preprocessor.computeRawMel(audio);
+
+      const features = this.preprocessor.normalizeFeatures(
+        rawMel,
+        nFrames,
+        featuresLen
+      );
+
+      // Cache raw mel for next call
       this._cachedRawMel = rawMel;
       this._cachedNFrames = nFrames;
       this._cachedAudioLen = N;
       this._cachedFeaturesLen = featuresLen;
 
       return {
-        ...result,
+        features,
+        length: featuresLen,
         cached: false,
         cachedFrames: 0,
         newFrames: featuresLen,
@@ -555,9 +468,9 @@ export class IncrementalMelProcessor {
       Math.min(prefixFrames - this.boundaryFrames, this._cachedFeaturesLen)
     );
 
-    // Compute full mel for this audio
+    // Compute mel for this audio, skipping the prefix we will reuse
     const { rawMel, nFrames, featuresLen } =
-      this.preprocessor.computeRawMel(audio);
+      this.preprocessor.computeRawMel(audio, safeFrames);
 
     // Replace first safeFrames with cached values (they're identical)
     if (safeFrames > 0 && this._cachedRawMel) {
@@ -596,10 +509,7 @@ export class IncrementalMelProcessor {
    * Clear the cache (e.g., on recording restart).
    */
   clear() {
-    this._cachedRawMel = null;
-    this._cachedNFrames = 0;
-    this._cachedAudioLen = 0;
-    this._cachedFeaturesLen = 0;
+    this.reset();
   }
 }
 
