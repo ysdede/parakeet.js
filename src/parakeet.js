@@ -268,8 +268,10 @@ export class ParakeetModel {
     const totalDim = logits.dims[3];
     const data = logits.data;
 
-    const tokenLogits = data.slice(0, vocab);
-    const durLogits = data.slice(vocab, totalDim);
+    // Optimization: subarray returns a view on the existing buffer (zero-copy).
+    // CAUTION: These are read-only views. Mutating them will corrupt the original logits.data buffer.
+    const tokenLogits = data.subarray(0, vocab);
+    const durLogits = data.subarray(vocab, totalDim);
 
     let step = 0;
     if (durLogits.length) {
