@@ -7,6 +7,8 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 [ONNX Runtime Web](https://onnxruntime.ai/).
 
 > **Parakeet.js** offers a high-performance, browser-first implementation for NVIDIA's Parakeet-TDT speech-to-text models, running entirely client-side via WebGPU and WASM. Powered by ONNX Runtime Web, this library makes it simple to integrate state-of-the-art transcription into any web application.
+>
+> **Performance note:** Parakeet.js is tuned for native-like performance in the browser, with real-time optimizations such as incremental caching and a custom, high-accuracy JS preprocessor.
 
 > **Status:** Stable v1.1.1 release - Production ready
 > **Supported Models:** Parakeet-TDT v2 (English) and v3 (Multilingual - 13 languages)
@@ -257,7 +259,7 @@ Extra options:
 
 ### Streaming with Pre-computed Features
 
-For streaming applications that compute mel spectrograms in a separate worker, you can bypass the internal preprocessor entirely:
+For streaming applications that compute mel spectrograms in a separate worker, you can bypass the built-in preprocessor entirely:
 
 ```js
 const result = await model.transcribe(null, 16000, {
@@ -271,7 +273,7 @@ const result = await model.transcribe(null, 16000, {
 
 When `precomputedFeatures` is provided:
 - The audio parameter can be `null` (audio is not needed)
-- The internal preprocessor (JS or ONNX) is completely skipped
+- The built-in preprocessor (JS or ONNX) is completely skipped
 - Features must be normalized (zero mean, unit variance per feature)
 - This enables **pipeline parallelism**: compute mel in one worker, run inference in another
 
@@ -533,7 +535,7 @@ npm run test:watch  # Watch mode
 ### v1.1.1 (February 2026) — Streaming Enhancements & Test Suite
 **Pre-computed features, conditional ONNX loading, and comprehensive test coverage.**
 
-- **`precomputedFeatures` option**: `transcribe()` now accepts pre-computed mel spectrograms, allowing external mel workers to feed features directly and bypass the internal preprocessor entirely.
+- **`precomputedFeatures` option**: `transcribe()` now accepts pre-computed mel spectrograms, allowing external mel workers to feed features directly and bypass the built-in preprocessor entirely.
 - **Conditional ONNX preprocessor loading**: `fromUrls()` no longer creates an ONNX preprocessor session when `preprocessorBackend: 'js'` is active. This prevents unnecessary loading of `nemo128.onnx`.
 - **Conditional `nemo128.onnx` download**: `getParakeetModel()` in `hub.js` now skips downloading `nemo128.onnx` when `preprocessorBackend: 'js'` is configured, saving ~5MB of network transfer and IndexedDB storage.
 - **Enhanced logging**: Model loading now logs the preprocessor backend selection (`JS (mel.js)` vs `ONNX`), and performance metrics include `preprocessor_backend` and `mel_cache` fields.
