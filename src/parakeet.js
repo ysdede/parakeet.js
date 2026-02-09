@@ -1390,6 +1390,7 @@ export class LCSPTFAMerger {
     // State
     this.confirmedTokens = [];
     this.pendingTokens = [];
+    this._lcsBuffer = new Int32Array(1024);
   }
 
   /**
@@ -1499,7 +1500,11 @@ export class LCSPTFAMerger {
 
     // Dynamic programming matrix
     // Using 1D array for space efficiency: LCS[j] = LCS value at column j
-    const LCS = new Array(n + 1).fill(0);
+    if (this._lcsBuffer.length < n + 1) {
+      this._lcsBuffer = new Int32Array(n + 1 + 1024);
+    }
+    const LCS = this._lcsBuffer;
+    LCS.fill(0, 0, n + 1);
 
     let maxLen = 0;
     let endX = 0;
