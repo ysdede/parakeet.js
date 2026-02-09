@@ -1,9 +1,30 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 
 // Check if we should use local source files instead of npm package
 const useLocalSource = process.env.PARAKEET_LOCAL === 'true';
+
+function readJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+const localPkg = readJson(path.resolve(__dirname, '../../package.json'));
+const npmPkg = readJson(path.resolve(__dirname, 'node_modules/parakeet.js/package.json'));
+const localVersion = localPkg?.version;
+const npmVersion = npmPkg?.version;
+
+let parakeetVersion = useLocalSource ? localVersion : npmVersion;
+let parakeetSource = useLocalSource ? 'local' : 'npm';
+if (!parakeetVersion) {
+  parakeetVersion = localVersion || 'unknown';
+  parakeetSource = localVersion ? 'local (fallback)' : 'unknown';
+}
 
 export default defineConfig({
   plugins: [react()],
@@ -25,5 +46,7 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
+    __PARAKEET_VERSION__: JSON.stringify(parakeetVersion),
+    __PARAKEET_SOURCE__: JSON.stringify(parakeetSource),
   },
 });

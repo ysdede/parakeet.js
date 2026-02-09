@@ -415,14 +415,41 @@ export default function App() {
     navigator.clipboard.writeText(text);
   }
 
+  const parakeetVersion = typeof __PARAKEET_VERSION__ !== 'undefined' ? __PARAKEET_VERSION__ : 'unknown';
+  const parakeetSource = typeof __PARAKEET_SOURCE__ !== 'undefined' ? __PARAKEET_SOURCE__ : 'unknown';
+  const [ortVersion, setOrtVersion] = useState('not loaded yet');
+
+  useEffect(() => {
+    const readOrtVersion = () => {
+      const ver = globalThis?.ort?.env?.versions?.common;
+      if (ver) {
+        setOrtVersion(ver);
+        return true;
+      }
+      return false;
+    };
+
+    if (readOrtVersion()) return undefined;
+    const timer = setInterval(() => {
+      if (readOrtVersion()) clearInterval(timer);
+    }, 500);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-200 font-sans min-h-screen p-6 md:p-10 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <header className="mb-8 flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Parakeet.js Demo
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Parakeet.js Demo
+            </h1>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <div>parakeet.js {parakeetVersion} ({parakeetSource})</div>
+              <div>onnxruntime-web {ortVersion}</div>
+            </div>
+          </div>
           <button
             className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             onClick={() => setDarkMode(!darkMode)}
