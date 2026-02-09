@@ -102,9 +102,6 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
   if (typeof globalThis !== 'undefined') {
     globalThis.ort = ort;
   }
-  if (typeof self !== 'undefined') {
-    self.ort = ort;
-  }
 
   // Return the ort module for use in creating sessions and tensors
   return ort;
