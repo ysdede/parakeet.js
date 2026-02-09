@@ -44,6 +44,13 @@ This uses the `parakeet.js` package from npm (version specified in `package.json
 - Testing after `npm publish`
 - Before deploying to production
 
+## Version Display
+
+The demo header shows the active `parakeet.js` version/source and the loaded `onnxruntime-web` runtime version.
+
+- **Local mode** (`PARAKEET_LOCAL=true`): shows the root repo version.
+- **NPM mode**: shows the version from `node_modules/parakeet.js`.
+
 ## Building
 
 ### Local Source Build
