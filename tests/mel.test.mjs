@@ -432,12 +432,17 @@ describe('IncrementalMelProcessor', () => {
     const audio = new Float32Array(16000);
     for (let i = 0; i < audio.length; i++) audio[i] = Math.sin(2 * Math.PI * 440 * i / 16000);
 
+    // Test clear()
     inc.process(audio, 0);
     inc.clear();
-
-    // After clear, second call should NOT be cached
     const r2 = inc.process(audio, 0);
     expect(r2.cached).toBe(false);
+
+    // Test reset()
+    inc.process(audio, 0);
+    inc.reset();
+    const r3 = inc.process(audio, 0);
+    expect(r3.cached).toBe(false);
   });
 });
 
