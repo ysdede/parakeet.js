@@ -284,7 +284,9 @@ const result = await model.transcribe(audio, 16000, {
 
 The cache stores decoder state at the prefix boundary. On the next call with the same `cacheKey`, frames up to `prefixSeconds` are skipped, reducing decoder time by **~80%** for typical overlap ratios.
 
-Call `model.resetIncrementalCache()` when starting a new recording session.
+The cache size is limited by `maxIncrementalCacheSize` (default: 50). When full, the oldest entry is evicted (LRU policy).
+
+Call `model.resetMelCache()` to clear the mel spectrogram cache, and `model.clearIncrementalCache()` to explicitly clear all decoder states.
 
 ### Result schema
 
@@ -342,6 +344,7 @@ if (utterance_text.toLowerCase().includes(expected)) {
 | `preprocessorBackend` | `getParakeetModel()` / `fromUrls()` | `'js'` (default) uses pure JS mel; `'onnx'` uses nemo128.onnx |
 | `frameStride` | `transcribe()` | Trade-off latency vs accuracy |
 | `precomputedFeatures` | `transcribe()` | Bypass preprocessor with external mel features |
+| `maxIncrementalCacheSize` | `fromUrls()` | Max entries in incremental decoder cache (default: 50) |
 | `enableProfiling` | `fromUrls()` | Enables ORT profiler (JSON written to `/tmp/profile_*.json`) |
 
 ---

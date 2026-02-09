@@ -73,6 +73,7 @@ export class ParakeetModel {
    * @param {('webgpu'|'wasm')} [cfg.backend='webgpu']
    * @param {('onnx'|'js')} [cfg.preprocessorBackend='js'] Preprocessor backend: 'js' (default) uses pure JS mel computation (faster, no ONNX overhead, enables incremental streaming), 'onnx' uses nemo*.onnx via WASM
    * @param {number} [cfg.nMels] Number of mel bins (auto-detected from model config, or 128)
+   * @param {number} [cfg.maxIncrementalCacheSize=50] Maximum number of entries in the incremental decoder cache
    */
   static async fromUrls(cfg) {
     const {
@@ -93,6 +94,7 @@ export class ParakeetModel {
       cpuThreads = undefined,
       preprocessorBackend = 'js',
       nMels,
+      maxIncrementalCacheSize = 50,
     } = cfg;
 
     const useJsPreprocessor = preprocessorBackend === 'js';
@@ -241,6 +243,7 @@ export class ParakeetModel {
       tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling, windowStride,
       onnxPreprocessor: onnxPreprocessor !== preprocessor ? onnxPreprocessor : null,
       nMels: detectedMels,
+      maxIncrementalCacheSize,
     });
   }
 
@@ -718,6 +721,7 @@ export class ParakeetModel {
         if (!this._incrementalCache.has(inc.cacheKey) && this._incrementalCache.size >= this.maxIncrementalCacheSize) {
           const oldestKey = this._incrementalCache.keys().next().value;
           this._incrementalCache.delete(oldestKey);
+          if (debug) console.warn(`[Parakeet] Incremental cache full (${this.maxIncrementalCacheSize}). Evicting oldest key:`, oldestKey);
         }
         // Update/Insert (moves to end)
         if (this._incrementalCache.has(inc.cacheKey)) {
