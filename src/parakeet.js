@@ -466,7 +466,7 @@ export class ParakeetModel {
       returnConfidences = false,
       temperature = 1.0, // Greedy decoding (1.0) is better for ASR than sampling (1.2)
       debug = false,
-      enableProfiling = false,
+      enableProfiling = true,
       skipCMVN = false,
       frameStride = 1,
       // NEW: Streaming options
@@ -484,7 +484,7 @@ export class ParakeetModel {
       precomputedFeatures = null,    // { features: Float32Array, T: number, melBins: number }
     } = opts;
 
-    const perfEnabled = debug || enableProfiling; // collect and log timings
+    const perfEnabled = debug || enableProfiling; // collect timings & populate result.metrics (default: true for backward compat)
     let t0, tPreproc = 0, tEncode = 0, tDecode = 0, tToken = 0;
     if (perfEnabled) t0 = performance.now();
 

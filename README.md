@@ -251,6 +251,7 @@ Extra options:
 |--------|---------|-------------|
 | `temperature` | 1.0 | Softmax temperature for decoding (1.0 = greedy, >1.0 = sampling) |
 | `frameStride` | 1 | Advance decoder by *n* encoder frames per step |
+| `enableProfiling` | true | Collect timing metrics and populate `result.metrics`. Set to `false` to disable. |
 | `returnLogProbs` | false | Return per-token log probabilities |
 | `timeOffset` | 0 | Time offset (seconds) to add to all timestamps |
 | `prefixSamples` | 0 | Number of overlapping prefix samples for incremental mel caching |
@@ -295,7 +296,7 @@ The cache stores decoder state at the prefix boundary. On the next call with the
 
 You can tune the cache size with `maxIncrementalCacheSize` (default `50`) when constructing the model. Increase it for many concurrent streams to avoid LRU evictions; in `debug` mode, evictions are logged to help with tuning.
 
-Call `model.resetIncrementalCache()` when starting a new recording session.
+Call `model.clearIncrementalCache()` when starting a new recording session.
 
 ### Result schema
 
@@ -353,7 +354,8 @@ if (utterance_text.toLowerCase().includes(expected)) {
 | `preprocessorBackend` | `getParakeetModel()` / `fromUrls()` | `'js'` (default) uses pure JS mel; `'onnx'` uses nemo128.onnx |
 | `frameStride` | `transcribe()` | Trade-off latency vs accuracy |
 | `precomputedFeatures` | `transcribe()` | Bypass preprocessor with external mel features |
-| `enableProfiling` | `fromUrls()` | Enables ORT profiler (JSON written to `/tmp/profile_*.json`) |
+| `enableProfiling` | `transcribe()` | Populates `result.metrics` with timing data (default `true`). Set `false` to skip metric collection. |
+| `enableProfiling` | `fromUrls()` | Enables ORT session profiler (JSON written to `/tmp/profile_*.json`; default `false`) |
 
 ---
 
