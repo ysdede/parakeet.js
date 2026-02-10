@@ -28,7 +28,7 @@ const MIN_DB = -11.0; // Black: noise floor / silence
 const MAX_DB = 0.0;   // Red: loudest speech peaks
 const DB_RANGE = MAX_DB - MIN_DB; // 11.0
 
-// Pre-computed 256-entry RGB lookup table for GoldWave-style colormap.
+// Pre-computed 256-entry RGB lookup table for mel heatmap (black to red).
 // Built once at module load; indexed by Math.round(intensity * 255).
 // Colormap: black -> blue -> purple -> green -> yellow -> orange -> red.
 const COLORMAP_LUT = (() => {
