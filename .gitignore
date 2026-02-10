@@ -61,3 +61,4 @@ metrics/*.json
 docs/
 legacy/
 public/models/
+performance-trace.json.gz

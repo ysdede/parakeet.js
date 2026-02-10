@@ -58,6 +58,10 @@ let melFilterbank: Float32Array;
 let hannWindow: Float64Array;
 let twiddles: { cos: Float64Array; sin: Float64Array };
 
+// Logging throttle for getFeatures (avoid console spam)
+let lastGetFeaturesLogTime = 0;
+const GET_FEATURES_LOG_INTERVAL = 5000; // Log every 5 seconds max
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Initialization
 // ═══════════════════════════════════════════════════════════════════════════
@@ -219,7 +223,23 @@ function compactPreemphBuffer() {
 // Feature Extraction (normalize a requested range)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function getFeatures(startFrame: number, endFrame: number): {
+/**
+ * Extract mel features for a frame range.
+ * 
+ * @param startFrame - Start frame index
+ * @param endFrame - End frame index (exclusive)
+ * @param normalize - If true (default), apply per-feature mean/variance normalization
+ *   (required for ASR). If false, return raw log-mel values (for visualization with
+ *   fixed dB scaling to avoid "gain hunting" during silence).
+ * 
+ * PERFORMANCE NOTE (2026-02-09): When normalize=false, the caller (e.g. visualizer)
+ * still incurs the cost of extracting frames from the circular buffer. If visualization
+ * performance becomes an issue, consider:
+ * 1. Reducing visualizer update frequency
+ * 2. Caching/reusing extracted frames between draws
+ * 3. Downsampling the spectrogram (skip frames for display)
+ */
+function getFeatures(startFrame: number, endFrame: number, normalize: boolean = true): {
     features: Float32Array;
     T: number;
     melBins: number;
@@ -252,11 +272,16 @@ function getFeatures(startFrame: number, endFrame: number): {
         }
     }
 
-    // Normalize
-    const features = normalizeMelFeatures(raw, nMels, T);
+    // Optionally normalize (ASR requires normalized; visualizer uses raw for fixed dB scale)
+    const features = normalize ? normalizeMelFeatures(raw, nMels, T) : raw;
 
-    const elapsed = performance.now() - t0;
-    console.log(`[MelWorker] getFeatures: frames ${sf}..${ef} (${T} frames, ${(T * HOP_LENGTH / 16000).toFixed(2)}s), normalize ${elapsed.toFixed(1)} ms, buf [${baseFrame}..${computedFrames})`);
+    // Throttled logging to avoid console spam (was causing noticeable CPU overhead)
+    const now = performance.now();
+    if (now - lastGetFeaturesLogTime > GET_FEATURES_LOG_INTERVAL) {
+        lastGetFeaturesLogTime = now;
+        const elapsed = now - t0;
+        console.log(`[MelWorker] getFeatures: frames ${sf}..${ef} (${T} frames, ${(T * HOP_LENGTH / 16000).toFixed(2)}s), normalize=${normalize}, ${elapsed.toFixed(1)} ms, buf [${baseFrame}..${computedFrames})`);
+    }
 
     return { features, T, melBins: nMels };
 }
@@ -297,10 +322,10 @@ self.onmessage = (e: MessageEvent) => {
             }
 
             case 'GET_FEATURES': {
-                const { startSample, endSample } = payload;
+                const { startSample, endSample, normalize = true } = payload;
                 const startFrame = sampleToFrame(startSample);
                 const endFrame = sampleToFrame(endSample);
-                const result = getFeatures(startFrame, endFrame);
+                const result = getFeatures(startFrame, endFrame, normalize);
 
                 if (result) {
                     // Transfer the features buffer for zero-copy

@@ -6,7 +6,7 @@ This file records high-level decisions and recent work for multi-agent context. 
 
 ## Branch and recent commits (refactor/streaming-merger)
 
-- **Mel spectrogram**: GoldWave-style heatmap colormap (black -> blue -> purple -> green -> yellow -> orange -> red). High energy speech in yellow/orange/red. Data: same mel features from MelWorkerClient; intensity from `(val + 2) / 4`.
+- **Mel spectrogram**: Heatmap colormap (black -> blue -> purple -> green -> yellow -> orange -> red). High energy speech in yellow/orange/red. Data: same mel features from MelWorkerClient; intensity from `(val + 2) / 4`.
 - **Waveform**: Fixed vertical scale with constant gain (`WAVEFORM_GAIN = 4`) and clamp to strip bounds to avoid amplitude "jumps" that occurred when scaling to per-buffer min/max.
 - **TenVAD**: New TEN-VAD Web Worker (`tenvad.worker.ts`) and main-thread client (`TenVADWorkerClient`). WASM in `public/wasm/` (ten_vad.js, ten_vad.wasm). Init/dispose, fire-and-forget process(), onResult callback. Tests use invalid WASM URL for init-failure and 15s timeout.
 - **BufferWorker**: Centralized multi-layer buffer in a Web Worker (`buffer.worker.ts`, `BufferWorkerClient`). Layers: audio, mel, energyVad, inferenceVad; time-aligned by global sample index. Fire-and-forget writes; promise-based reads (hasSpeech, getSilenceTail, queryRange, getState). Types in `src/lib/buffer/types.ts`.
@@ -32,7 +32,7 @@ This file records high-level decisions and recent work for multi-agent context. 
 **Serena summary (paste into mcp_serena_write_memory):**
 
 ```
-boncukjs (refactor/streaming-merger): Real-time STT in browser (SolidJS, Parakeet.js). Mel spectrogram uses GoldWave-style heatmap (black to red). Waveform uses fixed gain 4 and clamp to avoid jumps. TenVAD: worker + TenVADWorkerClient + public/wasm. BufferWorker: multi-layer (audio, mel, energyVad, inferenceVad), BufferWorkerClient, fire-and-forget writes, promise reads. Debug panel: LayeredBufferVisualizer (melClient, 8s), auto-scroll finalized sentences, stable VAD/Silero/SNR UI. Vitest pool: forks. Workers: mel, transcription, buffer, tenvad; main thread coordinates.
+boncukjs (refactor/streaming-merger): Real-time STT in browser (SolidJS, Parakeet.js). Mel spectrogram uses black-to-red heatmap. Waveform uses fixed gain 4 and clamp to avoid jumps. TenVAD: worker + TenVADWorkerClient + public/wasm. BufferWorker: multi-layer (audio, mel, energyVad, inferenceVad), BufferWorkerClient, fire-and-forget writes, promise reads. Debug panel: LayeredBufferVisualizer (melClient, 8s), auto-scroll finalized sentences, stable VAD/Silero/SNR UI. Vitest pool: forks. Workers: mel, transcription, buffer, tenvad; main thread coordinates.
 ```
 
 Last updated: 2026-02-07 (after refactor/streaming-merger commits: TenVAD, BufferWorker, Debug panel, mel heatmap, waveform scaling, test config, WindowBuilder comment).

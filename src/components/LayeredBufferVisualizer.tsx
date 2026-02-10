@@ -12,7 +12,23 @@ interface LayeredBufferVisualizerProps {
 
 const MEL_BINS = 128; // Standard for this app
 
-// Pre-computed 256-entry RGB lookup table for GoldWave-style colormap.
+// ═══════════════════════════════════════════════════════════════════════════
+// Fixed dB scaling for spectrogram visualization (2026-02-09)
+// ═══════════════════════════════════════════════════════════════════════════
+// Raw log-mel features (unnormalized) have typical range:
+//   - Silence: ~-11 to -8 (log of the zero guard + quiet noise)
+//   - Speech:  ~-4 to 0 (energetic speech peaks near 0)
+//
+// Using fixed scaling avoids "gain hunting" where per-window normalization
+// causes silence to stretch to full brightness (GitHub issue #89).
+//
+// To tune: set MAX_DB higher if clipping occurs on loud speech;
+// set MIN_DB lower if you want more contrast in quiet passages.
+const MIN_DB = -11.0; // Black: noise floor / silence
+const MAX_DB = 0.0;   // Red: loudest speech peaks
+const DB_RANGE = MAX_DB - MIN_DB; // 11.0
+
+// Pre-computed 256-entry RGB lookup table for mel heatmap (black to red).
 // Built once at module load; indexed by Math.round(intensity * 255).
 // Colormap: black -> blue -> purple -> green -> yellow -> orange -> red.
 const COLORMAP_LUT = (() => {
@@ -217,7 +233,9 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
                 const fetchStartSample = Math.round(startTime * sampleRate);
                 const fetchEndSample = Math.round(currentTime * sampleRate);
 
-                props.melClient.getFeatures(fetchStartSample, fetchEndSample).then(features => {
+                // Request RAW (unnormalized) features for fixed dB scaling.
+                // ASR transcription still uses normalized features (default).
+                props.melClient.getFeatures(fetchStartSample, fetchEndSample, false).then(features => {
                     if (features && specCtx && specCanvas) {
                         // Store with time alignment info
                         cachedSpecData = {
@@ -316,9 +334,12 @@ export const LayeredBufferVisualizer: Component<LayeredBufferVisualizerProps> = 
 
                 const val = features[m * timeSteps + t];
 
-                // Normalize: NeMo features are mean 0, std 1. Map -2..2 -> 0..1.
-                // Clamp and convert to 0-255 LUT index in one step.
-                const lutIdx = Math.max(0, Math.min(255, ((val + 2.0) * 63.75) | 0));
+                // Fixed dB scaling: map MIN_DB..MAX_DB to 0..1, then to LUT index.
+                // Raw log-mel values are in range ~-11 (silence) to ~0 (loud speech).
+                // This avoids "gain hunting" where silence is stretched to full brightness.
+                const normalized = (val - MIN_DB) / DB_RANGE;
+                const clamped = Math.max(0, Math.min(1, normalized));
+                const lutIdx = (clamped * 255) | 0;
                 const lutBase = lutIdx * 3;
 
                 const idx = (y * width + x) * 4;
