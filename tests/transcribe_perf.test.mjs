@@ -44,8 +44,14 @@ describe('ParakeetModel.transcribe performance logging', () => {
     nMels: 128,
   });
 
-  it('should NOT return metrics by default (metrics should be null)', async () => {
+  it('should return metrics by default (enableProfiling defaults to true for backward compat)', async () => {
     const result = await model.transcribe(new Float32Array(16000), 16000, {});
+    expect(result.metrics).not.toBeNull();
+    expect(result.metrics).toHaveProperty('total_ms');
+  });
+
+  it('should NOT return metrics when enableProfiling is explicitly false', async () => {
+    const result = await model.transcribe(new Float32Array(16000), 16000, { enableProfiling: false });
     expect(result.metrics).toBeNull();
   });
 
