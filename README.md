@@ -10,8 +10,32 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 >
 > **Performance note:** Parakeet.js is tuned for native-like performance in the browser, with real-time optimizations such as incremental caching and a custom, high-accuracy JS preprocessor.
 
-> **Status:** Stable v1.1.1 release - Production ready
+> **Status:** Stable v1.2.0 release - Production ready
 > **Supported Models:** Parakeet-TDT v2 (English) and v3 (Multilingual - 13 languages)
+
+---
+
+## What's New in v1.2.0 (Stateful Streaming & PTFA Merging)
+
+### Stateful Streaming API
+- **New `StatefulStreamingTranscriber` class**: Provides a high-level API for processing sequential audio chunks without needing complex merging logic.
+- Maintains decoder state between chunks for seamless, high-quality continuation.
+- Zero redundant audio processing (no overlapping windows needed).
+
+### Advanced Transcription Merging
+- **`LCSPTFAMerger`**: Hybrid algorithm combining Longest Common Subsequence (NeMo-style) with Probabilistic Token-Frame Alignment.
+- **`FrameAlignedMerger`**: Precise token-level merging using frame indices and stability checks.
+- Ideal for low-latency streaming where overlapping transcriptions must be unified.
+
+### Improved Developer Experience
+- **Static Import Refactoring**: Switched to static top-level imports in `src/index.js` for better bundler compatibility and IDE support.
+- **Subpath Exports**: Import only what you need (e.g., `parakeet.js/parakeet`, `parakeet.js/hub`) for smaller bundle footprints.
+- **Enhanced Demo**: Version display for both the library and ORT-web, plus real-time profiling toggles.
+
+### Performance & Stability
+- **Array Slicing Optimization**: Replaced `slice()` with `subarray()` in the decoding loop (~22x faster for logit extraction).
+- **LRU Cache Eviction**: Added `maxIncrementalCacheSize` to prevent unbounded memory growth during long sessions.
+- **Dynamic ORT Versioning**: Automatically derives the CDN URL for WASM binaries from the active runtime version.
 
 ---
 
@@ -533,6 +557,19 @@ npm run test:watch  # Watch mode
 ---
 
 ## Changelog
+
+### v1.2.0 (February 2026) — Stateful Streaming & PTFA Merging
+**High-level streaming API, advanced transcription merging, and performance optimizations.**
+
+- **`StatefulStreamingTranscriber`**: New high-level API for processing sequential audio chunks while maintaining decoder state automatically.
+- **`LCSPTFAMerger`**: Hybrid merging algorithm using Longest Common Subsequence and Probabilistic Token-Frame Alignment for high-accuracy streaming.
+- **`FrameAlignedMerger`**: Token-level merging utility using encoder frame indices and stability thresholds.
+- **Static Import Refactor**: `src/index.js` now uses static top-level imports for better bundler compatibility and IDE intellisense.
+- **Subpath Exports**: Added support for importing specific modules (e.g., `parakeet.js/parakeet`) to reduce bundle size.
+- **Array Slicing Optimization**: Replaced `slice()` with `subarray()` in the hot decoding loop, achieving a ~22x speedup for logit extraction.
+- **Incremental Cache LRU**: Added `maxIncrementalCacheSize` (default 50) and LRU eviction to `ParakeetModel` to prevent memory growth during long sessions.
+- **Dynamic ORT Versioning**: The library now automatically derives the `onnxruntime-web` version from the environment to set up WASM CDN paths.
+- **Demo Enhancements**: Added version display for the library and runtime, plus a profiling toggle for performance analysis.
 
 ### v1.1.1 (February 2026) — Streaming Enhancements & Test Suite
 **Pre-computed features, conditional ONNX loading, and comprehensive test coverage.**
