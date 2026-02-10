@@ -9,6 +9,7 @@ describe('ParakeetModel Incremental Cache', () => {
         this.data = data;
         this.dims = dims;
       }
+      dispose() {}
     }
   };
 

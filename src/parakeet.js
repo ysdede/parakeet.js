@@ -283,7 +283,7 @@ export class ParakeetModel {
       state2: out['output_states_2'] || state2,
     };
 
-    return { tokenLogits, step, newState };
+    return { tokenLogits, step, newState, _logitsTensor: logits };
   }
 
   _snapshotDecoderState(state) {
@@ -392,6 +392,24 @@ export class ParakeetModel {
    */
   clearIncrementalCache() {
     this._incrementalCache.clear();
+  }
+
+  /**
+   * Dispose ORT tensors inside a decoder state object.
+   * Safely skips null states, pre-allocated initial states, and tensors
+   * shared with a `keepState` (to avoid double-dispose when the joiner
+   * falls back to reusing its input state).
+   * @param {object|null} state  - The state whose tensors should be freed.
+   * @param {object|null} [keepState] - A state whose tensors must NOT be freed.
+   */
+  _disposeDecoderState(state, keepState = null) {
+    if (!state) return;
+    if (state.state1 && state.state1 !== this._combState1 && state.state1 !== keepState?.state1) {
+      state.state1.dispose?.();
+    }
+    if (state.state2 && state.state2 !== this._combState2 && state.state2 !== keepState?.state2) {
+      state.state2.dispose?.();
+    }
   }
 
   /**
@@ -548,6 +566,10 @@ export class ParakeetModel {
       enc = encOut['outputs'] ?? Object.values(encOut)[0];
     }
 
+    // Dispose per-call input tensors (data is now in encOut; inputs no longer needed)
+    input.dispose?.();
+    lenTensor.dispose?.();
+
     // Transpose encoder output [B, D, T] ➔ [T, D] for B=1
     const [, D, Tenc] = enc.dims;
 
@@ -576,6 +598,9 @@ export class ParakeetModel {
       console.warn('[Parakeet] Unexpected encoder output format:', enc.dims);
       transposed = new Float32Array(enc.data);
     }
+
+    // Dispose encoder output tensor (data fully copied into transposed Float32Array)
+    enc.dispose?.();
 
     // Pre-allocate encoder frame buffer for reuse
     if (!this._encoderFrameBuffer || this._encoderFrameBuffer.length !== D) {
@@ -640,7 +665,7 @@ export class ParakeetModel {
       // const encTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
 
       const prevTok = ids.length ? ids[ids.length - 1] : this.blankId;
-      const { tokenLogits, step, newState } = await this._runCombinedStep(this._encoderFrameTensor, prevTok, decoderState);
+      const { tokenLogits, step, newState, _logitsTensor } = await this._runCombinedStep(this._encoderFrameTensor, prevTok, decoderState);
       // NOTE: State update moved below - only update on non-blank token (matching Python reference)
 
       // Temperature scaling & argmax
@@ -669,9 +694,13 @@ export class ParakeetModel {
         }
       }
 
+      // Dispose the joiner logits tensor (tokenLogits subarray has been fully consumed)
+      _logitsTensor?.dispose?.();
+
       if (maxId !== this.blankId) {
         // CRITICAL FIX: Only update decoder state on non-blank token emission
         // This matches the Python reference in onnx-asr/src/onnx_asr/asr.py line 212
+        this._disposeDecoderState(decoderState, newState); // free old state tensors
         decoderState = newState;
         ids.push(maxId);
 
@@ -693,6 +722,9 @@ export class ParakeetModel {
         }
         if (returnConfidences) tokenConfs.push(confVal);
         emittedTokens += 1;
+      } else {
+        // Blank token: newState is unused, free its tensors (keep current decoderState)
+        this._disposeDecoderState(newState, decoderState);
       }
 
       // Frame advancement logic matching onnx-asr exactly:
@@ -783,6 +815,9 @@ export class ParakeetModel {
       if (returnTdtSteps) {
         result.tdtSteps = tokenTdtSteps.slice();
       }
+
+      // Dispose final decoder state tensors (snapshots already copied the data)
+      this._disposeDecoderState(decoderState);
 
       return result;
     }
@@ -886,6 +921,9 @@ export class ParakeetModel {
     if (returnTdtSteps) {
       result.tdtSteps = tokenTdtSteps.slice();
     }
+
+    // Dispose final decoder state tensors (snapshots already copied the data)
+    this._disposeDecoderState(decoderState);
 
     return result;
   }
