@@ -29,6 +29,7 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
   let parentRef: HTMLDivElement | undefined;
 
   // State
+  const [isDarkSignal, setIsDarkSignal] = createSignal(false);
   const [canvasWidth, setCanvasWidth] = createSignal(0);
   const [waveformData, setWaveformData] = createSignal<Float32Array>(new Float32Array(0));
   const [metrics, setMetrics] = createSignal<AudioMetrics>({
@@ -51,6 +52,9 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
 
   let animationFrameId: number | undefined;
   let resizeObserver: ResizeObserver | null = null;
+  let needsRedraw = true;
+  let lastDrawTime = 0;
+  const DRAW_INTERVAL_MS = 33;
 
   // Draw function
   const draw = () => {
@@ -65,8 +69,8 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     // Clear canvas
     ctx.clearRect(0, 0, width, canvasHeight);
 
-    // Optimized theme detection (no getComputedStyle in loop)
-    const isDarkMode = document.documentElement.classList.contains('dark');
+    // Optimized theme detection (using signal instead of DOM access)
+    const isDarkMode = isDarkSignal();
 
     // Colors (Mechanical Etched Palette) - Cached values
     const bgColor = isDarkMode ? '#1e293b' : '#f1f5f9';
@@ -384,7 +388,12 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     }
 
     if (visible()) {
-      draw();
+      const now = performance.now();
+      if (needsRedraw && now - lastDrawTime >= DRAW_INTERVAL_MS) {
+        lastDrawTime = now;
+        needsRedraw = false;
+        draw();
+      }
       animationFrameId = requestAnimationFrame(drawLoop);
     } else {
       // When not visible, check less frequently to save CPU
@@ -404,6 +413,7 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
         // Refetch visualization data for new width
         if (props.audioEngine && visible()) {
           setWaveformData(props.audioEngine.getVisualizationData(newWidth));
+          needsRedraw = true;
           // Note: can't update bufferEndTime here easily without calling another method on engine,
           // but next update loop will catch it.
         }
@@ -430,6 +440,7 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
 
           // Fetch segments for visualization
           setSegments(engine.getSegmentsForVisualization());
+          needsRedraw = true;
         } else {
           // Still update metrics even when not visible
           setMetrics(newMetrics);
@@ -440,10 +451,29 @@ export const BufferVisualizer: Component<BufferVisualizerProps> = (props) => {
     }
   });
 
+  // Mark for redraw when visibility toggles
+  createEffect(() => {
+    if (visible()) {
+      needsRedraw = true;
+    }
+  });
+
   onMount(() => {
     if (canvasRef) {
       ctx = canvasRef.getContext('2d');
     }
+
+    // Setup dark mode observer
+    setIsDarkSignal(document.documentElement.classList.contains('dark'));
+    const themeObserver = new MutationObserver(() => {
+      setIsDarkSignal(document.documentElement.classList.contains('dark'));
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    onCleanup(() => themeObserver.disconnect());
 
     // Setup resize observer
     handleResize();

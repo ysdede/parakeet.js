@@ -74,7 +74,6 @@ export class TokenStreamTranscriber {
     private _callbacks: TokenStreamCallbacks;
 
     // State
-    private _audioBuffer: Float32Array[] = [];
     private _currentTimestamp: number = 0;
     private _chunkCount: number = 0;
     private _isProcessing: boolean = false;
@@ -472,7 +471,6 @@ export class TokenStreamTranscriber {
         if (model?.resetMelCache) {
             model.resetMelCache();
         }
-        this._audioBuffer = [];
         this._currentTimestamp = 0;
         this._chunkCount = 0;
         this._isProcessing = false;

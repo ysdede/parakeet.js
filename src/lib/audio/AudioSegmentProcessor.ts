@@ -63,7 +63,6 @@ interface ProcessorState {
     noiseFloor: number;
     recentEnergies: number[];
     silenceDuration: number;
-    energyTrends: number[];
 }
 
 /** Segment output */
@@ -530,8 +529,7 @@ export class AudioSegmentProcessor {
             segmentCounter: 0,
             noiseFloor: 0.005,
             recentEnergies: [],
-            silenceDuration: 0,
-            energyTrends: []
+            silenceDuration: 0
         };
     }
 

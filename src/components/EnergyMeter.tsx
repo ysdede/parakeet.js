@@ -1,4 +1,4 @@
-import { Component, createSignal, onCleanup, onMount } from 'solid-js';
+import { Component, createSignal, createEffect, onCleanup } from 'solid-js';
 import { AudioEngine } from '../lib/audio/types';
 import { appStore } from '../stores/appStore';
 
@@ -11,26 +11,27 @@ export const EnergyMeter: Component<EnergyMeterProps> = (props) => {
     const [metrics, setMetrics] = createSignal({ noiseFloor: 0, snr: 0, threshold: 0.02, snrThreshold: 3.0 });
     const [isSpeaking, setIsSpeaking] = createSignal(false);
 
-    let animId: number;
-
-    const update = () => {
-        if (!props.audioEngine) return;
-
-        const currentE = props.audioEngine.getCurrentEnergy();
-        const currentM = props.audioEngine.getSignalMetrics();
+    const updateFromEngine = (engine: AudioEngine) => {
+        const currentE = engine.getCurrentEnergy();
+        const currentM = engine.getSignalMetrics();
 
         setEnergy(currentE);
         setMetrics(currentM);
         // Check if speaking based on SNR threshold (matching VAD logic)
         setIsSpeaking(currentM.snr > currentM.snrThreshold || currentE > currentM.threshold);
-        animId = requestAnimationFrame(update);
     };
 
-    onMount(() => {
-        animId = requestAnimationFrame(update);
-    });
+    createEffect(() => {
+        const engine = props.audioEngine;
+        if (!engine) return;
 
-    onCleanup(() => cancelAnimationFrame(animId));
+        updateFromEngine(engine);
+        const unsubscribe = engine.onVisualizationUpdate(() => {
+            updateFromEngine(engine);
+        });
+
+        onCleanup(() => unsubscribe());
+    });
 
     // Logarithmic scaling for better visualization
     const toPercent = (val: number) => {

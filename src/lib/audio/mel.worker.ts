@@ -33,16 +33,20 @@ const { N_FFT, HOP_LENGTH, N_FREQ_BINS, PREEMPH, LOG_ZERO_GUARD } = MEL_CONSTANT
 
 let nMels = 128;
 
-// Pre-emphasized audio buffer (grows as audio arrives)
+// Pre-emphasized audio buffer (compacted after each pushAudio to stay bounded).
+// Only retains samples needed for the next mel frame's FFT window.
 let preemphBuffer = new Float32Array(0);
-let preemphLen = 0;
+let preemphBaseIdx = 0;  // Global sample index corresponding to preemphBuffer[0]
+let preemphLen = 0;      // Number of valid samples currently in preemphBuffer
 let lastRawSample = 0;
 let totalSamples = 0;
 
-// Raw mel frame buffer: [nMels * maxFrames], mel-major layout
+// Raw mel frame buffer: fixed-size circular, mel-major layout [nMels * maxFrames].
+// For mel bin m at frame t: rawMelBuffer[m * maxFrames + (t % maxFrames)].
 let rawMelBuffer: Float32Array | null = null;
 let maxFrames = 0;
-let computedFrames = 0;
+let computedFrames = 0;  // Monotonic: total frames computed (next frame index)
+let baseFrame = 0;       // Oldest frame still available in the circular buffer
 
 // Pre-allocated FFT buffers (reused per frame)
 let fftRe: Float64Array;
@@ -53,6 +57,10 @@ let powerBuf: Float32Array;
 let melFilterbank: Float32Array;
 let hannWindow: Float64Array;
 let twiddles: { cos: Float64Array; sin: Float64Array };
+
+// Logging throttle for getFeatures (avoid console spam)
+let lastGetFeaturesLogTime = 0;
+const GET_FEATURES_LOG_INTERVAL = 5000; // Log every 5 seconds max
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Initialization
@@ -72,18 +80,24 @@ function init(config: { nMels?: number }) {
     fftIm = new Float64Array(N_FFT);
     powerBuf = new Float32Array(N_FREQ_BINS);
 
-    // Pre-allocate raw mel buffer for ~120 seconds (12000 frames at 100 fps)
+    // Fixed-size circular mel buffer for ~120 seconds (12000 frames at 100 fps).
+    // Old frames are silently overwritten; no reallocation ever occurs.
     maxFrames = 12000;
     rawMelBuffer = new Float32Array(nMels * maxFrames);
     computedFrames = 0;
+    baseFrame = 0;
 
-    // Reset audio state
-    preemphBuffer = new Float32Array(16000 * 120); // Pre-allocate for 120s
+    // Pre-emphasized audio buffer: only needs to hold the FFT overlap window
+    // plus one incoming chunk. Compacted after each pushAudio call so it
+    // stays bounded to roughly N_FFT + chunk_size samples.
+    preemphBuffer = new Float32Array(N_FFT + 16000); // N_FFT overlap + up to 1s chunk
+    preemphBaseIdx = 0;
     preemphLen = 0;
     lastRawSample = 0;
     totalSamples = 0;
 
-    console.log(`[MelWorker] Initialized: nMels=${nMels}, maxFrames=${maxFrames}, prealloc=${(preemphBuffer.length / 16000).toFixed(0)}s audio, ${(nMels * maxFrames * 4 / 1024 / 1024).toFixed(1)}MB mel buffer, init ${(performance.now() - t0).toFixed(1)} ms`);
+    const melBufMB = (nMels * maxFrames * 4 / 1024 / 1024).toFixed(1);
+    console.log(`[MelWorker] Initialized: nMels=${nMels}, maxFrames=${maxFrames} (circular), ${melBufMB}MB mel buffer, preemph=${preemphBuffer.length} samples, init ${(performance.now() - t0).toFixed(1)} ms`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -98,8 +112,8 @@ function pushAudio(chunk: Float32Array) {
 
     const t0 = performance.now();
 
-    // 1. Pre-emphasize the new chunk incrementally
-    // Grow preemph buffer if needed
+    // 1. Pre-emphasize the new chunk incrementally.
+    //    Grow preemph buffer if needed (safety net; compaction below keeps it small).
     if (preemphLen + chunkLen > preemphBuffer.length) {
         const newSize = Math.max(preemphBuffer.length * 2, preemphLen + chunkLen);
         const newBuf = new Float32Array(newSize);
@@ -118,32 +132,24 @@ function pushAudio(chunk: Float32Array) {
 
     // 2. Compute new valid frames
     const newTotalFrames = Math.floor(totalSamples / HOP_LENGTH);
-    if (newTotalFrames <= computedFrames) return;
-
-    // Grow raw mel buffer if needed
-    if (newTotalFrames > maxFrames) {
-        const newMaxFrames = Math.max(maxFrames * 2, newTotalFrames + 1000);
-        const newMelBuf = new Float32Array(nMels * newMaxFrames);
-        // Copy existing data (mel-major layout)
-        for (let m = 0; m < nMels; m++) {
-            const srcOff = m * maxFrames;
-            const dstOff = m * newMaxFrames;
-            newMelBuf.set(rawMelBuffer!.subarray(srcOff, srcOff + computedFrames), dstOff);
-        }
-        rawMelBuffer = newMelBuf;
-        maxFrames = newMaxFrames;
+    if (newTotalFrames <= computedFrames) {
+        compactPreemphBuffer();
+        return;
     }
 
-    // 3. Compute each new frame
+    // 3. Compute each new frame, writing into the circular mel buffer.
+    //    No reallocation: old frames are silently overwritten via modulo.
     const pad = N_FFT >> 1; // 256
 
     for (let t = computedFrames; t < newTotalFrames; t++) {
         const frameStart = t * HOP_LENGTH - pad;
+        const circularT = t % maxFrames;
 
-        // a) Window the frame
+        // a) Window the frame (using local index into compacted preemph buffer)
         for (let k = 0; k < N_FFT; k++) {
-            const idx = frameStart + k;
-            const sample = (idx >= 0 && idx < preemphLen) ? preemphBuffer[idx] : 0;
+            const globalIdx = frameStart + k;
+            const localIdx = globalIdx - preemphBaseIdx;
+            const sample = (localIdx >= 0 && localIdx < preemphLen) ? preemphBuffer[localIdx] : 0;
             fftRe[k] = sample * hannWindow[k];
             fftIm[k] = 0;
         }
@@ -156,26 +162,60 @@ function pushAudio(chunk: Float32Array) {
             powerBuf[k] = fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k];
         }
 
-        // d) Mel filterbank multiply + log
+        // d) Mel filterbank multiply + log (circular write)
         for (let m = 0; m < nMels; m++) {
             let melVal = 0;
             const fbOff = m * N_FREQ_BINS;
             for (let k = 0; k < N_FREQ_BINS; k++) {
                 melVal += powerBuf[k] * melFilterbank[fbOff + k];
             }
-            rawMelBuffer![m * maxFrames + t] = Math.log(melVal + LOG_ZERO_GUARD);
+            rawMelBuffer![m * maxFrames + circularT] = Math.log(melVal + LOG_ZERO_GUARD);
         }
     }
 
     const prevFrames = computedFrames;
     computedFrames = newTotalFrames;
+
+    // Advance baseFrame when the circular buffer has wrapped
+    if (computedFrames - baseFrame > maxFrames) {
+        baseFrame = computedFrames - maxFrames;
+    }
+
+    // 4. Compact preemph buffer: discard samples no longer needed
+    compactPreemphBuffer();
+
     const newFramesComputed = newTotalFrames - prevFrames;
     if (newFramesComputed > 0) {
         const elapsed = performance.now() - t0;
         // Log every ~50 chunks (~4s) to avoid spam
         if (computedFrames % 50 < newFramesComputed) {
-            console.log(`[MelWorker] pushAudio: +${chunkLen} samples, +${newFramesComputed} frames → total ${computedFrames} frames (${(totalSamples / 16000).toFixed(1)}s), ${elapsed.toFixed(1)} ms`);
+            console.log(`[MelWorker] pushAudio: +${chunkLen} samples, +${newFramesComputed} frames, total ${computedFrames} frames (${(totalSamples / 16000).toFixed(1)}s), buf [${baseFrame}..${computedFrames}), preemph ${preemphLen} samples, ${elapsed.toFixed(1)} ms`);
         }
+    }
+}
+
+/**
+ * Compact the preemph buffer by discarding samples that are no longer needed.
+ * The next mel frame to be computed (computedFrames) requires samples starting
+ * at global index (computedFrames * HOP_LENGTH - N_FFT/2). Everything before
+ * that can be safely discarded.
+ */
+function compactPreemphBuffer() {
+    const pad = N_FFT >> 1;
+    const nextFrameStart = computedFrames * HOP_LENGTH - pad;
+    const discardBefore = Math.max(0, nextFrameStart);
+    const discardLocal = discardBefore - preemphBaseIdx;
+
+    if (discardLocal > 0 && discardLocal < preemphLen) {
+        // Shift remaining samples to front of buffer
+        const remaining = preemphLen - discardLocal;
+        preemphBuffer.copyWithin(0, discardLocal, discardLocal + remaining);
+        preemphLen = remaining;
+        preemphBaseIdx = discardBefore;
+    } else if (discardLocal >= preemphLen) {
+        // All current samples are stale
+        preemphLen = 0;
+        preemphBaseIdx = discardBefore;
     }
 }
 
@@ -183,7 +223,23 @@ function pushAudio(chunk: Float32Array) {
 // Feature Extraction (normalize a requested range)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function getFeatures(startFrame: number, endFrame: number): {
+/**
+ * Extract mel features for a frame range.
+ * 
+ * @param startFrame - Start frame index
+ * @param endFrame - End frame index (exclusive)
+ * @param normalize - If true (default), apply per-feature mean/variance normalization
+ *   (required for ASR). If false, return raw log-mel values (for visualization with
+ *   fixed dB scaling to avoid "gain hunting" during silence).
+ * 
+ * PERFORMANCE NOTE (2026-02-09): When normalize=false, the caller (e.g. visualizer)
+ * still incurs the cost of extracting frames from the circular buffer. If visualization
+ * performance becomes an issue, consider:
+ * 1. Reducing visualizer update frequency
+ * 2. Caching/reusing extracted frames between draws
+ * 3. Downsampling the spectrogram (skip frames for display)
+ */
+function getFeatures(startFrame: number, endFrame: number, normalize: boolean = true): {
     features: Float32Array;
     T: number;
     melBins: number;
@@ -195,31 +251,37 @@ function getFeatures(startFrame: number, endFrame: number): {
         return null;
     }
 
-    // Clamp to available range
-    const sf = Math.max(0, startFrame);
+    // Clamp to available circular range [baseFrame, computedFrames)
+    const sf = Math.max(baseFrame, startFrame);
     const ef = Math.min(computedFrames, endFrame);
     const T = ef - sf;
 
     if (T <= 0) {
-        console.warn(`[MelWorker] getFeatures: empty range (requested ${startFrame}..${endFrame}, available 0..${computedFrames})`);
+        console.warn(`[MelWorker] getFeatures: empty range (requested ${startFrame}..${endFrame}, available ${baseFrame}..${computedFrames})`);
         return null;
     }
 
-    // Extract the requested window (mel-major layout [nMels, T])
+    // Extract the requested window from circular buffer (mel-major layout [nMels, T])
     const raw = new Float32Array(nMels * T);
     for (let m = 0; m < nMels; m++) {
-        const srcBase = m * maxFrames + sf;
+        const srcRowBase = m * maxFrames;
         const dstBase = m * T;
-        for (let t = 0; t < T; t++) {
-            raw[dstBase + t] = rawMelBuffer![srcBase + t];
+        for (let i = 0; i < T; i++) {
+            const circularIdx = (sf + i) % maxFrames;
+            raw[dstBase + i] = rawMelBuffer![srcRowBase + circularIdx];
         }
     }
 
-    // Normalize
-    const features = normalizeMelFeatures(raw, nMels, T);
+    // Optionally normalize (ASR requires normalized; visualizer uses raw for fixed dB scale)
+    const features = normalize ? normalizeMelFeatures(raw, nMels, T) : raw;
 
-    const elapsed = performance.now() - t0;
-    console.log(`[MelWorker] getFeatures: frames ${sf}..${ef} (${T} frames, ${(T * HOP_LENGTH / 16000).toFixed(2)}s), normalize ${elapsed.toFixed(1)} ms, buffer ${computedFrames} total frames`);
+    // Throttled logging to avoid console spam (was causing noticeable CPU overhead)
+    const now = performance.now();
+    if (now - lastGetFeaturesLogTime > GET_FEATURES_LOG_INTERVAL) {
+        lastGetFeaturesLogTime = now;
+        const elapsed = now - t0;
+        console.log(`[MelWorker] getFeatures: frames ${sf}..${ef} (${T} frames, ${(T * HOP_LENGTH / 16000).toFixed(2)}s), normalize=${normalize}, ${elapsed.toFixed(1)} ms, buf [${baseFrame}..${computedFrames})`);
+    }
 
     return { features, T, melBins: nMels };
 }
@@ -230,9 +292,11 @@ function getFeatures(startFrame: number, endFrame: number): {
 
 function reset() {
     preemphLen = 0;
+    preemphBaseIdx = 0;
     lastRawSample = 0;
     totalSamples = 0;
     computedFrames = 0;
+    baseFrame = 0;
     console.log('[MelWorker] Reset');
 }
 
@@ -258,10 +322,10 @@ self.onmessage = (e: MessageEvent) => {
             }
 
             case 'GET_FEATURES': {
-                const { startSample, endSample } = payload;
+                const { startSample, endSample, normalize = true } = payload;
                 const startFrame = sampleToFrame(startSample);
                 const endFrame = sampleToFrame(endSample);
-                const result = getFeatures(startFrame, endFrame);
+                const result = getFeatures(startFrame, endFrame, normalize);
 
                 if (result) {
                     // Transfer the features buffer for zero-copy

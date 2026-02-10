@@ -51,9 +51,14 @@ lib-cov/
 *.seed
 pids/
 
+# Large trace files (Chrome performance traces)
+metrics/*.json
+!metrics/trace_analysis_summary.json
+
 # Misc
 .grunt/
 *.wim
 docs/
 legacy/
 public/models/
+performance-trace.json.gz

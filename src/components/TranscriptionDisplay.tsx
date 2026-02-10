@@ -13,11 +13,17 @@ export interface TranscriptionDisplayProps {
 
 export const TranscriptionDisplay: Component<TranscriptionDisplayProps> = (props) => {
     let containerRef: HTMLDivElement | undefined;
+    let scrollScheduled = false;
 
     const scrollToBottom = () => {
-        if (containerRef) {
-            containerRef.scrollTop = containerRef.scrollHeight;
-        }
+        if (scrollScheduled) return;
+        scrollScheduled = true;
+        requestAnimationFrame(() => {
+            scrollScheduled = false;
+            if (containerRef) {
+                containerRef.scrollTop = containerRef.scrollHeight;
+            }
+        });
     };
 
     const hasContent = createMemo(() =>
@@ -29,7 +35,7 @@ export const TranscriptionDisplay: Component<TranscriptionDisplayProps> = (props
     onMount(() => {
         if (containerRef) {
             observer = new MutationObserver(scrollToBottom);
-            observer.observe(containerRef, { childList: true, subtree: true, characterData: true });
+            observer.observe(containerRef, { childList: true, subtree: true });
         }
     });
 
