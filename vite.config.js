@@ -14,11 +14,34 @@ const localParakeetPath = path.resolve(__dirname, '../parakeet.js');
 // Check if local parakeet.js exists
 const localParakeetExists = fs.existsSync(localParakeetPath);
 
+function readJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+const boncukPkg = readJson(path.resolve(__dirname, 'package.json'));
+const localParakeetPkg = localParakeetExists ? readJson(path.resolve(localParakeetPath, 'package.json')) : null;
+const npmParakeetPkg = readJson(path.resolve(__dirname, 'node_modules/parakeet.js/package.json'));
+
+const localVersion = localParakeetPkg?.version;
+const npmVersion = npmParakeetPkg?.version;
+let parakeetVersion = useLocalParakeet ? localVersion : npmVersion;
+let parakeetSource = useLocalParakeet ? 'local' : 'npm';
+if (!parakeetVersion) {
+  parakeetVersion = localVersion || 'unknown';
+  parakeetSource = localVersion ? 'local (fallback)' : 'unknown';
+}
+
+const onnxVersion = boncukPkg?.dependencies?.['onnxruntime-web'] || 'unknown';
+
 if (useLocalParakeet) {
   if (localParakeetExists) {
-    console.log('🔗 Using LOCAL parakeet.js from:', localParakeetPath);
+    console.log('Using LOCAL parakeet.js from:', localParakeetPath);
   } else {
-    console.error('❌ LOCAL mode requested but parakeet.js not found at:', localParakeetPath);
+    console.error('LOCAL mode requested but parakeet.js not found at:', localParakeetPath);
     console.error('   Expected folder structure:');
     console.error('   └── github/ysdede/');
     console.error('       ├── boncukjs/');
@@ -26,7 +49,7 @@ if (useLocalParakeet) {
     process.exit(1);
   }
 } else {
-  console.log('📦 Using NPM parakeet.js (v1.0.1)');
+  console.log('Using NPM parakeet.js (v' + (npmVersion || '?') + ')');
 }
 
 // Optional HTTPS setup
@@ -81,6 +104,11 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+  },
+  define: {
+    __PARAKEET_VERSION__: JSON.stringify(parakeetVersion),
+    __PARAKEET_SOURCE__: JSON.stringify(parakeetSource),
+    __ONNXRUNTIME_VERSION__: JSON.stringify(onnxVersion),
   },
   resolve: {
     alias: {

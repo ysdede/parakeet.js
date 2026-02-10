@@ -108,8 +108,7 @@ const Header: Component<{
       <div class="px-8 h-20 flex items-center justify-between">
         <div class="flex items-center gap-10">
           <div>
-            <h1 class="text-xl font-extrabold text-[#0f172a] tracking-tight">Boncuk AI</h1>
-            <div class="flex items-center gap-2 mt-0.5">
+            <div class="flex items-center gap-2">
               <span class="flex h-2 w-2">
                 <span class={`absolute inline-flex h-2 w-2 rounded-full opacity-75 ${props.isRecording ? 'animate-ping bg-red-400' : 'bg-slate-300'}`}></span>
                 <span class={`relative inline-flex rounded-full h-2 w-2 ${props.isRecording ? 'bg-red-500' : 'bg-slate-400'}`}></span>
@@ -117,6 +116,10 @@ const Header: Component<{
               <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 {props.isRecording ? 'Live' : 'Standby'}
               </span>
+            </div>
+            <div class="text-[10px] text-slate-500 mt-1">
+              <div>parakeet.js {typeof __PARAKEET_VERSION__ !== 'undefined' ? __PARAKEET_VERSION__ : 'unknown'} ({typeof __PARAKEET_SOURCE__ !== 'undefined' ? __PARAKEET_SOURCE__ : 'unknown'})</div>
+              <div>onnxruntime-web {typeof __ONNXRUNTIME_VERSION__ !== 'undefined' ? __ONNXRUNTIME_VERSION__ : 'unknown'}</div>
             </div>
           </div>
 
