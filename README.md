@@ -1,31 +1,33 @@
-# Parakeet.js  
+# Parakeet.js
 
-**[▶️ Try the Live Demo](https://ysdede.github.io/parakeet.js/)** | [NPM Package](https://www.npmjs.com/package/parakeet.js)
+[Live Demo](https://ysdede.github.io/parakeet.js/) | [NPM Package](https://www.npmjs.com/package/parakeet.js)
 
-Client-side ONNX inference of NVIDIA *Parakeet* speech-to-text models.
-Runs entirely in the browser on **WebGPU** or **WASM** via
-[ONNX Runtime Web](https://onnxruntime.ai/).
+![Real-time transcription with Parakeet.js](https://raw.githubusercontent.com/ysdede/boncukjs/refs/heads/master/public/img/streaming-preview.jpg)
 
-> **Parakeet.js** offers a high-performance, browser-first implementation for NVIDIA's Parakeet-TDT speech-to-text models, running entirely client-side via WebGPU and WASM. Powered by ONNX Runtime Web, this library makes it simple to integrate state-of-the-art transcription into any web application.
->
-> **Performance note:** Parakeet.js is tuned for native-like performance in the browser, with real-time optimizations such as incremental caching and a custom, high-accuracy JS preprocessor.
+Browser-based speech-to-text using NVIDIA Parakeet models. Runs entirely client-side on **WebGPU** or **WASM** via [ONNX Runtime Web](https://onnxruntime.ai/).
 
-> **Status:** Stable v1.2.0 release - Production ready
-> **Supported Models:** Parakeet-TDT v2 (English) and v3 (Multilingual - 13 languages)
+**Key features:**
+- Pure JavaScript mel spectrogram preprocessor with incremental caching for real-time streaming
+- Parallel preprocessing support via worker threads and `precomputedFeatures` direct-feed path
+- Stateful chunked inference with cached decoder state for low-latency applications
+
+### Features in detail
+
+- **Decoder state caching and reuse**: Incremental decoder cache stores LSTM state at the prefix boundary (keyed by `cacheKey`); the next call with the same key restores state and skips decoding the overlapping prefix (~80% decoder time savings for typical overlap). Chunk-to-chunk streaming uses `previousDecoderState` / `returnDecoderState` with snapshot/restore so decoding continues without redoing the past. `StatefulStreamingTranscriber` uses this flow internally.
+- **Mel and feature caching**: `IncrementalMelProcessor` caches raw mel frames. With `prefixSamples` only new frames are computed; the rest are reused (~60-70% preprocessing savings for overlapping streaming). Metrics can report `mel_cache: { cached_frames, new_frames }`.
+- **Decoding speedups**: Zero-copy `subarray()` instead of `slice()` for token and duration logits in the hot path; systematic tensor disposal to avoid WASM/GPU growth; pre-allocated tensors for target, length, and encoder frame.
+- **Preprocessor in a separate worker**: The library accepts precomputed mel features via `precomputedFeatures`. When your app runs mel in its own worker and passes that in, `transcribe()` skips built-in preprocessing (0 ms preprocessing in the main thread) and you get pipeline parallelism: mel in one worker, inference in another.
+
+> **v1.2.0** | Parakeet-TDT v2 (English) and v3 (Multilingual, 13 languages)
 
 ---
 
-## What's New in v1.2.0 (Stateful Streaming & PTFA Merging)
+## What's New in v1.2.0 (Stateful Streaming & Runtime Improvements)
 
 ### Stateful Streaming API
-- **New `StatefulStreamingTranscriber` class**: Provides a high-level API for processing sequential audio chunks without needing complex merging logic.
+- **New `StatefulStreamingTranscriber` class**: Provides a high-level API for processing sequential audio chunks without custom stitching logic.
 - Maintains decoder state between chunks for seamless, high-quality continuation.
 - Zero redundant audio processing (no overlapping windows needed).
-
-### Advanced Transcription Merging
-- **`LCSPTFAMerger`**: Hybrid algorithm combining Longest Common Subsequence (NeMo-style) with Probabilistic Token-Frame Alignment.
-- **`FrameAlignedMerger`**: Precise token-level merging using frame indices and stability checks.
-- Ideal for low-latency streaming where overlapping transcriptions must be unified.
 
 ### Improved Developer Experience
 - **Static Import Refactoring**: Switched to static top-level imports in `src/index.js` for better bundler compatibility and IDE support.
@@ -33,77 +35,46 @@ Runs entirely in the browser on **WebGPU** or **WASM** via
 - **Enhanced Demo**: Version display for both the library and ORT-web, plus real-time profiling toggles.
 
 ### Performance & Stability
+- **Tensor Disposal**: Systematic `dispose()` calls for all per-call ORT tensors (input, encoder output, joiner logits, decoder state) to prevent WASM/GPU memory leaks on repeated calls.
 - **Array Slicing Optimization**: Replaced `slice()` with `subarray()` in the decoding loop (~22x faster for logit extraction).
 - **LRU Cache Eviction**: Added `maxIncrementalCacheSize` to prevent unbounded memory growth during long sessions.
 - **Dynamic ORT Versioning**: Automatically derives the CDN URL for WASM binaries from the active runtime version.
+
+### Backward Compatibility
+- **`enableProfiling` defaults to `true`**: `result.metrics` is populated by default, matching v1.1.x behavior. Set `enableProfiling: false` to disable metric collection and get `metrics: null`.
+
+### Implementation Update: Streaming Inference and Parallel Preprocessing
+- **Parakeet TDT v3 support**: The current pipeline supports Parakeet-TDT v3 for multilingual speech-to-text with improved throughput and decoding quality.
+- **Cached decoder state for chunked inference**: Streaming calls can reuse decoder state between chunks (`previousDecoderState`, `returnDecoderState`, and incremental cache), reducing redundant compute and latency.
+- **Parallel JavaScript preprocessing path**: Mel feature extraction can run in parallel workers, and `precomputedFeatures` enables a direct feature-feed path where `transcribe()` skips built-in preprocessing.
+- **Near-zero preprocessing overhead path**: In real-time deployments that provide normalized mel features directly, preprocessing overhead can approach zero because inference reads precomputed feature buffers.
+- **Stateful streaming is preferred**: `StatefulStreamingTranscriber` is the recommended high-level API for chunked, low-latency streaming.
 
 ---
 
 ## What's New in v1.1.0 (Preprocessing Optimization)
 
-### Pure JS Mel Spectrogram — Now Default
-- **Pure JavaScript mel spectrogram computation is now the default** (`preprocessorBackend: 'js'`).
-- Eliminates ONNX Runtime overhead for preprocessing (no session creation, tensor allocation, WASM bridge).
-- **Skips preprocessor ONNX download** — one fewer file to download from HuggingFace Hub (~5MB saved).
+### Pure JS Mel Spectrogram -- Now Default
+- **Pure JavaScript mel spectrogram is now the default** (`preprocessorBackend: 'js'`). Eliminates ONNX Runtime overhead and skips the ~5MB ONNX preprocessor model download.
+- Matches NeMo's pipeline exactly (pre-emphasis, STFT, Slaney mel filterbank, log, normalization). Cross-validated against ONNX reference with max error < 4e-4.
 - Switch back to ONNX with `preprocessorBackend: 'onnx'` in config.
-
-**Accuracy (validated with 70 automated tests against ONNX reference):**
-
-| Metric | Value |
-|---|---|
-| Mel filterbank max error vs ONNX | **2.645e-7** |
-| Full pipeline max error vs ONNX | **3.633e-4** |
-| Full pipeline mean error vs ONNX | **9.368e-6** |
-| Test signals validated | 4 (sine mix, short sine, noise, 5s mix) |
-
-The JS implementation matches NeMo's preprocessing pipeline exactly: pre-emphasis (0.97) → zero-pad → STFT (512-pt FFT, hop 160, win 400) → power spectrum → Slaney mel filterbank (128 bands) → log → per-feature normalization.
-
-**Performance (Node.js benchmarks):**
-
-| Audio Duration | Processing Time | Realtime Factor |
-|---|---|---|
-| 0.5s | ~4ms | 125x |
-| 1s | ~8ms | 125x |
-| 2s | ~15ms | 133x |
-| 5s | **36.9ms** | **135x** |
-| 10s | ~76ms | 132x |
 
 ### Incremental Mel Caching for Streaming
 - `IncrementalMelProcessor` caches raw mel frames across overlapping streaming windows.
-- **Integrated into `transcribe()` via `prefixSamples` option** — streaming callers pass the overlap sample count and mel frames are reused automatically.
-- For typical 70% overlap scenarios: **reuses ~350 cached frames, computes only ~150 new frames** (~60-70% preprocessing savings).
-- Exact numerical match with full computation (zero error vs non-incremental path).
+- Integrated into `transcribe()` via `prefixSamples` option. For typical 70% overlap: ~60-70% preprocessing savings.
+- Exact numerical match with full computation.
 - Call `model.resetMelCache()` when starting a new recording session.
 
-**Incremental caching benchmark (5s audio, 70% overlap):**
-
-| Mode | Time | Speedup |
-|---|---|---|
-| Full computation | 71.7ms | — |
-| Incremental (cached prefix) | **36.6ms** | **~2x** |
-
-### Runtime Preprocessor Switching
-- New `model.setPreprocessorBackend('js' | 'onnx')` to switch preprocessors at runtime.
-- New `model.getPreprocessorBackend()` to query the active backend.
-- Both backends are available when model is loaded with `preprocessorUrl`.
-
-### Preprocessor Warm-up
-- JS/ONNX preprocessor warms up automatically during `fromUrls()` model loading.
-- Eliminates first-call latency (~100-200ms for ONNX session creation).
-
-### Model Repository Update
-- Default v2 model now points to `ysdede/parakeet-tdt-0.6b-v2-onnx` with corrected ONNX preprocessing.
-
-### Known Issue: nemo128.onnx Version
-- The `nemo128.onnx` in some HuggingFace model repos may use an older version from onnx-asr.
-- Latest onnx-asr (Dec 2025+) includes a **correctness fix** (`features_lens` calculation), pre-emphasis time masking, and ONNX graph optimizations.
-- **Recommendation**: Use the default JS preprocessor which implements the corrected algorithm.
+### Other Changes
+- **Runtime preprocessor switching**: `model.setPreprocessorBackend('js' | 'onnx')` and `model.getPreprocessorBackend()`.
+- **Preprocessor warm-up**: Runs automatically during `fromUrls()` model loading.
+- **Known issue**: Some ONNX preprocessor model artifacts in external repos may use older preprocessing logic. The default JS preprocessor implements the corrected version.
 
 ---
 
 ## What's New in v1.0.0
 
-**First stable release with production-ready accuracy and multilingual support.**
+**First stable release with NeMo-aligned accuracy and multilingual support.**
 
 ### NeMo-Aligned TDT Decoding (Critical Accuracy Fix)
 - **100% Parity with NVIDIA NeMo**: Aligned the JavaScript TDT decoding loop with the original Python reference implementation.
@@ -125,7 +96,7 @@ The JS implementation matches NeMo's preprocessing pipeline exactly: pre-emphasi
 ### Performance and Stability
 - Incremental transcription capabilities for real-time applications.
 - Optimized state snapshots for low-latency prefix caching.
-- Stable API suitable for production use.
+- Stable core API.
 
 ---
 
@@ -133,13 +104,13 @@ The JS implementation matches NeMo's preprocessing pipeline exactly: pre-emphasi
 
 ```bash
 # npm
-npm i parakeet.js onnxruntime-web
+npm i parakeet.js
 
 # yarn
-yarn add parakeet.js onnxruntime-web
+yarn add parakeet.js
 ```
 
-`onnxruntime-web` is a peer-dependency that supplies the runtime back-ends (WebGPU, WASM).
+`onnxruntime-web` is bundled as a dependency and supplies the runtime back-ends (WebGPU, WASM).
 
 ---
 
@@ -168,7 +139,7 @@ const { urls, filenames } = await getParakeetModel('istupakov/parakeet-tdt-0.6b-
   backend: 'webgpu',
   encoderQuant: 'fp32',
   decoderQuant: 'int8',
-  preprocessor: 'nemo128',
+  preprocessor: 'onnx-preprocessor',
 });
 ```
 
@@ -330,15 +301,15 @@ Call `model.clearIncrementalCache()` when starting a new recording session.
   words: Array<{text,start_time,end_time,confidence}>,
   tokens: Array<{token,start_time,end_time,confidence}>,
   confidence_scores: { overall_log_prob, word_avg, token_avg },
-  metrics: {
+  metrics: {               // null when enableProfiling: false
     rtf: number,
     total_ms: number,
     preprocess_ms: number,
     encode_ms: number,
     decode_ms: number,
     tokenize_ms: number
-  },
-  is_final: true
+  } | null,
+  is_final: boolean
 }
 ```
 
@@ -375,7 +346,7 @@ if (utterance_text.toLowerCase().includes(expected)) {
 | `cpuThreads` | `fromUrls()` | Sets `ort.env.wasm.numThreads`; pick *cores-2* for best balance |
 | `encoderQuant` | `getParakeetModel()` | Selects `fp32` or `int8` model for the encoder |
 | `decoderQuant` | `getParakeetModel()` | Selects `fp32` or `int8` model for the decoder |
-| `preprocessorBackend` | `getParakeetModel()` / `fromUrls()` | `'js'` (default) uses pure JS mel; `'onnx'` uses nemo128.onnx |
+| `preprocessorBackend` | `getParakeetModel()` / `fromUrls()` | `'js'` (default) uses pure JS mel; `'onnx'` uses the ONNX preprocessor path |
 | `frameStride` | `transcribe()` | Trade-off latency vs accuracy |
 | `precomputedFeatures` | `transcribe()` | Bypass preprocessor with external mel features |
 | `enableProfiling` | `transcribe()` | Populates `result.metrics` with timing data (default `true`). Set `false` to skip metric collection. |
@@ -488,40 +459,9 @@ Copy-paste the `loadModel()` and `transcribeFile()` functions into your app, adj
 
 ---
 
-## 🚀 Live Demo
-
-Try the library instantly in your browser without any setup:
-
-**[🦜 Parakeet.js Demo](https://ysdede.github.io/parakeet.js/)** | [🤗 HuggingFace Mirror](https://huggingface.co/spaces/ysdede/parakeet.js-demo)
-
-Both links point to identical demos with the same features:
-
-- **WebGPU/WASM backend selection** - Choose the best performance for your device
-- **Multi-threaded WASM** - SharedArrayBuffer enabled for maximum CPU utilization
-- **Real-time transcription** - Upload audio files and see instant results
-- **Performance metrics** - View detailed timing information and RTF scores
-- **Test samples** - Load random samples from HuggingFace speech datasets
-
-### Deploy Your Own
-
-```bash
-cd examples/demo
-npm install
-
-# HuggingFace Spaces
-npm run deploy-to-hf
-
-# GitHub Pages (via GitHub Actions)
-gh workflow run deploy-gh-pages.yml
-```
-
-See `examples/demo/README.md` for detailed deployment instructions.
-
----
-
 ## Testing
 
-The library includes a comprehensive Vitest test suite (70 tests):
+The library includes a Vitest test suite (79 tests across 6 suites):
 
 ```bash
 npm test          # Run all tests once
@@ -532,17 +472,12 @@ npm run test:watch  # Watch mode
 
 | Suite | Tests | Description |
 |---|---|---|
-| `mel.test.mjs` | 39 | Mel constants, filterbank, FFT, JsPreprocessor, IncrementalMelProcessor, performance, ONNX cross-validation |
+| `mel.test.mjs` | 39 | Mel constants, filterbank, FFT, JsPreprocessor, IncrementalMelProcessor, ONNX cross-validation |
 | `preprocessor-selection.test.mjs` | 16 | Hub file selection logic, fromUrls preprocessor creation, default config |
-| `precomputed-features.test.mjs` | 15 | Feature format, audioDur computation, preprocessorPath detection, edge cases |
-
-### Key Validations
-
-- **Mel filterbank** matches ONNX reference within `2.6e-7` max error
-- **Full pipeline** matches ONNX within `3.6e-4` max error, `1.1e-5` mean error
-- **Performance**: 5s audio processed in ~37ms (Node.js)
-- **Incremental**: ~2x faster with 70% overlap caching
-- **Preprocessor selection**: `nemo128.onnx` correctly skipped when `preprocessorBackend='js'`
+| `precomputed-features.test.mjs` | 15 | Feature format, audioDur computation, edge cases, integration |
+| `transcribe_perf.test.mjs` | 5 | Profiling/metrics behavior, tensor disposal verification |
+| `incremental_cache_fix.test.mjs` | 2 | LRU incremental decoder cache, cache clearing |
+| `index.test.mjs` | 2 | Top-level `fromUrls` and `fromHub` exports |
 
 ---
 
@@ -558,29 +493,24 @@ npm run test:watch  # Watch mode
 
 ## Changelog
 
-### v1.2.0 (February 2026) — Stateful Streaming & PTFA Merging
-**High-level streaming API, advanced transcription merging, and performance optimizations.**
+### v1.2.0 (February 2026) -- Stateful Streaming and Runtime Improvements
 
-- **`StatefulStreamingTranscriber`**: New high-level API for processing sequential audio chunks while maintaining decoder state automatically.
-- **`LCSPTFAMerger`**: Hybrid merging algorithm using Longest Common Subsequence and Probabilistic Token-Frame Alignment for high-accuracy streaming.
-- **`FrameAlignedMerger`**: Token-level merging utility using encoder frame indices and stability thresholds.
-- **Static Import Refactor**: `src/index.js` now uses static top-level imports for better bundler compatibility and IDE intellisense.
-- **Subpath Exports**: Added support for importing specific modules (e.g., `parakeet.js/parakeet`) to reduce bundle size.
-- **Array Slicing Optimization**: Replaced `slice()` with `subarray()` in the hot decoding loop, achieving a ~22x speedup for logit extraction.
-- **Incremental Cache LRU**: Added `maxIncrementalCacheSize` (default 50) and LRU eviction to `ParakeetModel` to prevent memory growth during long sessions.
-- **Dynamic ORT Versioning**: The library now automatically derives the `onnxruntime-web` version from the environment to set up WASM CDN paths.
-- **Demo Enhancements**: Added version display for the library and runtime, plus a profiling toggle for performance analysis.
+- **`StatefulStreamingTranscriber`**: High-level API for processing sequential audio chunks with automatic decoder state management.
+- **Tensor Disposal**: Systematic `dispose()` calls for all per-call ORT tensors to prevent WASM/GPU memory leaks.
+- **`enableProfiling` backward compat**: Defaults to `true` so `result.metrics` is populated by default (matching v1.1.x). Set `false` to disable.
+- **Static Import Refactor**: `src/index.js` uses static top-level imports for better bundler compatibility.
+- **Subpath Exports**: Import specific modules (e.g., `parakeet.js/parakeet`) for smaller bundles.
+- **Array Slicing Optimization**: `subarray()` replaces `slice()` in the decode loop.
+- **Incremental Cache LRU**: `maxIncrementalCacheSize` (default 50) prevents unbounded memory growth.
+- **Dynamic ORT Versioning**: WASM CDN paths derived automatically from the active runtime.
 
-### v1.1.1 (February 2026) — Streaming Enhancements & Test Suite
-**Pre-computed features, conditional ONNX loading, and comprehensive test coverage.**
+### v1.1.1 (February 2026) -- Streaming Enhancements & Test Suite
 
-- **`precomputedFeatures` option**: `transcribe()` now accepts pre-computed mel spectrograms, allowing external mel workers to feed features directly and bypass the built-in preprocessor entirely.
-- **Conditional ONNX preprocessor loading**: `fromUrls()` no longer creates an ONNX preprocessor session when `preprocessorBackend: 'js'` is active. This prevents unnecessary loading of `nemo128.onnx`.
-- **Conditional `nemo128.onnx` download**: `getParakeetModel()` in `hub.js` now skips downloading `nemo128.onnx` when `preprocessorBackend: 'js'` is configured, saving ~5MB of network transfer and IndexedDB storage.
-- **Enhanced logging**: Model loading now logs the preprocessor backend selection (`JS (mel.js)` vs `ONNX`), and performance metrics include `preprocessor_backend` and `mel_cache` fields.
-- **`timeOffset` bugfix**: Fixed `effectiveTimeOffset` in the incremental decoder cache path — the caller's `timeOffset` base was being lost when combined with prefix frame offset.
-- **Vitest test suite (70 tests)**: Comprehensive automated tests for mel spectrogram accuracy (cross-validated against ONNX reference), preprocessor selection logic, and precomputedFeatures format compatibility.
-- **New exports**: `hzToMel`, `melToHz` now exported from `mel.js` and package index for downstream use and testing.
+- **`precomputedFeatures` option**: `transcribe()` accepts pre-computed mel spectrograms, bypassing the built-in preprocessor.
+- **Conditional ONNX loading**: `fromUrls()` and `getParakeetModel()` skip the ONNX preprocessor model when `preprocessorBackend: 'js'` (~5MB saved).
+- **`timeOffset` bugfix**: Fixed `effectiveTimeOffset` in incremental decoder cache path.
+- **Vitest test suite**: Automated tests for mel accuracy, preprocessor selection, and feature format.
+- **New exports**: `hzToMel`, `melToHz` from `mel.js`.
 
 ### v1.0.0 (January 2026)
 **First stable release**
@@ -605,8 +535,6 @@ npm run test:watch  # Watch mode
 - IndexedDB model caching
 - Performance instrumentation (RTF, timing metrics)
 
-See `OPTIMIZATION_PLAN.md` for detailed performance notes.
-
 ---
 
 ## Credits
@@ -614,11 +542,7 @@ See `OPTIMIZATION_PLAN.md` for detailed performance notes.
 This project builds upon the excellent work of:
 
 - **[istupakov](https://github.com/istupakov)** - For providing the [ONNX-ASR](https://github.com/istupakov/onnx-asr) repository, which served as the foundation and starting point for this JavaScript implementation
-- **[istupakov/parakeet-tdt-0.6b-v2-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v2-onnx)** - English model exports
-- **[istupakov/parakeet-tdt-0.6b-v3-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx)** - Multilingual model exports
-- **ONNX Runtime Web** - For powering the browser-based inference engine
-- **HuggingFace Datasets** - People's Speech, Multilingual LibriSpeech for testing
 
 The Python-based ONNX-ASR project provided crucial insights into model handling, preprocessing pipelines, and served as a reference implementation during the development of this browser-compatible version.
 
-Happy hacking! 🎉
+Happy hacking!
