@@ -91,11 +91,17 @@ export class MelWorkerClient {
     }
 
     /**
-     * Request normalized mel features for a sample range.
+     * Request mel features for a sample range.
      * Returns null if no frames are available in the range.
+     * 
+     * @param startSample - Start sample index
+     * @param endSample - End sample index
+     * @param normalize - If true (default), return normalized features for ASR.
+     *   If false, return raw log-mel values for visualization with fixed dB scaling.
+     *   See mel.worker.ts for performance notes when using normalize=false.
      */
-    async getFeatures(startSample: number, endSample: number): Promise<MelFeatures | null> {
-        return this.sendRequest('GET_FEATURES', { startSample, endSample });
+    async getFeatures(startSample: number, endSample: number, normalize: boolean = true): Promise<MelFeatures | null> {
+        return this.sendRequest('GET_FEATURES', { startSample, endSample, normalize });
     }
 
     /**

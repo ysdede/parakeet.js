@@ -37,6 +37,7 @@ export interface AudioEngineConfig {
 
     // Advanced VAD properties matching parakeet-ui
     lookbackDuration?: number;
+    overlapDuration?: number;
     speechHangover?: number;
     minEnergyIntegral?: number;
     minEnergyPerSecond?: number;
@@ -187,6 +188,13 @@ export interface IRingBuffer {
      * @throws RangeError if data has been overwritten
      */
     read(startFrame: number, endFrame: number): Float32Array;
+
+    /**
+     * Read samples from [startFrame, endFrame) into a caller-supplied buffer.
+     * Zero-allocation variant of read(). Returns number of samples written.
+     * @throws RangeError if data has been overwritten
+     */
+    readInto?(startFrame: number, endFrame: number, dest: Float32Array): number;
 
     /** Get global frame offset of the NEXT frame to be written */
     getCurrentFrame(): number;

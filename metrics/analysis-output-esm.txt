@@ -1,0 +1,109 @@
+Reading trace file...
+Parsing JSON...
+Total events: 1161562
+
+--- Thread Analysis ---
+
+Thread 73564:55528 (CrGpuMain):
+  Total Active Time: 40834.95ms
+  Event Count: 146871
+
+Thread 73564:62072 (GpuVSyncThread):
+  Total Active Time: 31379.59ms
+  Event Count: 3763
+
+Thread 76416:71168 (CrRendererMain):
+  Total Active Time: 10001.80ms
+  Event Count: 180960
+  V8 Execution Time: 420.35ms
+
+Thread 76416:70772 (Compositor):
+  Total Active Time: 6912.58ms
+  Event Count: 350532
+
+Thread 73564:30348 (VizCompositorThread):
+  Total Active Time: 4258.37ms
+  Event Count: 120568
+
+Thread 72424:77808 (CrBrowserMain):
+  Total Active Time: 2763.93ms
+  Event Count: 70169
+
+Thread 76416:47784 (DedicatedWorker thread):
+  Total Active Time: 804.15ms
+  Event Count: 1931
+  V8 Execution Time: 389.80ms
+
+Thread 72424:74208 (ThreadPoolSingleThreadCOMSTASharedForegroundBlocking0):
+  Total Active Time: 791.75ms
+  Event Count: 164
+  Long Tasks (>50ms): 3
+    - [toplevel] ThreadPool_RunTask: 117.47ms
+    - [toplevel] ThreadPool_RunTask: 110.64ms
+    - [toplevel] ThreadPool_RunTask: 93.48ms
+
+Thread 76416:75496 (DedicatedWorker thread):
+  Total Active Time: 708.99ms
+  Event Count: 1822
+  V8 Execution Time: 342.61ms
+
+Thread 76416:74212 (ThreadPoolForegroundWorker):
+  Total Active Time: 661.89ms
+  Event Count: 32998
+
+Thread 73564:74516 (Chrome_ChildIOThread):
+  Total Active Time: 619.10ms
+  Event Count: 58187
+
+Thread 76416:75196 (DedicatedWorker thread):
+  Total Active Time: 570.87ms
+  Event Count: 35003
+  V8 Execution Time: 135.74ms
+
+Thread 72048:64548 (CrRendererMain):
+  Total Active Time: 506.74ms
+  Event Count: 11319
+  V8 Execution Time: 84.36ms
+
+Thread 72424:69296 (ThreadPoolForegroundWorker):
+  Total Active Time: 439.66ms
+  Event Count: 255
+  Long Tasks (>50ms): 1
+    - [toplevel] ThreadPool_RunTask: 338.57ms
+
+Thread 76416:77036 (ThreadPoolSingleThreadSharedForeground1):
+  Total Active Time: 423.96ms
+  Event Count: 3071
+
+Thread 76416:76740 (Realtime AudioWorklet thread):
+  Total Active Time: 353.69ms
+  Event Count: 18044
+  V8 Execution Time: 73.66ms
+
+Thread 76416:76460 (Chrome_ChildIOThread):
+  Total Active Time: 318.10ms
+  Event Count: 44073
+
+Thread 72048:76524 (Compositor):
+  Total Active Time: 199.47ms
+  Event Count: 14093
+
+Thread 72424:22460 (Chrome_IOThread):
+  Total Active Time: 176.81ms
+  Event Count: 24875
+
+Thread 76188:76980 (tracing.CrUtilityMain):
+  Total Active Time: 175.42ms
+  Event Count: 2358
+
+Thread 72424:75256 (CompositorTileWorker1):
+  Total Active Time: 162.32ms
+  Event Count: 6524
+
+Thread 72424:70000 (Chrome_DevToolsHandlerThread):
+  Total Active Time: 114.85ms
+  Event Count: 1978
+
+Thread 76416:69528 (ThreadPoolServiceThread):
+  Total Active Time: 102.09ms
+  Event Count: 12280

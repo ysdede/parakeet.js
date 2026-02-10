@@ -1,30 +1,7 @@
 import { AudioEngine as IAudioEngine, AudioEngineConfig, AudioSegment, IRingBuffer, AudioMetrics } from './types';
 import { RingBuffer } from './RingBuffer';
 import { AudioSegmentProcessor, ProcessedSegment } from './AudioSegmentProcessor';
-
-/**
- * Simple linear interpolation resampler for downsampling audio.
- * Good enough for speech recognition where we're going 48kHz -> 16kHz.
- */
-function resampleLinear(input: Float32Array, fromRate: number, toRate: number): Float32Array {
-    if (fromRate === toRate) return input;
-
-    const ratio = fromRate / toRate;
-    const outputLength = Math.floor(input.length / ratio);
-    const output = new Float32Array(outputLength);
-
-    for (let i = 0; i < outputLength; i++) {
-        const srcIndex = i * ratio;
-        const srcIndexFloor = Math.floor(srcIndex);
-        const srcIndexCeil = Math.min(srcIndexFloor + 1, input.length - 1);
-        const t = srcIndex - srcIndexFloor;
-
-        // Linear interpolation
-        output[i] = input[srcIndexFloor] * (1 - t) + input[srcIndexCeil] * t;
-    }
-
-    return output;
-}
+import { resampleLinear } from './utils';
 
 /** Duration of the visualization buffer in seconds */
 const VISUALIZATION_BUFFER_DURATION = 30;
@@ -38,9 +15,6 @@ export class AudioEngine implements IAudioEngine {
     private ringBuffer: IRingBuffer;
     private audioProcessor: AudioSegmentProcessor; // Replaces EnergyVAD
     private deviceId: string | null = null;
-
-    // Cache last stats for UI
-    private lastProcessorStats: any = null;
 
     private audioContext: AudioContext | null = null;
     private mediaStream: MediaStream | null = null;
@@ -137,7 +111,6 @@ export class AudioEngine implements IAudioEngine {
             silenceThreshold: this.config.minSilenceDuration,
             maxSegmentDuration: this.config.maxSegmentDuration,
             lookbackDuration: this.config.lookbackDuration,
-            speechHangover: this.config.speechHangover,
             maxSilenceWithinSpeech: this.config.maxSilenceWithinSpeech,
             endingSpeechTolerance: this.config.endingSpeechTolerance,
             snrThreshold: 3.0,
@@ -223,14 +196,50 @@ export class AudioEngine implements IAudioEngine {
                 class CaptureProcessor extends AudioWorkletProcessor {
                     constructor(options) {
                         super(options);
-                        const sr = (options?.processorOptions?.sampleRate) || 16000;
-                        this.bufferSize = Math.round(${windowDuration} * sr);
+                        const opts = options?.processorOptions || {};
+                        this.inputSampleRate = opts.inputSampleRate || 16000;
+                        this.targetSampleRate = opts.targetSampleRate || this.inputSampleRate;
+                        this.ratio = this.inputSampleRate / this.targetSampleRate;
+                        this.bufferSize = Math.round(${windowDuration} * this.inputSampleRate);
                         this.buffer = new Float32Array(this.bufferSize);
                         this.index = 0;
                         this._lastLog = 0;
                     }
 
-                    process(inputs, outputs) {
+                    _emitChunk() {
+                        let out;
+                        let maxAbs = 0;
+
+                        if (this.targetSampleRate === this.inputSampleRate) {
+                            out = new Float32Array(this.bufferSize);
+                            for (let i = 0; i < this.bufferSize; i++) {
+                                const v = this.buffer[i];
+                                out[i] = v;
+                                const a = v < 0 ? -v : v;
+                                if (a > maxAbs) maxAbs = a;
+                            }
+                        } else {
+                            const outLength = Math.floor(this.bufferSize / this.ratio);
+                            out = new Float32Array(outLength);
+                            for (let i = 0; i < outLength; i++) {
+                                const srcIndex = i * this.ratio;
+                                const srcIndexFloor = Math.floor(srcIndex);
+                                const srcIndexCeil = Math.min(srcIndexFloor + 1, this.bufferSize - 1);
+                                const t = srcIndex - srcIndexFloor;
+                                const v = this.buffer[srcIndexFloor] * (1 - t) + this.buffer[srcIndexCeil] * t;
+                                out[i] = v;
+                                const a = v < 0 ? -v : v;
+                                if (a > maxAbs) maxAbs = a;
+                            }
+                        }
+
+                        this.port.postMessage(
+                            { type: 'audio', samples: out, sampleRate: this.targetSampleRate, maxAbs },
+                            [out.buffer]
+                        );
+                    }
+
+                    process(inputs) {
                         const input = inputs[0];
                         if (!input || !input[0]) return true;
                         
@@ -241,8 +250,7 @@ export class AudioEngine implements IAudioEngine {
                             this.buffer[this.index++] = channelData[i];
                             
                             if (this.index >= this.bufferSize) {
-                                // Send buffer
-                                this.port.postMessage(this.buffer.slice());
+                                this._emitChunk();
                                 this.index = 0;
                                 
                                 // Debug log every ~5 seconds
@@ -278,11 +286,13 @@ export class AudioEngine implements IAudioEngine {
         if (this.workletNode) this.workletNode.disconnect();
 
         this.workletNode = new AudioWorkletNode(this.audioContext, 'capture-processor', {
-            processorOptions: { sampleRate: this.deviceSampleRate },
+            processorOptions: { inputSampleRate: this.deviceSampleRate, targetSampleRate: this.targetSampleRate },
         });
         this.workletNode.port.onmessage = (event: MessageEvent<any>) => {
-            if (event.data instanceof Float32Array) {
-                this.handleAudioChunk(event.data);
+            if (event.data?.type === 'audio' && event.data.samples instanceof Float32Array) {
+                this.handleAudioChunk(event.data.samples, event.data.maxAbs, event.data.sampleRate);
+            } else if (event.data instanceof Float32Array) {
+                this.handleAudioChunk(event.data, undefined, this.deviceSampleRate);
             } else if (event.data?.type === 'log') {
                 console.log(event.data.message);
             }
@@ -461,20 +471,21 @@ export class AudioEngine implements IAudioEngine {
         this.sourceNode = null;
     }
 
-    private handleAudioChunk(rawChunk: Float32Array): void {
-        // 0. Resample from device rate to target rate (e.g., 48kHz -> 16kHz)
-        const chunk = resampleLinear(rawChunk, this.deviceSampleRate, this.targetSampleRate);
-
-        // 0.5. Notify audio chunk subscribers (e.g., mel worker)
-        for (const cb of this.audioChunkCallbacks) {
-            cb(chunk);
-        }
+    private handleAudioChunk(rawChunk: Float32Array, precomputedMaxAbs?: number, chunkSampleRate?: number): void {
+        // 0. Ensure chunk is at target sample rate (resample only if needed)
+        const sampleRate = chunkSampleRate ?? this.targetSampleRate;
+        const needsResample = sampleRate !== this.targetSampleRate;
+        const chunk = needsResample
+            ? resampleLinear(rawChunk, sampleRate, this.targetSampleRate)
+            : rawChunk;
 
         // Calculate chunk energy (Peak Amplitude) + SMA for VAD compatibility
-        let maxAbs = 0;
-        for (let i = 0; i < chunk.length; i++) {
-            const abs = Math.abs(chunk[i]);
-            if (abs > maxAbs) maxAbs = abs;
+        let maxAbs = (!needsResample && precomputedMaxAbs !== undefined) ? precomputedMaxAbs : 0;
+        if (precomputedMaxAbs === undefined || needsResample) {
+            for (let i = 0; i < chunk.length; i++) {
+                const abs = Math.abs(chunk[i]);
+                if (abs > maxAbs) maxAbs = abs;
+            }
         }
 
         // SMA Smoothing (matching Parakeet-UI logic)
@@ -493,11 +504,10 @@ export class AudioEngine implements IAudioEngine {
             console.debug(`[AudioEngine] Energy threshold crossed: ${energy.toFixed(6)} > ${this.config.energyThreshold} = ${isSpeech}`);
         }
 
-        // 1. Write resampled audio to ring buffer FIRST
-        // This is crucial so that when the processor detects a segment (possibly with lookback),
-        // the data is already available in the ring buffer.
-        const endFrame = this.ringBuffer.getCurrentFrame() + chunk.length;
+        // 1. Write to ring buffer before any callbacks can transfer the chunk.
         this.ringBuffer.write(chunk);
+
+        const endFrame = this.ringBuffer.getCurrentFrame();
 
         // 2. Process VAD on resampled audio
         // The processor uses its own internal history for lookback, but we pull full audio from ring buffer later.
@@ -597,7 +607,13 @@ export class AudioEngine implements IAudioEngine {
         // 6. Fixed-window streaming (v3 token streaming mode)
         this.processWindowCallbacks(endFrame);
 
-        // 7. Notify visualization subscribers
+        // 7. Notify audio chunk subscribers AFTER internal processing.
+        // Callbacks may transfer the chunk's buffer; do not use `chunk` after this.
+        for (const cb of this.audioChunkCallbacks) {
+            cb(chunk);
+        }
+
+        // 8. Notify visualization subscribers
         this.notifyVisualizationUpdate();
     }
 
@@ -813,22 +829,69 @@ export class AudioEngine implements IAudioEngine {
 
     private getVisualizationDataFromRaw(targetWidth: number): Float32Array {
         if (!this.visualizationBuffer) return new Float32Array(0);
+        const buffer = this.visualizationBuffer;
         const bufferLength = this.visualizationBufferSize;
         const pos = this.visualizationBufferPosition;
         const samplesPerPoint = bufferLength / targetWidth;
         const subsampledBuffer = new Float32Array(targetWidth * 2);
 
-        for (let i = 0; i < targetWidth; i++) {
-            const rangeStart = i * samplesPerPoint;
-            const rangeEnd = (i + 1) * samplesPerPoint;
-            let minVal = 0, maxVal = 0, first = true;
+        // Logical index s maps to physical index:
+        // if s < wrapS: pos + s
+        // else: s - wrapS (which is s - (bufferLength - pos) = s + pos - bufferLength)
+        const wrapS = bufferLength - pos;
 
-            for (let s = Math.floor(rangeStart); s < Math.floor(rangeEnd); s++) {
-                const circularIdx = (pos + s) % bufferLength;
-                const val = this.visualizationBuffer[circularIdx];
-                if (first) { minVal = val; maxVal = val; first = false; }
-                else { if (val < minVal) minVal = val; if (val > maxVal) maxVal = val; }
+        for (let i = 0; i < targetWidth; i++) {
+            const startS = Math.floor(i * samplesPerPoint);
+            const endS = Math.floor((i + 1) * samplesPerPoint);
+
+            let minVal = 0;
+            let maxVal = 0;
+            let first = true;
+
+            // Part 1: Before wrap (Logical indices < wrapS)
+            // Physical indices: pos + s
+            const end1 = (endS < wrapS) ? endS : wrapS;
+            if (startS < end1) {
+                let p = pos + startS;
+                const pEnd = pos + end1;
+
+                if (first && p < pEnd) {
+                    const val = buffer[p];
+                    minVal = val;
+                    maxVal = val;
+                    first = false;
+                    p++;
+                }
+
+                for (; p < pEnd; p++) {
+                    const val = buffer[p];
+                    if (val < minVal) minVal = val;
+                    else if (val > maxVal) maxVal = val;
+                }
             }
+
+            // Part 2: After wrap (Logical indices >= wrapS)
+            // Physical indices: s - wrapS
+            const start2 = (startS > wrapS) ? startS : wrapS;
+            if (start2 < endS) {
+                let p = start2 - wrapS;
+                const pEnd = endS - wrapS;
+
+                if (first && p < pEnd) {
+                    const val = buffer[p];
+                    minVal = val;
+                    maxVal = val;
+                    first = false;
+                    p++;
+                }
+
+                for (; p < pEnd; p++) {
+                    const val = buffer[p];
+                    if (val < minVal) minVal = val;
+                    else if (val > maxVal) maxVal = val;
+                }
+            }
+
             subsampledBuffer[i * 2] = minVal;
             subsampledBuffer[i * 2 + 1] = maxVal;
         }

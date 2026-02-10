@@ -1,6 +1,6 @@
 {
   "name": "boncukjs",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Real-time transcription with parakeet.js",
   "type": "module",
   "scripts": {
@@ -32,14 +32,11 @@
     "@huggingface/transformers": "^3.6.1",
     "@solid-primitives/transition-group": "^1.1.2",
     "@thisbeyond/solid-dnd": "^0.7.5",
-    "lodash.debounce": "^4.0.8",
-    "lz4js": "^0.2.0",
     "material-icons": "^1.13.14",
     "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4",
     "parakeet.js": "^1.0.1",
     "solid-js": "^1.9.5",
     "uuid": "^11.1.0",
-    "wavefile": "^11.0.0",
     "wink-eng-lite-web-model": "^1.8.1",
     "wink-nlp": "^2.4.0"
   }

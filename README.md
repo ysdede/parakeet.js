@@ -2,22 +2,32 @@
 
 Real-time speech-to-text transcription in the browser, powered by [Parakeet.js](https://github.com/ysdede/parakeet.js).
 
+![Streaming preview](public/img/streaming-preview.jpg)
+
 ## Overview
 
-BoncukJS is a real-time speech-to-text transcription application built with SolidJS, Vite, and Tailwind CSS. It runs NVIDIA NeMo Parakeet TDT models directly in the browser using WebGPU/WASM via Parakeet.js — no backend required.
+Boncuk.js is a real-time speech-to-text application built with SolidJS, Vite, and Tailwind CSS. It runs NVIDIA NeMo Parakeet TDT models in the browser via WebGPU/WASM through Parakeet.js, with no backend required.
 
-**Architecture:** Transcription uses **per-utterance** mode (VAD-defined segments, no cross-segment model state). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architecture decisions and NeMo streaming limitations.
+**Default pipeline (v4):** Utterance-based streaming with a centralized BufferWorker (multi-layer time-aligned buffer), TEN-VAD (WASM) for inference VAD, and HybridVAD (energy-based) for UI. WindowBuilder and UtteranceBasedMerger handle sentence finalization and mature/immature text. Legacy per-utterance (VAD-defined segments) mode is still available. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [.serena/memories/v4-utterance-pipeline-refactor.md](.serena/memories/v4-utterance-pipeline-refactor.md) for details.
 
-### Key Features
+### What's new in 1.0
 
-- **Zero-backend transcription** — WebGPU/WASM inference runs entirely client-side
-- **Real-time audio processing** — VAD-based speech detection with SNR-aware triggering
-- **Pipeline-parallel mel preprocessing** — dedicated Web Worker for continuous mel spectrogram production
-- **Pure JS mel spectrogram** — no ONNX preprocessor needed, validated against NeMo reference
-- **Incremental decoder cache** — skip re-decoding overlapping prefix frames
-- **Live transcription UI** — waveform visualization, SNR meter, debug panel with RTF/latency
-- **Model management** — WebGPU/WASM backend selection, model sideloading from HuggingFace
-- **Gemini integration** — post-processing and analysis of transcribed text
+- **v4 pipeline as default** – BufferWorker, TEN-VAD, WindowBuilder, UtteranceBasedMerger; sentence finalization via wink-nlp.
+- **Canvas waveform** – Replaced 32 DOM bars with a single canvas renderer, removing the main 60fps layout/paint hotspot.
+- **Zero-allocation buffer reads** – RingBuffer `readInto(target)` and pre-allocated waveform/mel buffers to cut GC and main-thread cost.
+- **Debug panel** – RTFx (1/RTF) and latency with last-N averages; LayeredBufferVisualizer (mel heatmap + waveform) with pre-allocated ImageData and ResizeObserver cache; finalized sentences auto-scroll.
+- **Mel spectrogram** – Fixed dB scaling to prevent gain hunting; black-to-red gradient colormap in the debug visualizer.
+- **Security** – Content Security Policy (CSP) and dependency cleanup (e.g. removed unused wavefile, lz4js).
+
+### Key features
+
+- **Zero-backend transcription** – WebGPU/WASM inference runs entirely client-side
+- **Real-time audio** – VAD-based speech detection (energy + optional TEN-VAD WASM)
+- **Pipeline-parallel mel** – Dedicated Web Worker for continuous mel spectrogram; pure JS preprocessor (no ONNX), validated against NeMo
+- **Incremental decoder cache** – Skips re-decoding overlapping prefix frames
+- **Live UI** – Canvas waveform, mel heatmap in debug panel, SNR meter, auto-scroll for finalized sentences
+- **Model management** – WebGPU/WASM backend selection, sideloading from HuggingFace
+- **Gemini integration** – Post-processing and analysis of transcribed text
 
 ---
 
@@ -25,89 +35,92 @@ BoncukJS is a real-time speech-to-text transcription application built with Soli
 
 Measured on a desktop with 12-thread CPU and WebGPU-capable GPU (Feb 2026):
 
-| Metric | Before Optimization | After Optimization |
-|---|---|---|
+| Metric | Before optimization | After optimization |
+|--------|----------------------|---------------------|
 | **Preprocess** | 181 ms | **0.0 ms** (precomputed by mel worker) |
 | **Encode** | 468 ms | **160-178 ms** |
 | **Decode** | 133 ms | **19-99 ms** |
 | **Total per chunk** | 787 ms | **187-265 ms** |
-| **Real-Time Factor** | 6.3x | **19-27x** |
+| **Real-time factor** | 6.3x | **19-27x** |
 
-The preprocessing bottleneck has been completely eliminated through the mel worker architecture. See [docs/mel-worker-architecture.md](docs/mel-worker-architecture.md) for details.
+Preprocessing is fully offloaded via the mel worker. See [docs/mel-worker-architecture.md](docs/mel-worker-architecture.md) for details.
 
 ---
 
 ## Architecture
 
-### Multi-Worker Pipeline
+### Multi-worker pipeline
 
 ```
-Main Thread (UI)
-  ├── AudioEngine → captures mic → 80ms PCM chunks
-  │     ├── AudioWorklet → raw audio processing
-  │     └── AudioSegmentProcessor → VAD / speech detection
-  │
-  ├── MelWorkerClient → sends audio to mel worker
-  │
-  └── TranscriptionWorkerClient → triggers inference
+Main thread (UI)
+  ├── AudioEngine → mic → 80 ms PCM chunks (resample to 16 kHz)
+  │     ├── AudioWorklet → raw audio
+  │     └── onAudioChunk → MelWorker, HybridVAD, TenVADWorkerClient, BufferWorker (audio)
+  ├── BufferWorkerClient → multi-layer store (audio, mel, energyVad, inferenceVad); fire-and-forget writes, promise reads
+  ├── MelWorkerClient → audio to mel worker; features queried for inference windows
+  ├── TenVADWorkerClient → audio to TEN-VAD worker; inference VAD into BufferWorker
+  └── TranscriptionWorkerClient → v4Tick, BufferWorker (hasSpeech), WindowBuilder, inference
 
-Mel Worker (Web Worker)
-  └── Continuous mel spectrogram production
-      ├── Pre-emphasis → STFT → Power → Mel filterbank → Log
-      └── Raw mel frames stored in ring buffer
-      └── On request: normalize window → return features
+Mel worker
+  └── Continuous mel: pre-emphasis → STFT → power → mel filterbank → log; on request: normalize window → features
 
-Inference Worker (Web Worker)
-  ├── ModelManager → loads parakeet.js model (WebGPU/WASM)
-  ├── TokenStreamTranscriber → streaming merge logic
+Buffer worker
+  └── Time-aligned layers (16 kHz sample offsets): hasSpeech(energyVad | inferenceVad), getSilenceTail, queryRange
+
+TEN-VAD worker
+  └── ten-vad WASM (~278 KB); 256-sample hops; probabilities → BufferWorker inferenceVad layer
+
+Inference worker
+  ├── ModelManager → Parakeet.js (WebGPU/WASM)
+  ├── WindowBuilder → cursor-based window (min/max duration, hasSpeech from BufferWorker)
+  ├── UtteranceBasedMerger → sentence finalization, mature/immature text
   └── parakeet.js transcribe() with precomputedFeatures
-      ├── Encoder (WebGPU) → ~160ms for 5s audio
-      └── Decoder (WASM) → 20-100ms depending on text length
+      ├── Encoder (WebGPU) → ~160 ms for 5 s audio
+      └── Decoder (WASM) → 20-100 ms by text length
 ```
 
-### Key Optimizations
+### Main optimizations
 
-1. **Mel Worker (pipeline parallelism)** — Mel spectrogram computation runs in a separate Web Worker, continuously processing audio as it arrives. When inference is triggered, normalized features are ready instantly.
-
-2. **Pure JS preprocessor** — Replaces the ONNX `nemo128.onnx` model. Eliminates ONNX session overhead and one model download. Validated against NeMo reference (max error < 4e-4).
-
-3. **Incremental decoder cache** — Parakeet.js caches decoder state at prefix boundaries, skipping re-decoding of overlapping frames (~80% decoder savings).
-
-4. **Reduced streaming window** — 5.0s window / 3.5s overlap / 1.5s trigger (down from 7.0s/5.5s/1.0s), ~30% less work per chunk.
-
-5. **Queue-based chunk processing** — Latest-only queue prevents dropped chunks when inference is busy.
-
-6. **Optional log probabilities** — `returnLogProbs` disabled by default, saving per-frame softmax computation.
+1. **Mel worker** – Mel runs in a separate worker; when inference triggers, normalized features are ready (no preprocess wait).
+2. **Pure JS preprocessor** – Replaces ONNX `nemo128.onnx`; validated against NeMo (max error < 4e-4).
+3. **Incremental decoder cache** – Caches decoder state at prefix boundaries (~80% decoder savings).
+4. **Streaming window** – 5.0 s window / 3.5 s overlap / 1.5 s trigger (~30% less work per chunk).
+5. **Queue-based chunk processing** – Latest-only queue when inference is busy.
+6. **Optional log probs** – `returnLogProbs` off by default to save softmax cost.
+7. **v4 pipeline** – BufferWorker, TEN-VAD, WindowBuilder, UtteranceBasedMerger; see [.serena/memories/v4-utterance-pipeline-refactor.md](.serena/memories/v4-utterance-pipeline-refactor.md).
+8. **Canvas waveform** – Single canvas instead of DOM bars; fixed gain and clamp.
+9. **Zero-allocation reads** – RingBuffer `readInto()`, pre-allocated waveform and ImageData for visualizers.
+10. **ResizeObserver cache** – Replaces per-frame `getBoundingClientRect()` to avoid reflows.
 
 ---
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
 - Node.js 18+ and npm
 
-### Installation
+### Install
 
 ```bash
 npm install
 ```
 
-### Development
+### Develop
 
 ```bash
-npm run dev          # HTTPS dev server (for microphone access)
-npm run dev:local    # HTTP on localhost:3100 (faster, local-only)
+npm run dev          # HTTPS dev server (for microphone)
+npm run dev:local    # HTTP on localhost:3100 (faster, local only)
 ```
 
-### Testing
+### Test
 
 ```bash
-npm test             # Run all 71 tests
+npm test             # All tests (~116; Vitest pool: forks)
 npm run test:watch   # Watch mode
 ```
 
-### Production Build
+### Build
 
 ```bash
 npm run build
@@ -116,76 +129,84 @@ npm run serve        # Preview production build
 
 ---
 
-## Test Suite
+## Test suite
 
-The project includes comprehensive tests covering the mel processing pipeline:
+About 116 tests across 10 files for mel processing, v4 pipeline, and workers. Run: `npm test -- --run`. See [.serena/memories/v4-test-suite.md](.serena/memories/v4-test-suite.md) for v4 coverage.
 
-| Test File | Tests | Description |
-|---|---|---|
-| `mel-math.test.ts` | 31 | Unit tests for mel computation functions (FFT, filterbank, normalization) |
-| `mel.worker.test.ts` | 10 | Integration tests for mel worker loading and message handling |
-| `mel-e2e.test.ts` | 10 | End-to-end tests with real WAV audio and ONNX reference cross-validation |
-| `preprocessor-selection.test.ts` | 12 | Preprocessor selection logic (ensures nemo128.onnx is skipped when using JS) |
+| Test file | Scope | Description |
+|-----------|--------|-------------|
+| `mel-math.test.ts` | Unit | Mel (FFT, filterbank, normalization); 37 tests |
+| `mel.worker.test.ts` | Integration | Mel worker load and messages; 9 tests |
+| `mel-e2e.test.ts` | E2E | Real WAV + ONNX reference; 13 tests |
+| `preprocessor-selection.test.ts` | Unit | Preprocessor selection (nemo128 skipped when backend=js); 12 tests |
+| `VADRingBuffer.test.ts` | Unit | VAD ring buffer write/read, hasSpeech, silence tail, reset; 15 tests |
+| `buffer.worker.test.ts` | Integration | BufferWorker INIT, HAS_SPEECH, GET_SILENCE_TAIL, RESET; 6 tests |
+| `energy-calculation.test.ts` | Unit | Peak + 6-sample SMA energy; 4 tests |
+| `WindowBuilder.test.ts` | Unit | WindowBuilder with mock ring buffer; 11 tests |
+| `tenvad.worker.test.ts` | Integration | TEN-VAD worker INIT, RESET, PROCESS; 4 tests |
+| `TenVADWorkerClient.test.ts` | Unit | TenVADWorkerClient ready, init reject, dispose; 5 tests |
 
-### Key Validations
-
-- **Mel filterbank** matches ONNX reference within `2.6e-7` max error
-- **Full mel pipeline** matches ONNX within `3.6e-4` max error, `1.1e-5` mean error
-- **Real audio** (life_Jim.wav): 254 frames from 2.54s speech processed at **120x realtime**
-- **Preprocessor selection**: `nemo128.onnx` correctly skipped when `preprocessorBackend='js'`
-- **Determinism**: identical input always produces identical features
+**Validations:** Mel filterbank vs ONNX < 2.6e-7; full mel pipeline vs ONNX < 3.6e-4 max, 1.1e-5 mean; real audio (life_Jim.wav) 254 frames @ 120x realtime; preprocessor selection when `preprocessorBackend='js'`; determinism; v4 components covered.
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 src/
-├── App.tsx                              # Main app: audio + mel worker + inference orchestration
+├── App.tsx                              # v4 orchestration (v4Tick, toggleRecording)
 ├── lib/
-│   ├── audio/
-│   │   ├── AudioEngine.ts               # Mic capture, AudioWorklet, VAD
-│   │   ├── AudioSegmentProcessor.ts     # Speech onset/offset detection
-│   │   ├── mel.worker.ts               # Continuous mel spectrogram producer (Web Worker)
-│   │   ├── MelWorkerClient.ts          # Client for mel worker
-│   │   ├── mel-math.ts                 # Pure mel computation functions (testable)
-│   │   ├── mel-math.test.ts            # Unit tests
-│   │   ├── mel.worker.test.ts          # Worker integration tests
-│   │   ├── mel-e2e.test.ts             # End-to-end tests with real audio
-│   │   └── index.ts                    # Public exports
-│   └── transcription/
-│       ├── ModelManager.ts             # Parakeet.js model lifecycle
-│       ├── TokenStreamTranscriber.ts   # Streaming transcription with LCS merging
-│       ├── TranscriptionWorkerClient.ts # Client for inference worker
-│       ├── transcription.worker.ts     # Inference Web Worker
-│       └── preprocessor-selection.test.ts # Preprocessor logic tests
+│   ├── audio/                           # AudioEngine, mel.worker, MelWorkerClient, mel-math, RingBuffer
+│   ├── buffer/                          # buffer.worker, BufferWorkerClient (v4 layers)
+│   ├── vad/                             # tenvad.worker, TenVADWorkerClient, HybridVAD, VADRingBuffer
+│   ├── transcription/                   # ModelManager, WindowBuilder, UtteranceBasedMerger, transcription.worker
+│   └── model/                           # ModelService (loading/sideloading)
+├── components/                          # LayeredBufferVisualizer, Waveform, DebugPanel, etc.
 └── stores/
-    └── appStore.ts                     # SolidJS reactive state
+    └── appStore.ts                      # v4 state: matureText, immatureText, vadState, ...
 ```
 
 ---
 
-## Technology Stack
+## Technology stack
 
 | Component | Technology |
-|---|---|
-| **UI Framework** | SolidJS |
-| **Build Tool** | Vite |
+|-----------|------------|
+| **UI** | SolidJS |
+| **Build** | Vite |
 | **Styling** | Tailwind CSS |
-| **ASR Engine** | [Parakeet.js](https://github.com/ysdede/parakeet.js) (ONNX Runtime Web) |
-| **GPU Inference** | WebGPU (encoder) + WASM (decoder) |
-| **Mel Spectrogram** | Pure JavaScript (validated against NeMo ONNX) |
-| **Testing** | Vitest + @vitest/web-worker + happy-dom |
+| **ASR** | [Parakeet.js](https://github.com/ysdede/parakeet.js) (ONNX Runtime Web) |
+| **Inference** | WebGPU (encoder) + WASM (decoder) |
+| **Mel** | Pure JavaScript (validated vs NeMo ONNX) |
+| **VAD** | HybridVAD (energy); optional TEN-VAD WASM ([ten-vad](https://github.com/TEN-framework/ten-vad)) |
+| **Sentences** | wink-nlp + wink-eng-lite-web-model |
+| **Tests** | Vitest + @vitest/web-worker + happy-dom (pool: forks) |
 | **Audio** | Web Audio API + AudioWorklet |
 
 ---
 
 ## Deployment
 
-Build the `dist` folder and deploy to any static host (Netlify, Vercel, GitHub Pages, etc.):
+Build and deploy the `dist` folder to any static host (Netlify, Vercel, GitHub Pages):
 
 ```bash
 npm run build
 ```
 
-The app is fully client-side — no server required for transcription.
+The app is fully client-side; no server is required for transcription.
+
+---
+
+## Documentation and context
+
+| Doc | Description |
+|-----|-------------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Per-utterance vs v4 streaming; VAD and audio flow |
+| [docs/mel-worker-architecture.md](docs/mel-worker-architecture.md) | Mel worker pipeline and performance |
+| [PROJECT_MEMORY.md](PROJECT_MEMORY.md) | Decisions and agent context (Serena MCP) |
+| [LOCAL_DEV_SETUP.md](LOCAL_DEV_SETUP.md) | Local Parakeet.js source for development |
+| [GEMINI.md](GEMINI.md) | Project context for Gemini |
+| [MULTI_AGENT_SETUP.md](MULTI_AGENT_SETUP.md) | Multi-agent and Cursor/Serena setup |
+| [AGENTS.md](AGENTS.md) | Available skills and agent usage |
+
+**Serena memories** (`.serena/memories/`): [v4-utterance-pipeline-refactor.md](.serena/memories/v4-utterance-pipeline-refactor.md), [v4-test-suite.md](.serena/memories/v4-test-suite.md), [boncukjs-implementation-status.md](.serena/memories/boncukjs-implementation-status.md), [waveform-optimization.md](.serena/memories/waveform-optimization.md), [visualization-fixes.md](.serena/memories/visualization-fixes.md), [mel-producer-architecture.md](.serena/memories/mel-producer-architecture.md), [preprocessing-optimization.md](.serena/memories/preprocessing-optimization.md), [synchronization-fix.md](.serena/memories/synchronization-fix.md), [vad-correction-peak-energy.md](.serena/memories/vad-correction-peak-energy.md).

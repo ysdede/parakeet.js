@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -14,8 +15,6 @@
   --shadow-neu-btn: 5px 5px 10px #c8cdd8, -5px -5px 10px #ffffff;
   --shadow-neu-btn-hover: 3px 3px 6px #c8cdd8, -3px -3px 6px #ffffff;
 }
-
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* Material Symbols - ensure they load and look sharp. */
 .material-symbols-outlined {
