@@ -27,7 +27,6 @@ Boncuk.js is a real-time speech-to-text application built with SolidJS, Vite, an
 - **Incremental decoder cache** – Skips re-decoding overlapping prefix frames
 - **Live UI** – Canvas waveform, mel heatmap in debug panel, SNR meter, auto-scroll for finalized sentences
 - **Model management** – WebGPU/WASM backend selection, sideloading from HuggingFace
-- **Gemini integration** – Post-processing and analysis of transcribed text
 
 ---
 
