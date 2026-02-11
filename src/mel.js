@@ -232,12 +232,24 @@ export class JsPreprocessor {
 
     // Precompute sparse filterbank indices to skip zero multiplications
     // This provides ~60x speedup for the filterbank application loop
+    this._initSparseIndices();
+  }
+
+  /**
+   * Precompute start and end indices for each mel filter.
+   * Filters are extremely sparse (mostly zeros), so we only iterate
+   * over the non-zero range [fbStart, fbEnd].
+   * @private
+   */
+  _initSparseIndices() {
     this.fbStart = new Int32Array(this.nMels);
     this.fbEnd = new Int32Array(this.nMels);
+
     for (let m = 0; m < this.nMels; m++) {
       let start = 0;
       let end = -1;
       const fbOffset = m * N_FREQ_BINS;
+
       // Find first non-zero
       for (let k = 0; k < N_FREQ_BINS; k++) {
         if (this.melFilterbank[fbOffset + k] !== 0) {
@@ -245,6 +257,7 @@ export class JsPreprocessor {
           break;
         }
       }
+
       // Find last non-zero
       for (let k = N_FREQ_BINS - 1; k >= 0; k--) {
         if (this.melFilterbank[fbOffset + k] !== 0) {
@@ -252,6 +265,7 @@ export class JsPreprocessor {
           break;
         }
       }
+
       this.fbStart[m] = start;
       this.fbEnd[m] = end; // inclusive
     }
