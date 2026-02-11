@@ -58,7 +58,7 @@ The demo header shows the active `parakeet.js` version/source and the loaded `on
 npm run build:local
 ```
 
-### NPM Package Build (for deployment)
+### NPM Package Build
 ```bash
 npm run build
 ```
@@ -85,10 +85,10 @@ This will:
 
 ### 🐙 GitHub Pages
 
-GitHub Pages deployment is automated via GitHub Actions.
+GitHub Pages deployment is automated via GitHub Actions and uses a **local source build** (`build:local`) so the live page always reflects the latest repository code, even before an npm publish.
 
 **Automatic Deployment:**
-Pushing changes to `examples/demo/**` on the `master` branch triggers the workflow.
+Pushing changes to `examples/demo/**` or `src/**` on the `master` branch triggers the workflow.
 
 **Manual Trigger:**
 ```bash

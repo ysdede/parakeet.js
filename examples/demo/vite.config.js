@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 
 // Check if we should use local source files instead of npm package
 const useLocalSource = process.env.PARAKEET_LOCAL === 'true';
@@ -14,16 +15,29 @@ function readJson(filePath) {
   }
 }
 
-const localPkg = readJson(path.resolve(__dirname, '../../package.json'));
+function getShortCommitHash(repoRoot) {
+  try {
+    return execSync('git rev-parse --short HEAD', {
+      encoding: 'utf8',
+      cwd: repoRoot,
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+const repoRoot = path.resolve(__dirname, '../..');
+const localPkg = readJson(path.resolve(repoRoot, 'package.json'));
 const npmPkg = readJson(path.resolve(__dirname, 'node_modules/parakeet.js/package.json'));
 const localVersion = localPkg?.version;
 const npmVersion = npmPkg?.version;
 
+const shortHash = getShortCommitHash(repoRoot);
 let parakeetVersion = useLocalSource ? localVersion : npmVersion;
-let parakeetSource = useLocalSource ? 'local' : 'npm';
+let parakeetSource = useLocalSource ? (shortHash ? `dev-${shortHash}` : 'dev') : 'npm';
 if (!parakeetVersion) {
   parakeetVersion = localVersion || 'unknown';
-  parakeetSource = localVersion ? 'local (fallback)' : 'unknown';
+  parakeetSource = localVersion ? (shortHash ? `dev-${shortHash}` : 'dev') : 'unknown';
 }
 
 export default defineConfig({

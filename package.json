@@ -1,6 +1,6 @@
 {
   "name": "parakeet.js",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "NVIDIA Parakeet speech recognition for the browser (WebGPU/WASM) powered by ONNX Runtime Web.",
   "type": "module",
   "exports": {
@@ -30,7 +30,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4"
+    "onnxruntime-web": "1.24.1"
   },
   "author": "Yunus Seyhan Dede",
   "license": "MIT",

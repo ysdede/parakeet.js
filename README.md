@@ -2,7 +2,7 @@
 
 [Live Demo](https://ysdede.github.io/parakeet.js/) | [NPM Package](https://www.npmjs.com/package/parakeet.js)
 
-![Real-time transcription with Parakeet.js](https://raw.githubusercontent.com/ysdede/boncukjs/refs/heads/master/public/img/streaming-preview.jpg)
+![Real-time transcription with Parakeet.js](https://raw.githubusercontent.com/ysdede/keet/refs/heads/master/public/img/streaming-preview.jpg)
 
 Browser-based speech-to-text using NVIDIA Parakeet models. Runs entirely client-side on **WebGPU** or **WASM** via [ONNX Runtime Web](https://onnxruntime.ai/).
 
@@ -33,7 +33,7 @@ Browser-based speech-to-text using NVIDIA Parakeet models. Runs entirely client-
 - **Conditional Performance Logging**: `console.log`/`console.table` in the decode path is now gated behind `enableProfiling`, reducing overhead when profiling is off.
 
 ### Streaming Transcription with Sliding Window and Cached Decoder
-- The library's incremental decoder cache (`incremental: { cacheKey, prefixSeconds }`) and `precomputedFeatures` path were validated in a production real-time app ([boncukjs](https://github.com/ysdede/boncukjs)) with measurable results:
+- The library's incremental decoder cache (`incremental: { cacheKey, prefixSeconds }`) and `precomputedFeatures` path were validated in a production real-time app ([keet](https://github.com/ysdede/keet)) with measurable results:
 
 | Stage | Before | After |
 |-------|--------|-------|
@@ -413,9 +413,11 @@ The demo runs at `http://localhost:3000/` with CORS headers enabled for SharedAr
 # Deploy to HuggingFace Spaces
 npm run deploy-to-hf
 
-# Deploy to GitHub Pages (via GitHub Actions)
+# Trigger GitHub Pages deploy manually (optional)
 gh workflow run deploy-gh-pages.yml
 ```
+
+GitHub Pages is normally auto-deployed by the `deploy-gh-pages.yml` workflow when `examples/demo/**` or `src/**` changes on `master`. The workflow uses `build:local`, so the live page reflects the latest repository source rather than waiting for an npm release.
 
 ### Demo Features
 
@@ -510,7 +512,7 @@ npm run test:watch  # Watch mode
 - **Static Import Refactor**: `src/index.js` uses static top-level imports for better bundler compatibility.
 - **Subpath Exports**: Import specific modules (e.g., `parakeet.js/parakeet`) for smaller bundles.
 - **Dynamic ORT Versioning**: WASM CDN paths derived automatically from the active runtime.
-- **Streaming demo validated**: Sliding-window transcription with mel worker + `precomputedFeatures` + incremental decoder cache demonstrated 19-27x real-time in [boncukjs](https://github.com/ysdede/boncukjs).
+- **Streaming demo validated**: Sliding-window transcription with mel worker + `precomputedFeatures` + incremental decoder cache demonstrated 19-27x real-time in [keet](https://github.com/ysdede/keet).
 
 ### v1.1.1 (February 2026) -- Streaming Enhancements & Test Suite
 
