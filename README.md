@@ -22,33 +22,37 @@ Browser-based speech-to-text using NVIDIA Parakeet models. Runs entirely client-
 
 ---
 
-## What's New in v1.2.0 (Stateful Streaming & Runtime Improvements)
+## What's New in v1.2.0 (Memory Safety, Decode Speedups & Streaming Demo)
 
-### Stateful Streaming API
-- **New `StatefulStreamingTranscriber` class**: Provides a high-level API for processing sequential audio chunks without custom stitching logic.
-- Maintains decoder state between chunks for seamless, high-quality continuation.
-- Zero redundant audio processing (no overlapping windows needed).
+### Performance & Memory
+- **Tensor Disposal**: Systematic `dispose()` calls for all per-call ORT tensors (input, encoder output, joiner logits, decoder state) to prevent WASM/GPU memory leaks on repeated calls.
+- **Array Slicing Optimization**: Replaced `slice()` with `subarray()` in the decoding loop -- zero-copy view into the joiner output buffer (~22x faster for logit extraction in microbenchmarks).
+- **LRU Cache Eviction**: Added `maxIncrementalCacheSize` (default 50) to cap the incremental decoder cache and prevent unbounded memory growth during long sessions.
+- **Tokenizer Pre-computation**: Sanitized tokens are pre-computed in the constructor, removing per-decode regex work.
+- **Incremental Mel Optimization**: Faster incremental mel frame calculation path in `IncrementalMelProcessor`.
+- **Conditional Performance Logging**: `console.log`/`console.table` in the decode path is now gated behind `enableProfiling`, reducing overhead when profiling is off.
 
-### Improved Developer Experience
+### Streaming Transcription with Sliding Window and Cached Decoder
+- The library's incremental decoder cache (`incremental: { cacheKey, prefixSeconds }`) and `precomputedFeatures` path were validated in a production real-time app ([boncukjs](https://github.com/ysdede/boncukjs)) with measurable results:
+
+| Stage | Before | After |
+|-------|--------|-------|
+| Preprocess | 181 ms | **0 ms** (mel worker + `precomputedFeatures`) |
+| Decode | 133 ms | **19-99 ms** (incremental cache skips overlap prefix) |
+| Total | 787 ms | **187-265 ms** |
+| Real-time factor | 6.3x | **19-27x** |
+
+- The sliding-window pattern: a dedicated mel Web Worker continuously produces raw log-mel frames; when inference triggers, normalized features for the window are ready instantly. The encoder runs on WebGPU, and the decoder reuses its LSTM state from the previous window's overlap boundary via `cacheKey`/`prefixSeconds`, skipping ~80% of decoder frames for typical overlap ratios.
+- `precomputedFeatures` (v1.1.1) removes preprocessing from the inference thread entirely. `subarray()` (v1.2.0) and tensor disposal (v1.2.0) keep the hot loop fast and memory-stable across hundreds of consecutive calls.
+
+### Developer Experience
 - **Static Import Refactoring**: Switched to static top-level imports in `src/index.js` for better bundler compatibility and IDE support.
 - **Subpath Exports**: Import only what you need (e.g., `parakeet.js/parakeet`, `parakeet.js/hub`) for smaller bundle footprints.
 - **Enhanced Demo**: Version display for both the library and ORT-web, plus real-time profiling toggles.
-
-### Performance & Stability
-- **Tensor Disposal**: Systematic `dispose()` calls for all per-call ORT tensors (input, encoder output, joiner logits, decoder state) to prevent WASM/GPU memory leaks on repeated calls.
-- **Array Slicing Optimization**: Replaced `slice()` with `subarray()` in the decoding loop (~22x faster for logit extraction).
-- **LRU Cache Eviction**: Added `maxIncrementalCacheSize` to prevent unbounded memory growth during long sessions.
 - **Dynamic ORT Versioning**: Automatically derives the CDN URL for WASM binaries from the active runtime version.
 
 ### Backward Compatibility
 - **`enableProfiling` defaults to `true`**: `result.metrics` is populated by default, matching v1.1.x behavior. Set `enableProfiling: false` to disable metric collection and get `metrics: null`.
-
-### Implementation Update: Streaming Inference and Parallel Preprocessing
-- **Parakeet TDT v3 support**: The current pipeline supports Parakeet-TDT v3 for multilingual speech-to-text with improved throughput and decoding quality.
-- **Cached decoder state for chunked inference**: Streaming calls can reuse decoder state between chunks (`previousDecoderState`, `returnDecoderState`, and incremental cache), reducing redundant compute and latency.
-- **Parallel JavaScript preprocessing path**: Mel feature extraction can run in parallel workers, and `precomputedFeatures` enables a direct feature-feed path where `transcribe()` skips built-in preprocessing.
-- **Near-zero preprocessing overhead path**: In real-time deployments that provide normalized mel features directly, preprocessing overhead can approach zero because inference reads precomputed feature buffers.
-- **Stateful streaming is preferred**: `StatefulStreamingTranscriber` is the recommended high-level API for chunked, low-latency streaming.
 
 ---
 
@@ -461,7 +465,7 @@ Copy-paste the `loadModel()` and `transcribeFile()` functions into your app, adj
 
 ## Testing
 
-The library includes a Vitest test suite (79 tests across 6 suites):
+The library includes a Vitest test suite (82 tests across 7 suites):
 
 ```bash
 npm test          # Run all tests once
@@ -477,6 +481,7 @@ npm run test:watch  # Watch mode
 | `precomputed-features.test.mjs` | 15 | Feature format, audioDur computation, edge cases, integration |
 | `transcribe_perf.test.mjs` | 5 | Profiling/metrics behavior, tensor disposal verification |
 | `incremental_cache_fix.test.mjs` | 2 | LRU incremental decoder cache, cache clearing |
+| `stateful-streaming.test.mjs` | 3 | StatefulStreamingTranscriber state handoff, finalize/reset, and explicit non-dedupe behavior |
 | `index.test.mjs` | 2 | Top-level `fromUrls` and `fromHub` exports |
 
 ---
@@ -493,16 +498,19 @@ npm run test:watch  # Watch mode
 
 ## Changelog
 
-### v1.2.0 (February 2026) -- Stateful Streaming and Runtime Improvements
+### v1.2.0 (February 2026) -- Memory Safety, Decode Speedups & Streaming Demo
 
-- **`StatefulStreamingTranscriber`**: High-level API for processing sequential audio chunks with automatic decoder state management.
 - **Tensor Disposal**: Systematic `dispose()` calls for all per-call ORT tensors to prevent WASM/GPU memory leaks.
+- **`subarray()` Optimization**: Zero-copy view replaces `slice()` in the decode hot loop (~22x faster logit extraction).
+- **LRU Cache Eviction**: `maxIncrementalCacheSize` (default 50) caps the incremental decoder cache.
+- **Tokenizer Pre-computation**: Sanitized tokens built once in constructor.
+- **Incremental Mel Optimization**: Faster frame calculation in `IncrementalMelProcessor`.
+- **Conditional Perf Logging**: `console.log`/`console.table` gated behind `enableProfiling`.
 - **`enableProfiling` backward compat**: Defaults to `true` so `result.metrics` is populated by default (matching v1.1.x). Set `false` to disable.
 - **Static Import Refactor**: `src/index.js` uses static top-level imports for better bundler compatibility.
 - **Subpath Exports**: Import specific modules (e.g., `parakeet.js/parakeet`) for smaller bundles.
-- **Array Slicing Optimization**: `subarray()` replaces `slice()` in the decode loop.
-- **Incremental Cache LRU**: `maxIncrementalCacheSize` (default 50) prevents unbounded memory growth.
 - **Dynamic ORT Versioning**: WASM CDN paths derived automatically from the active runtime.
+- **Streaming demo validated**: Sliding-window transcription with mel worker + `precomputedFeatures` + incremental decoder cache demonstrated 19-27x real-time in [boncukjs](https://github.com/ysdede/boncukjs).
 
 ### v1.1.1 (February 2026) -- Streaming Enhancements & Test Suite
 
