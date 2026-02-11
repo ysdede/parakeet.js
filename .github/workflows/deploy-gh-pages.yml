@@ -5,6 +5,8 @@ on:
     branches: [master]
     paths:
       - 'examples/demo/**'
+      - 'src/**'
+      - 'package.json'
       - '.github/workflows/deploy-gh-pages.yml'
   workflow_dispatch:  # Allow manual trigger
 
@@ -27,14 +29,28 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: examples/demo/package-lock.json
-          
+
+      - name: Install root dependencies for local source build
+        run: npm install
+
+      - name: Use local parakeet.js package for demo build
+        working-directory: examples/demo
+        run: |
+          node -e "
+          const p = require('./package.json');
+          p.dependencies['parakeet.js'] = 'file:../..';
+          require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2));
+          "
+
       - name: Install dependencies
         working-directory: examples/demo
-        run: npm ci
+        run: npm install
         
       - name: Build
         working-directory: examples/demo
-        run: npm run build
+        env:
+          PARAKEET_LOCAL: 'true'
+        run: npm run build:local
         
       - name: Prepare deployment files
         run: |
