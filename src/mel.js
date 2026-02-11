@@ -354,9 +354,10 @@ export class JsPreprocessor {
    *
    * @param {Float32Array} audio - Mono PCM [-1,1] at 16kHz
    * @param {number} [startFrame=0] - Frame index to start computation from (optimization)
+   * @param {Float32Array} [outBuffer] - Optional output buffer to avoid allocation
    * @returns {{rawMel: Float32Array, nFrames: number, featuresLen: number}}
    */
-  computeRawMel(audio, startFrame = 0) {
+  computeRawMel(audio, startFrame = 0, outBuffer = null) {
     const N = audio.length;
     if (N === 0) {
       return { rawMel: new Float32Array(0), nFrames: 0, featuresLen: 0 };
@@ -386,7 +387,10 @@ export class JsPreprocessor {
     }
 
     // STFT + power + mel + log (no normalization)
-    const rawMel = new Float32Array(this.nMels * nFrames);
+    const rawMel =
+      outBuffer && outBuffer.length >= this.nMels * nFrames
+        ? outBuffer
+        : new Float32Array(this.nMels * nFrames);
     const fftRe = this._fftRe;
     const fftIm = this._fftIm;
     const powerBuf = this._powerBuf;
@@ -489,6 +493,9 @@ export class IncrementalMelProcessor {
     this._cachedNFrames = 0;
     this._cachedAudioLen = 0; // length of audio that produced the cache
     this._cachedFeaturesLen = 0;
+
+    // Buffer reuse for double buffering to reduce GC
+    this._reuseBuffer = null;
   }
 
   /**
@@ -499,6 +506,7 @@ export class IncrementalMelProcessor {
     this._cachedNFrames = 0;
     this._cachedAudioLen = 0;
     this._cachedFeaturesLen = 0;
+    this._reuseBuffer = null;
   }
 
   /**
@@ -562,11 +570,21 @@ export class IncrementalMelProcessor {
       Math.min(prefixFrames - this.boundaryFrames, this._cachedFeaturesLen)
     );
 
-    // Compute full mel for this audio
-    const { rawMel, nFrames, featuresLen } =
-      this.preprocessor.computeRawMel(audio, safeFrames);
+    // Prepare buffer (reuse if available and large enough)
+    // nFrames = floor(N / HOP_LENGTH) + 1
+    const estimatedNFrames = Math.floor(N / HOP_LENGTH) + 1;
+    const requiredSize = this.nMels * estimatedNFrames;
+    let targetBuffer = this._reuseBuffer;
 
-    // Replace first safeFrames with cached values (they're identical)
+    if (!targetBuffer || targetBuffer.length < requiredSize) {
+      targetBuffer = new Float32Array(requiredSize);
+    }
+
+    // Compute full mel (delta) for this audio into targetBuffer
+    const { rawMel, nFrames, featuresLen } =
+      this.preprocessor.computeRawMel(audio, safeFrames, targetBuffer);
+
+    // Now copy the prefix into the gap (0 to safeFrames-1)
     if (safeFrames > 0 && this._cachedRawMel) {
       for (let m = 0; m < this.nMels; m++) {
         const srcBase = m * this._cachedNFrames;
@@ -584,8 +602,9 @@ export class IncrementalMelProcessor {
       featuresLen
     );
 
-    // Update cache
-    this._cachedRawMel = rawMel;
+    // Update cache (swap buffers)
+    this._reuseBuffer = this._cachedRawMel; // Recycle the old cache buffer
+    this._cachedRawMel = rawMel;            // New cache is the current result
     this._cachedNFrames = nFrames;
     this._cachedAudioLen = N;
     this._cachedFeaturesLen = featuresLen;
