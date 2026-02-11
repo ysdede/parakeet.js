@@ -931,7 +931,9 @@ export class ParakeetModel {
   /**
    * Create a stateful streaming transcriber for this model.
    * This provides a convenient API for processing sequential audio chunks
-   * without needing complex merging logic.
+   * without manually wiring decoder-state handoff between calls.
+   * For overlapping windows that require dedupe/stitching, use
+   * app-side merge logic suited to your overlap strategy.
    * 
    * @param {Object} opts - Streaming options
    * @param {number} opts.chunkDuration - Expected chunk duration in seconds (for timestamp calculation)
@@ -991,8 +993,9 @@ export class ParakeetModel {
  * StatefulStreamingTranscriber - High-level API for streaming transcription.
  * 
  * This class wraps a ParakeetModel and provides a simple interface for processing
- * sequential audio chunks without complex merging logic. It maintains decoder state
- * between chunks, allowing for seamless continuation of transcription.
+ * sequential audio chunks while carrying decoder state between calls. This class
+ * does not dedupe overlaps or stitch boundaries; it is best suited to contiguous
+ * non-overlapping chunk streams.
  * 
  * Usage:
  * ```javascript
