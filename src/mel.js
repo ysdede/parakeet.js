@@ -225,6 +225,23 @@ export class JsPreprocessor {
     this.hannWindow = createPaddedHannWindow();
     this.twiddles = precomputeTwiddles(N_FFT);
 
+    // Precompute sparsity bounds for filterbank
+    this.fbStart = new Int32Array(this.nMels);
+    this.fbEnd = new Int32Array(this.nMels);
+    for (let m = 0; m < this.nMels; m++) {
+      let start = -1;
+      let end = -1;
+      const offset = m * N_FREQ_BINS;
+      for (let k = 0; k < N_FREQ_BINS; k++) {
+        if (this.melFilterbank[offset + k] !== 0) {
+          if (start === -1) start = k;
+          end = k + 1;
+        }
+      }
+      this.fbStart[m] = start === -1 ? 0 : start;
+      this.fbEnd[m] = end === -1 ? 0 : end;
+    }
+
     // Pre-allocate reusable buffers
     this._fftRe = new Float64Array(N_FFT);
     this._fftIm = new Float64Array(N_FFT);
@@ -313,7 +330,9 @@ export class JsPreprocessor {
       for (let m = 0; m < nMels; m++) {
         let melVal = 0;
         const fbOff = m * N_FREQ_BINS;
-        for (let k = 0; k < N_FREQ_BINS; k++) {
+        const start = this.fbStart[m];
+        const end = this.fbEnd[m];
+        for (let k = start; k < end; k++) {
           melVal += powerBuf[k] * fb[fbOff + k];
         }
         rawMel[m * nFrames + t] = Math.log(melVal + LOG_ZERO_GUARD);
