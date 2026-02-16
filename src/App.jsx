@@ -114,6 +114,7 @@ export default function App() {
   const [encoderQuant, setEncoderQuant] = useState('int8');
   const [decoderQuant, setDecoderQuant] = useState('int8');
   const [preprocessor, setPreprocessor] = useState('nemo128');
+  const [preprocessorBackend, setPreprocessorBackend] = useState('onnx');
   const [status, setStatus] = useState('Idle');
   const [progressText, setProgressText] = useState('');
   const [progressPct, setProgressPct] = useState(null);
@@ -126,6 +127,7 @@ export default function App() {
   const [verboseLog, setVerboseLog] = useState(false);
   const [frameStride, setFrameStride] = useState(1);
   const [dumpDetail, setDumpDetail] = useState(false);
+  const [enableProfiling, setEnableProfiling] = useState(true);
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -232,7 +234,8 @@ export default function App() {
       const res = await modelRef.current.transcribe(sample.pcm, 16000, {
         returnTimestamps: true,
         returnConfidences: true,
-        frameStride
+        frameStride,
+        enableProfiling
       });
       console.timeEnd('Transcribe-Sample');
 
@@ -286,6 +289,7 @@ export default function App() {
         encoderQuant,
         decoderQuant,
         preprocessor,
+        preprocessorBackend,
         backend,
         progress: progressCallback
       });
@@ -297,6 +301,7 @@ export default function App() {
       modelRef.current = await ParakeetModel.fromUrls({
         ...modelUrls.urls,
         filenames: modelUrls.filenames,
+        preprocessorBackend,
         backend,
         verbose: verboseLog,
         cpuThreads,
@@ -315,7 +320,7 @@ export default function App() {
         const decoded = await audioCtx.decodeAudioData(buf);
         const pcm = decoded.getChannelData(0);
 
-        const { utterance_text } = await modelRef.current.transcribe(pcm, 16000);
+        const { utterance_text } = await modelRef.current.transcribe(pcm, 16000, { enableProfiling });
         const normalize = (str) => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
 
         if (normalize(utterance_text).includes(normalize(expectedText))) {
@@ -358,7 +363,8 @@ export default function App() {
       const res = await modelRef.current.transcribe(pcm, 16_000, {
         returnTimestamps: true,
         returnConfidences: true,
-        frameStride
+        frameStride,
+        enableProfiling
       });
       console.timeEnd(`Transcribe-${file.name}`);
 
@@ -409,14 +415,41 @@ export default function App() {
     navigator.clipboard.writeText(text);
   }
 
+  const parakeetVersion = typeof __PARAKEET_VERSION__ !== 'undefined' ? __PARAKEET_VERSION__ : 'unknown';
+  const parakeetSource = typeof __PARAKEET_SOURCE__ !== 'undefined' ? __PARAKEET_SOURCE__ : 'unknown';
+  const [ortVersion, setOrtVersion] = useState('not loaded yet');
+
+  useEffect(() => {
+    const readOrtVersion = () => {
+      const ver = globalThis?.ort?.env?.versions?.common;
+      if (ver) {
+        setOrtVersion(ver);
+        return true;
+      }
+      return false;
+    };
+
+    if (readOrtVersion()) return undefined;
+    const timer = setInterval(() => {
+      if (readOrtVersion()) clearInterval(timer);
+    }, 500);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-200 font-sans min-h-screen p-6 md:p-10 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <header className="mb-8 flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Parakeet.js Demo
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Parakeet.js Demo
+            </h1>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <div>parakeet.js {parakeetVersion} ({parakeetSource})</div>
+              <div>onnxruntime-web {ortVersion}</div>
+            </div>
+          </div>
           <button
             className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             onClick={() => setDarkMode(!darkMode)}
@@ -551,6 +584,32 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Preprocessor */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                    Preprocessor
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={preprocessorBackend}
+                      onChange={e => setPreprocessorBackend(e.target.value)}
+                      disabled={isLoading || isModelReady}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                    >
+                      <option value="js">JS (mel.js)</option>
+                      <option value="onnx">ONNX (nemo128.onnx)</option>
+                    </select>
+                    <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                      expand_more
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    {preprocessorBackend === 'js'
+                      ? 'Pure JS: no ONNX download, supports streaming caching'
+                      : 'ONNX WASM+SIMD: slightly faster per-call, requires nemo128.onnx download'}
+                  </p>
+                </div>
+
                 {/* Toggles */}
                 <div className="flex flex-col gap-3 pt-2">
                   <div className="flex items-center justify-between">
@@ -583,6 +642,23 @@ export default function App() {
                       />
                       <label
                         htmlFor="log"
+                        className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 dark:bg-gray-700 cursor-pointer"
+                      ></label>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Enable profiling</span>
+                    <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                      <input
+                        type="checkbox"
+                        checked={enableProfiling}
+                        onChange={e => setEnableProfiling(e.target.checked)}
+                        className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 dark:border-gray-600 checked:right-0"
+                        id="profiling"
+                      />
+                      <label
+                        htmlFor="profiling"
                         className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 dark:bg-gray-700 cursor-pointer"
                       ></label>
                     </div>
