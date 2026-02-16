@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "parakeet.js": "^1.2.1",
-    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4",
+    "onnxruntime-web": "1.24.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
