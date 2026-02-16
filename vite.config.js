@@ -23,15 +23,6 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
-  resolve: {
-    alias: {
-      // Force parakeet.js to resolve ORT from top-level dependency.
-      'onnxruntime-web': path.resolve(__dirname, 'node_modules/onnxruntime-web'),
-    },
-  },
-  optimizeDeps: {
-    include: ['onnxruntime-web'],
-  },
   define: {
     global: 'globalThis',
     __PARAKEET_VERSION__: JSON.stringify(parakeetVersion),

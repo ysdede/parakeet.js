@@ -447,7 +447,7 @@ export default function App() {
             </h1>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               <div>parakeet.js {parakeetVersion} ({parakeetSource})</div>
-              <div>onnxruntime-web {ortVersion}</div>
+              <div>onnxruntime-web (used by parakeet.js) {ortVersion}</div>
             </div>
           </div>
           <button
