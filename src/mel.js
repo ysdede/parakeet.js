@@ -229,6 +229,24 @@ export class JsPreprocessor {
     this._fftRe = new Float64Array(N_FFT);
     this._fftIm = new Float64Array(N_FFT);
     this._powerBuf = new Float32Array(N_FREQ_BINS);
+
+    // Precompute sparse filterbank bounds
+    // The filterbank matrix is highly sparse (~98.5% zeros).
+    // We precompute start/end indices for each row to skip zero multiplications.
+    this.fbBounds = new Int32Array(this.nMels * 2);
+    for (let m = 0; m < this.nMels; m++) {
+      let start = -1;
+      let end = -1;
+      const offset = m * N_FREQ_BINS;
+      for (let k = 0; k < N_FREQ_BINS; k++) {
+        if (this.melFilterbank[offset + k] > 0) {
+          if (start === -1) start = k;
+          end = k + 1; // Exclusive end
+        }
+      }
+      this.fbBounds[m * 2] = start === -1 ? 0 : start;
+      this.fbBounds[m * 2 + 1] = end === -1 ? 0 : end;
+    }
   }
 
   /**
@@ -313,7 +331,9 @@ export class JsPreprocessor {
       for (let m = 0; m < nMels; m++) {
         let melVal = 0;
         const fbOff = m * N_FREQ_BINS;
-        for (let k = 0; k < N_FREQ_BINS; k++) {
+        const start = this.fbBounds[m * 2];
+        const end = this.fbBounds[m * 2 + 1];
+        for (let k = start; k < end; k++) {
           melVal += powerBuf[k] * fb[fbOff + k];
         }
         rawMel[m * nFrames + t] = Math.log(melVal + LOG_ZERO_GUARD);
