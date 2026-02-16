@@ -55,9 +55,6 @@ export default defineConfig({
       'parakeet.js': path.resolve(__dirname, '../../src/index.js'),
     } : {},
   },
-  optimizeDeps: {
-    include: ['onnxruntime-web'],
-  },
   define: {
     global: 'globalThis',
     __PARAKEET_VERSION__: JSON.stringify(parakeetVersion),

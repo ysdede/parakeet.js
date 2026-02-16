@@ -417,24 +417,6 @@ export default function App() {
 
   const parakeetVersion = typeof __PARAKEET_VERSION__ !== 'undefined' ? __PARAKEET_VERSION__ : 'unknown';
   const parakeetSource = typeof __PARAKEET_SOURCE__ !== 'undefined' ? __PARAKEET_SOURCE__ : 'unknown';
-  const [ortVersion, setOrtVersion] = useState('not loaded yet');
-
-  useEffect(() => {
-    const readOrtVersion = () => {
-      const ver = globalThis?.ort?.env?.versions?.common;
-      if (ver) {
-        setOrtVersion(ver);
-        return true;
-      }
-      return false;
-    };
-
-    if (readOrtVersion()) return undefined;
-    const timer = setInterval(() => {
-      if (readOrtVersion()) clearInterval(timer);
-    }, 500);
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-200 font-sans min-h-screen p-6 md:p-10 transition-colors duration-300">
@@ -447,7 +429,6 @@ export default function App() {
             </h1>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               <div>parakeet.js {parakeetVersion} ({parakeetSource})</div>
-              <div>onnxruntime-web {ortVersion}</div>
             </div>
           </div>
           <button
