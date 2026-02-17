@@ -33,7 +33,7 @@ console.log('='.repeat(60));
 const debugFrames = ref.debug_frames || [];
 for (const frame of debugFrames) {
   if (frame.t >= 240 && frame.t <= 270) {
-    const marker = frame.state_updated ? '✓' : '·';
+    const marker = frame.state_updated ? 'PASS' : '·';
     console.log(`  t=${frame.t.toString().padStart(3)}: ${marker} token='${frame.token_str?.padEnd(10)}' step=${frame.step} blank=${frame.is_blank}`);
   }
 }

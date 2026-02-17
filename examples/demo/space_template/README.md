@@ -1,6 +1,6 @@
 ---
 title: Parakeet.js Demo
-emoji: 🦜
+emoji: parakeet
 colorFrom: green
 colorTo: blue
 sdk: static

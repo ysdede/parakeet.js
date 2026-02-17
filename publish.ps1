@@ -23,19 +23,19 @@ $ErrorActionPreference = "Stop" # Exit script on any error
 # Check if git working directory is clean
 $gitStatus = git status --porcelain
 if ($gitStatus) {
-    Write-Host "❌ Git working directory is not clean. Please commit or stash your changes before publishing." -ForegroundColor Red
+    Write-Host "FAIL: Git working directory is not clean. Please commit or stash your changes before publishing." -ForegroundColor Red
     exit 1
 }
-Write-Host "✔️ Git directory is clean."
+Write-Host "OK: Git directory is clean."
 
 # Check if logged into npm
 $npmWhoami = npm whoami
-Write-Host "✔️ Logged into npm as '$npmWhoami'."
+Write-Host "OK: Logged into npm as '$npmWhoami'."
 
 
 # --- 2. Versioning and Publishing ---
 
-Write-Host "🚀 Starting publish process for version $NewVersion..." -ForegroundColor Green
+Write-Host "Starting publish process for version $NewVersion..." -ForegroundColor Green
 
 try {
     # Step 1: Bump version. If it's already set, that's okay.
@@ -56,10 +56,10 @@ try {
     npm publish
 
     Write-Host ""
-    Write-Host "✅ Successfully published parakeet.js version $NewVersion!" -ForegroundColor Green
+    Write-Host "PASS: Successfully published parakeet.js version $NewVersion!" -ForegroundColor Green
 }
 catch {
-    Write-Host "❌ An error occurred during the publish process: $_" -ForegroundColor Red
+    Write-Host "FAIL: An error occurred during the publish process: $_" -ForegroundColor Red
     Write-Host "   Publish process aborted. Please check the state of your repository and npm." -ForegroundColor Yellow
     exit 1
 } 

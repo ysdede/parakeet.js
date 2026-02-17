@@ -14,7 +14,7 @@ async function testBackend() {
   try {
     console.log('2. Testing backend initialization...');
     const ort = await initOrt({ backend: 'webgpu' });
-    console.log('✓ Backend initialized successfully');
+    console.log('PASS: Backend initialized successfully');
     console.log('Available execution providers:', ort.env.availableExecutionProviders);
 
     // Test 3: Check if we can load model files from Hub
@@ -26,7 +26,7 @@ async function testBackend() {
       preprocessor: 'nemo128'
     });
 
-    console.log('✓ Model URLs retrieved:', Object.keys(result.urls));
+    console.log('PASS: Model URLs retrieved:', Object.keys(result.urls));
 
     // Test 4: Try to create a model instance
     console.log('4. Testing model creation...');
@@ -38,11 +38,11 @@ async function testBackend() {
       backend: 'wasm'
     });
 
-    console.log('✓ Model loaded successfully');
+    console.log('PASS: Model loaded successfully');
     console.log('Model ready for transcription!');
 
   } catch (error) {
-    console.error('❌ Test failed:', error);
+    console.error('FAIL: Test failed:', error);
   }
 }
 

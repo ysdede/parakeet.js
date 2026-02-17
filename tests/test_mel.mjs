@@ -119,7 +119,7 @@ function testMelFilterbank(reference) {
   console.log(`  Mean absolute error: ${meanErr.toExponential(3)}`);
 
   const pass = maxErr < 1e-5;
-  console.log(`  ${pass ? "PASS ✓" : "FAIL ✗"}`);
+  console.log(`  ${pass ? "PASS" : "FAIL"}`);
   return pass;
 }
 
@@ -149,7 +149,7 @@ function testFullPipeline(reference) {
 
     // Check dimensions
     if (jsLen !== test.featuresLen) {
-      console.log(`    FAIL ✗ Feature length mismatch: JS=${jsLen} vs Ref=${test.featuresLen}`);
+      console.log(`    FAIL Feature length mismatch: JS=${jsLen} vs Ref=${test.featuresLen}`);
       allPass = false;
       continue;
     }
@@ -183,7 +183,7 @@ function testFullPipeline(reference) {
     // Thresholds: ONNX uses float32, our FFT is float64, so differences come from
     // the float32 truncation of power spectrum + mel matmul accumulation differences
     const pass = totalErr.maxAbsError < 0.05 && meanErr < 0.005;
-    console.log(`    ${pass ? "PASS ✓" : "FAIL ✗"} (thresholds: max<0.05, mean<0.005)`);
+    console.log(`    ${pass ? "PASS" : "FAIL"} (thresholds: max<0.05, mean<0.005)`);
     if (!pass) allPass = false;
   }
 
@@ -252,7 +252,7 @@ function testIncrementalMel(reference) {
 
   // Incremental should match full exactly (same audio, just cached prefix)
   const pass = maxErr < 1e-6;
-  console.log(`  ${pass ? "PASS ✓" : "FAIL ✗"} (threshold: <1e-6)`);
+  console.log(`  ${pass ? "PASS" : "FAIL"} (threshold: <1e-6)`);
   return pass;
 }
 
@@ -308,7 +308,7 @@ function testStandalone() {
   {
     const { features, length } = preprocessor.process(new Float32Array(0));
     const pass = features.length === 0 && length === 0;
-    console.log(`  Empty audio: ${pass ? "PASS ✓" : "FAIL ✗"}`);
+    console.log(`  Empty audio: ${pass ? "PASS" : "FAIL"}`);
     allPass = allPass && pass;
   }
 
@@ -316,7 +316,7 @@ function testStandalone() {
   {
     const { features, length } = preprocessor.process(new Float32Array(100));
     const pass = length === 0;
-    console.log(`  Very short audio (100 samples): length=${length} ${pass ? "PASS ✓" : "FAIL ✗"}`);
+    console.log(`  Very short audio (100 samples): length=${length} ${pass ? "PASS" : "FAIL"}`);
     allPass = allPass && pass;
   }
 
@@ -333,7 +333,7 @@ function testStandalone() {
       maxAbs = Math.max(maxAbs, Math.abs(features[i]));
     }
     const pass = maxAbs < 1e-3;
-    console.log(`  Silence: maxAbs=${maxAbs.toExponential(3)} ${pass ? "PASS ✓" : "FAIL ✗"}`);
+    console.log(`  Silence: maxAbs=${maxAbs.toExponential(3)} ${pass ? "PASS" : "FAIL"}`);
     allPass = allPass && pass;
   }
 
@@ -343,7 +343,7 @@ function testStandalone() {
     const { length } = preprocessor.process(audio);
     const expected = Math.floor(32000 / 160); // 200
     const pass = length === expected;
-    console.log(`  Frame count: JS=${length}, expected=${expected} ${pass ? "PASS ✓" : "FAIL ✗"}`);
+    console.log(`  Frame count: JS=${length}, expected=${expected} ${pass ? "PASS" : "FAIL"}`);
     allPass = allPass && pass;
   }
 
@@ -354,7 +354,7 @@ function testStandalone() {
     const { features, length } = preprocessor.process(audio);
     const nFramesTotal = features.length / 128;
     const pass = Number.isInteger(nFramesTotal) && length <= nFramesTotal;
-    console.log(`  Output shape: [128, ${nFramesTotal}], valid=${length} ${pass ? "PASS ✓" : "FAIL ✗"}`);
+    console.log(`  Output shape: [128, ${nFramesTotal}], valid=${length} ${pass ? "PASS" : "FAIL"}`);
     allPass = allPass && pass;
   }
 
@@ -387,7 +387,7 @@ async function main() {
     console.log(`  ONNX model: ${reference.onnxModel}`);
     console.log(`  Tests: ${Object.keys(reference.tests).join(", ")}`);
   } catch (e) {
-    console.log(`\n  ⚠ No reference file found at: ${refPath}`);
+    console.log(`\n  WARN: No reference file found at: ${refPath}`);
     console.log("  Run: python tests/generate_mel_reference.py");
     console.log("  Skipping ONNX comparison tests.\n");
   }
@@ -407,10 +407,10 @@ async function main() {
   console.log("═══════════════════════════════════════════════════════════");
   let allPass = true;
   for (const [name, pass] of Object.entries(results)) {
-    console.log(`  ${pass ? "✓" : "✗"} ${name}`);
+    console.log(`  ${pass ? "PASS" : "FAIL"} ${name}`);
     if (!pass) allPass = false;
   }
-  console.log(`\n  Overall: ${allPass ? "ALL PASSED ✓" : "SOME FAILED ✗"}`);
+  console.log(`\n  Overall: ${allPass ? "ALL PASSED" : "SOME FAILED"}`);
 
   process.exit(allPass ? 0 : 1);
 }
