@@ -116,6 +116,7 @@ function createMelFilterbank(nMels) {
  * zero-padded to N_FFT. Uses Float64Array to match ONNX's DOUBLE precision.
  *
  * Matches: op.Pad(op.HannWindow(400, periodic=0, output_datatype=DOUBLE), [56, 56])
+ * @returns {Float64Array} Zero-padded Hann window of length `N_FFT`.
  */
 function createPaddedHannWindow() {
   const window = new Float64Array(N_FFT); // zeros
@@ -157,6 +158,7 @@ function precomputeTwiddles(N) {
  * @param {Float64Array} im - Imaginary part (modified in-place)
  * @param {number} N - FFT size (must be power of 2)
  * @param {{cos: Float64Array, sin: Float64Array}} tw - Precomputed twiddle factors
+ * @returns {void}
  */
 function fft(re, im, N, tw) {
   // Bit-reversal permutation
@@ -398,6 +400,7 @@ export class IncrementalMelProcessor {
 
   /**
    * Reset the incremental cache. Call when starting a new utterance or recording session.
+   * @returns {void}
    */
   reset() {
     this._cachedRawMel = null;
@@ -507,13 +510,17 @@ export class IncrementalMelProcessor {
 
   /**
    * Clear the cache (e.g., on recording restart).
+   * @returns {void}
    */
   clear() {
     this.reset();
   }
 }
 
-// Export constants for testing
+/**
+ * Internal mel/STFT constants exported for tests and diagnostics.
+ * @type {{SAMPLE_RATE: number, N_FFT: number, WIN_LENGTH: number, HOP_LENGTH: number, PREEMPH: number, LOG_ZERO_GUARD: number, N_FREQ_BINS: number}}
+ */
 export const MEL_CONSTANTS = {
   SAMPLE_RATE,
   N_FFT,
