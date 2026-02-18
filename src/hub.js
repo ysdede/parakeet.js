@@ -4,6 +4,7 @@
  */
 
 import { MODELS, getModelConfig } from './models.js';
+/** @typedef {import('./models.js').ModelConfig} ModelConfig */
 
 const DB_NAME = 'parakeet-cache-db';
 const STORE_NAME = 'file-store';
@@ -12,6 +13,12 @@ let dbPromise = null;
 // Cache for repo file listings so we only hit the HF API once per page load
 const repoFileCache = new Map();
 
+/**
+ * List model repository files from the Hugging Face model API.
+ * @param {string} repoId - Hugging Face repository ID.
+ * @param {string} [revision='main'] - Git revision/branch/tag.
+ * @returns {Promise<string[]>} Repository file paths.
+ */
 async function listRepoFiles(repoId, revision = 'main') {
   const cacheKey = `${repoId}@${revision}`;
   if (repoFileCache.has(cacheKey)) return repoFileCache.get(cacheKey);
@@ -32,6 +39,10 @@ async function listRepoFiles(repoId, revision = 'main') {
   }
 }
 
+/**
+ * Get (or initialize) the IndexedDB database handle used for caching.
+ * @returns {Promise<IDBDatabase>} Open IndexedDB database instance.
+ */
 function getDb() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
@@ -49,6 +60,11 @@ function getDb() {
   return dbPromise;
 }
 
+/**
+ * Read a cached file blob from IndexedDB.
+ * @param {string} key - Cache key.
+ * @returns {Promise<Blob|undefined>} Cached blob if found.
+ */
 async function getFileFromDb(key) {
   const db = await getDb();
   return new Promise((resolve, reject) => {
@@ -60,6 +76,12 @@ async function getFileFromDb(key) {
   });
 }
 
+/**
+ * Save a file blob into IndexedDB.
+ * @param {string} key - Cache key.
+ * @param {Blob} blob - Blob to store.
+ * @returns {Promise<IDBValidKey | undefined>} IndexedDB request result.
+ */
 async function saveFileToDb(key, blob) {
     const db = await getDb();
     return new Promise((resolve, reject) => {
@@ -78,7 +100,7 @@ async function saveFileToDb(key, blob) {
  * @param {Object} [options]
  * @param {string} [options.revision='main'] Git revision
  * @param {string} [options.subfolder=''] Subfolder within repo
- * @param {Function} [options.progress] Progress callback
+ * @param {(progress: {loaded: number, total: number, file: string}) => void} [options.progress] Progress callback
  * @returns {Promise<string>} URL to cached file (blob URL)
  */
 export async function getModelFile(repoId, filename, options = {}) {
@@ -171,9 +193,10 @@ export async function getModelText(repoId, filename, options = {}) {
  * @param {('int8'|'fp32')} [options.encoderQuant='int8'] Encoder quantization
  * @param {('int8'|'fp32')} [options.decoderQuant='int8'] Decoder quantization
  * @param {('nemo80'|'nemo128')} [options.preprocessor] Preprocessor variant (auto-detected from model config if not specified)
- * @param {('webgpu'|'wasm')} [options.backend='webgpu'] Backend to use
- * @param {Function} [options.progress] Progress callback
- * @returns {Promise<{urls: object, filenames: object, modelConfig: object|null}>}
+ * @param {('js'|'onnx')} [options.preprocessorBackend='js'] Preprocessor backend selection.
+ * @param {('webgpu'|'webgpu-hybrid'|'webgpu-strict'|'wasm')} [options.backend='webgpu'] Backend mode (`webgpu` alias is accepted for compatibility)
+ * @param {(progress: {loaded: number, total: number, file: string}) => void} [options.progress] Progress callback
+ * @returns {Promise<{urls: {encoderUrl: string, decoderUrl: string, tokenizerUrl: string, preprocessorUrl?: string, encoderDataUrl?: string|null, decoderDataUrl?: string|null}, filenames: {encoder: string, decoder: string}, quantisation: {encoder: ('int8'|'fp32'), decoder: ('int8'|'fp32')}, modelConfig: ModelConfig|null, preprocessorBackend: ('js'|'onnx')}>}
  */
 export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   // Resolve model key to repo ID and get config
@@ -238,8 +261,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   
   for (const { key, name } of filesToGet) {
     try {
-        const wrappedProgress = progress ? (p) => progress({ ...p, file: name }) : undefined;
-        results.urls[key] = await getModelFile(repoId, name, { ...options, progress: wrappedProgress });
+        results.urls[key] = await getModelFile(repoId, name, { ...options, progress });
     } catch (e) {
         if (key.endsWith('DataUrl')) {
             console.warn(`[Hub] Optional external data file not found: ${name}. This is expected if the model is small.`);

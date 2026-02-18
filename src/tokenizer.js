@@ -3,6 +3,7 @@
 /**
  * Fetch a text file (tokens.txt or vocab.txt) and return its contents.
  * @param {string} url Remote URL or relative path served by the web app.
+ * @returns {Promise<string>} Raw text content.
  */
 async function fetchText(url) {
   const resp = await fetch(url);
@@ -10,6 +11,9 @@ async function fetchText(url) {
   return resp.text();
 }
 
+/**
+ * Tokenizer/decoder for Parakeet SentencePiece-style token vocabularies.
+ */
 export class ParakeetTokenizer {
   /**
    * @param {string[]} id2token Array where index=id and value=token string
@@ -28,6 +32,11 @@ export class ParakeetTokenizer {
     this.sanitizedTokens = this.id2token.map(t => t ? t.replace(/\u2581/g, ' ') : t);
   }
 
+  /**
+   * Create a tokenizer from a `vocab.txt` or `tokens.txt` URL.
+   * @param {string} tokensUrl - URL to tokenizer vocabulary file.
+   * @returns {Promise<ParakeetTokenizer>} Loaded tokenizer instance.
+   */
   static async fromUrl(tokensUrl) {
     const text = await fetchText(tokensUrl);
     const lines = text.split(/\r?\n/).filter(Boolean);
@@ -44,8 +53,8 @@ export class ParakeetTokenizer {
    * Decode an array of token IDs into a human readable string.
    * Implements the SentencePiece rule where leading `▁` marks a space.
    * Matches the Python reference regex pattern: r"\A\s|\s\B|(\s)\b"
-   * @param {number[]} ids
-   * @returns {string}
+   * @param {number[]} ids - Token IDs from decoder output.
+   * @returns {string} Decoded transcript text.
    */
   decode(ids) {
     // First pass: convert tokens to text with ▁ → space

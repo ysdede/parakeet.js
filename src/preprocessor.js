@@ -1,6 +1,9 @@
 import { initOrt } from './backend.js';
 
-// Runs the Nemo-style preprocessor ONNX model (80- or 128-bin log-mel spectrogram).
+/**
+ * ONNX-based NeMo preprocessor (80- or 128-bin log-mel spectrogram).
+ * Produces mel features compatible with Parakeet encoder inputs.
+ */
 export class OnnxPreprocessor {
   /**
    * @param {string} modelUrl URL to the preprocessor onnx file (e.g. nemo128.onnx)
@@ -17,6 +20,10 @@ export class OnnxPreprocessor {
     this.ort = null;
   }
 
+  /**
+   * Lazily create and cache the ONNX Runtime session.
+   * @returns {Promise<void>}
+   */
   async _ensureSession() {
     if (!this.session) {
       this.ort = await initOrt(this.opts);
@@ -50,7 +57,7 @@ export class OnnxPreprocessor {
   /**
    * Convert PCM audio Float32Array into log-mel features recognised by Parakeet.
    * @param {Float32Array} audio Normalised mono PCM [-1,1] at 16 kHz.
-   * @returns {Promise<{features:Float32Array,length:number}>}
+   * @returns {Promise<{features: Float32Array, length: number}>}
    */
   async process(audio) {
     await this._ensureSession();
