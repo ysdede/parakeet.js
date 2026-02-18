@@ -70,6 +70,7 @@ export const MODELS = {
 
 /**
  * Default model to use when none specified.
+ * @type {string}
  */
 export const DEFAULT_MODEL = 'parakeet-tdt-0.6b-v2';
 

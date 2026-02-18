@@ -9,6 +9,21 @@ import { JsPreprocessor, IncrementalMelProcessor } from './mel.js';
  * transformerjs' style) exported by parakeet TDT.
  */
 export class ParakeetModel {
+  /**
+   * Create a Parakeet model wrapper with initialized runtime sessions.
+   * @param {Object} cfg - Model dependencies and runtime options.
+   * @param {ParakeetTokenizer} cfg.tokenizer - Loaded tokenizer instance.
+   * @param {Object} cfg.encoderSession - ONNX Runtime encoder session.
+   * @param {Object} cfg.joinerSession - ONNX Runtime decoder/joiner session.
+   * @param {Object} cfg.preprocessor - Active preprocessor instance (JS or ONNX).
+   * @param {Object} cfg.ort - ONNX Runtime Web namespace/object.
+   * @param {number} [cfg.subsampling=8] - Encoder subsampling factor in frames.
+   * @param {number} [cfg.windowStride=0.01] - Feature frame stride in seconds (10 ms).
+   * @param {(text: string) => string} [cfg.normalizer] - Text normalizer applied to decoded output.
+   * @param {OnnxPreprocessor|null} [cfg.onnxPreprocessor=null] - Optional ONNX preprocessor instance for backend switching.
+   * @param {number} [cfg.nMels] - Number of mel bins (for example 80 or 128).
+   * @param {number} [cfg.maxIncrementalCacheSize=50] - Max decoder-state cache entries for incremental decoding.
+   */
   constructor({ tokenizer, encoderSession, joinerSession, preprocessor, ort, subsampling = 8, windowStride = 0.01, normalizer = (s) => s, onnxPreprocessor = null, nMels, maxIncrementalCacheSize = 50 }) {
     this.tokenizer = tokenizer;
     this.encoderSession = encoderSession;
@@ -67,10 +82,11 @@ export class ParakeetModel {
    * @param {string} cfg.encoderUrl URL to encoder-model.onnx
    * @param {string} cfg.decoderUrl URL to decoder_joint-model.onnx
    * @param {string} cfg.tokenizerUrl URL to vocab.txt or tokens.txt
-   * @param {string} cfg.preprocessorUrl URL to nemo80/128.onnx (not needed if preprocessorBackend='js')
-   * @param {('webgpu'|'wasm')} [cfg.backend='webgpu']
+   * @param {string} [cfg.preprocessorUrl] URL to nemo80/128.onnx (not needed if preprocessorBackend='js')
+   * @param {('webgpu-hybrid'|'webgpu-strict'|'wasm')} [cfg.backend='webgpu-hybrid']
    * @param {('onnx'|'js')} [cfg.preprocessorBackend='js'] Preprocessor backend: 'js' (default) uses pure JS mel computation (faster, no ONNX overhead, enables incremental streaming), 'onnx' uses nemo*.onnx via WASM
    * @param {number} [cfg.nMels] Number of mel bins (auto-detected from model config, or 128)
+   * @returns {Promise<ParakeetModel>} Initialized model instance.
    */
   static async fromUrls(cfg) {
     const {
@@ -242,6 +258,13 @@ export class ParakeetModel {
     });
   }
 
+  /**
+   * Run one decoder+joiner step for a single encoder frame.
+   * @param {Object} encTensor - Encoder frame tensor shaped [1, 1, D].
+   * @param {number} token - Previous token ID (uses blank when not numeric).
+   * @param {{state1: Object, state2: Object}|null} [currentState=null] - Decoder LSTM state tensors.
+   * @returns {Promise<{tokenLogits: Float32Array, step: number, newState: {state1: Object, state2: Object}, _logitsTensor: Object}>}
+   */
   async _runCombinedStep(encTensor, token, currentState = null) {
     const singleToken = typeof token === 'number' ? token : this.blankId;
 
@@ -286,6 +309,11 @@ export class ParakeetModel {
     return { tokenLogits, step, newState, _logitsTensor: logits };
   }
 
+  /**
+   * Copy decoder state tensors into plain typed arrays for transport/storage.
+   * @param {{state1: Object, state2: Object}|null} state - Decoder state to snapshot.
+   * @returns {{s1: Float32Array, s2: Float32Array, dims1: number[], dims2: number[]}|null}
+   */
   _snapshotDecoderState(state) {
     if (!state) return null;
     const s1 = state.state1;
@@ -298,6 +326,11 @@ export class ParakeetModel {
     };
   }
 
+  /**
+   * Restore decoder state tensors from a serialized snapshot.
+   * @param {{s1: Float32Array, s2: Float32Array, dims1: number[], dims2: number[]}|null} snap - Snapshot from `_snapshotDecoderState`.
+   * @returns {{state1: Object, state2: Object}|null}
+   */
   _restoreDecoderState(snap) {
     if (!snap) return null;
     const state1 = new this.ort.Tensor('float32', new Float32Array(snap.s1), snap.dims1);
@@ -477,6 +510,7 @@ export class ParakeetModel {
    * @param {Float32Array} opts.precomputedFeatures.features - Normalized mel features [melBins, T]
    * @param {number} opts.precomputedFeatures.T - Number of time frames
    * @param {number} opts.precomputedFeatures.melBins - Number of mel frequency bins
+   * @returns {Promise<Object>} Transcription result containing text, token/word details, optional metrics, and optional streaming state.
    */
   async transcribe(audio, sampleRate = 16000, opts = {}) {
     const {
@@ -949,6 +983,7 @@ export class ParakeetModel {
    * Stop ORT profiling (if enabled) for all sessions and print a quick summary
    * of time spent on GPU (WebGPU) vs CPU (WASM) kernels. Returns the parsed
    * summary object for further inspection.
+   * @returns {Object<string, {gpu_us: number, cpu_us: number, total_us: number}>|null} Parsed profile summary keyed by profile filename.
    */
   endProfiling() {
     try { this.encoderSession?.endProfiling(); } catch (e) { /* ignore */ }
@@ -1126,6 +1161,7 @@ export class StatefulStreamingTranscriber {
 
   /**
    * Reset the streamer to process a new audio stream.
+   * @returns {void}
    */
   reset() {
     this._decoderState = null;
@@ -1138,6 +1174,7 @@ export class StatefulStreamingTranscriber {
 
   /**
    * Get current state for inspection/debugging.
+   * @returns {{hasDecoderState: boolean, currentOffset: number, wordCount: number, chunkCount: number, isFinalized: boolean}}
    */
   getState() {
     return {
@@ -1239,6 +1276,7 @@ export class MelFeatureCache {
 
   /**
    * Clear the entire cache.
+   * @returns {void}
    */
   clear() {
     this.cache.clear();
@@ -1247,6 +1285,7 @@ export class MelFeatureCache {
 
   /**
    * Get cache statistics.
+   * @returns {{entries: number, sizeMB: string, maxSizeMB: number}}
    */
   getStats() {
     return {
@@ -1410,6 +1449,7 @@ export class FrameAlignedMerger {
 
   /**
    * Reset the merger state.
+   * @returns {void}
    */
   reset() {
     this.confirmedTokens = [];
@@ -1419,6 +1459,7 @@ export class FrameAlignedMerger {
 
   /**
    * Get merger state for debugging.
+   * @returns {{confirmedCount: number, pendingCount: number, stabilityMapSize: number}}
    */
   getState() {
     return {
@@ -1690,6 +1731,7 @@ export class LCSPTFAMerger {
 
   /**
    * Reset merger state.
+   * @returns {void}
    */
   reset() {
     this.confirmedTokens = [];
