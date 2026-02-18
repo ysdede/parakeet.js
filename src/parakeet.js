@@ -83,7 +83,7 @@ export class ParakeetModel {
    * @param {string} cfg.decoderUrl URL to decoder_joint-model.onnx
    * @param {string} cfg.tokenizerUrl URL to vocab.txt or tokens.txt
    * @param {string} [cfg.preprocessorUrl] URL to nemo80/128.onnx (not needed if preprocessorBackend='js')
-   * @param {('webgpu-hybrid'|'webgpu-strict'|'wasm')} [cfg.backend='webgpu-hybrid']
+   * @param {('webgpu'|'webgpu-hybrid'|'webgpu-strict'|'wasm')} [cfg.backend='webgpu-hybrid'] Backend mode (`webgpu` alias is accepted for compatibility)
    * @param {('onnx'|'js')} [cfg.preprocessorBackend='js'] Preprocessor backend: 'js' (default) uses pure JS mel computation (faster, no ONNX overhead, enables incremental streaming), 'onnx' uses nemo*.onnx via WASM
    * @param {number} [cfg.nMels] Number of mel bins (auto-detected from model config, or 128)
    * @returns {Promise<ParakeetModel>} Initialized model instance.
