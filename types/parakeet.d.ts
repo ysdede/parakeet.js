@@ -56,16 +56,38 @@ export interface TranscribeWord {
 
 export interface TranscribeToken {
   token: string;
+  raw_token?: string;
+  is_word_start?: boolean;
   start_time: number;
   end_time: number;
   confidence?: number;
 }
 
+export interface TranscribeConfidenceScoresDetailed {
+  token: number[];
+  token_avg: number | null;
+  word: number[];
+  word_avg: number | null;
+  frame: number[];
+  frame_avg: number | null;
+  overall_log_prob: number;
+}
+
+export interface TranscribeConfidenceScoresMinimal {
+  overall_log_prob: null;
+  frame: null;
+  frame_avg: null;
+}
+
+export type TranscribeConfidenceScores =
+  | TranscribeConfidenceScoresDetailed
+  | TranscribeConfidenceScoresMinimal;
+
 export interface TranscribeResult {
   utterance_text: string;
   words: TranscribeWord[];
-  tokens: TranscribeToken[];
-  confidence_scores?: Record<string, number | null>;
+  tokens?: TranscribeToken[];
+  confidence_scores?: TranscribeConfidenceScores;
   metrics?: {
     preprocess_ms: number;
     encode_ms: number;
@@ -172,43 +194,60 @@ export class MelFeatureCache {
   getStats(): { entries: number; sizeMB: string; maxSizeMB: number };
 }
 
+export interface MergedToken {
+  id: number;
+  frameIndex: number;
+  absTime: number;
+  logProb: number;
+  text: string;
+  vignetteWeight?: number;
+}
+
+export interface FrameAlignedProcessChunkInput {
+  tokenIds: number[];
+  frameIndices: number[];
+  timestamps?: number[][];
+  logProbs?: number[];
+  tokens?: Array<{ token?: string }>;
+}
+
+export interface FrameAlignedProcessChunkResult {
+  confirmed: MergedToken[];
+  pending: MergedToken[];
+  anchorsFound: number;
+  totalTokens: number;
+}
+
 export class FrameAlignedMerger {
   constructor(opts?: { frameTimeStride?: number; timeTolerance?: number; stabilityThreshold?: number });
-  processChunk(result: {
-    tokenIds: number[];
-    frameIndices: number[];
-    timestamps?: number[][];
-    logProbs?: number[];
-    tokens?: Array<{ token?: string }>;
-  }, chunkStartTime: number, overlapDuration?: number): {
-    confirmed: Array<Record<string, unknown>>;
-    pending: Array<Record<string, unknown>>;
-    anchorsFound: number;
-    totalTokens: number;
-  };
+  processChunk(result: FrameAlignedProcessChunkInput, chunkStartTime: number, overlapDuration?: number): FrameAlignedProcessChunkResult;
   getText(tokenizer: { decode(ids: number[]): string }): string;
-  getAllTokens(): Array<Record<string, unknown>>;
+  getAllTokens(): MergedToken[];
   reset(): void;
   getState(): { confirmedCount: number; pendingCount: number; stabilityMapSize: number };
 }
 
+export interface LCSPTFAProcessChunkInput {
+  tokenIds: number[];
+  frameIndices: number[];
+  logProbs?: number[];
+  tokens?: Array<{ token?: string }>;
+}
+
+export interface LCSPTFAProcessChunkResult {
+  confirmed: MergedToken[];
+  pending: MergedToken[];
+  lcsLength: number;
+  anchorValid: boolean;
+  overlapTokenCount?: number;
+  isFirstChunk?: boolean;
+}
+
 export class LCSPTFAMerger {
   constructor(opts?: { frameTimeStride?: number; timeTolerance?: number; sequenceAnchorLength?: number; vignetteSigmaFactor?: number });
-  processChunk(result: {
-    tokenIds: number[];
-    frameIndices: number[];
-    logProbs?: number[];
-    tokens?: Array<{ token?: string }>;
-  }, chunkStartTime: number, overlapDuration?: number): {
-    confirmed: Array<Record<string, unknown>>;
-    pending: Array<Record<string, unknown>>;
-    lcsLength: number;
-    anchorValid: boolean;
-    overlapTokenCount?: number;
-    isFirstChunk?: boolean;
-  };
+  processChunk(result: LCSPTFAProcessChunkInput, chunkStartTime: number, overlapDuration?: number): LCSPTFAProcessChunkResult;
   getText(tokenizer: { decode(ids: number[]): string }): { confirmed: string; pending: string; full: string };
-  getAllTokens(): Array<Record<string, unknown>>;
+  getAllTokens(): MergedToken[];
   reset(): void;
   getState(): {
     confirmedCount: number;
