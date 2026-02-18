@@ -261,8 +261,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   
   for (const { key, name } of filesToGet) {
     try {
-        const wrappedProgress = progress ? (p) => progress({ ...p, file: name }) : undefined;
-        results.urls[key] = await getModelFile(repoId, name, { ...options, progress: wrappedProgress });
+        results.urls[key] = await getModelFile(repoId, name, { ...options, progress });
     } catch (e) {
         if (key.endsWith('DataUrl')) {
             console.warn(`[Hub] Optional external data file not found: ${name}. This is expected if the model is small.`);
