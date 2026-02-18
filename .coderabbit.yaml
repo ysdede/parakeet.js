@@ -1,0 +1,18 @@
+# CodeRabbit: docstring coverage and generation style for parakeet.js (JS WebGPU/WASM)
+# See: https://docs.coderabbit.ai/pr-reviews/pre-merge-checks
+#      https://docs.coderabbit.ai/finishing-touches/docstrings
+
+reviews:
+  pre_merge_checks:
+    docstrings:
+      mode: "warning"
+      threshold: 80
+
+code_generation:
+  docstrings:
+    path_instructions:
+      - path: "src/**/*.js"
+        instructions: |
+          Use JSDoc with explicit types: @param {Type} name, @returns {Type}.
+          Config objects: @param {Object} cfg and cfg.prop for each key; optional [cfg.key=default].
+          Include units (Hz, samples, seconds, frames, mel bins). Match existing style in parakeet.js, mel.js, backend.js.
