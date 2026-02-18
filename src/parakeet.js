@@ -260,7 +260,7 @@ export class ParakeetModel {
 
   /**
    * Run one decoder+joiner step for a single encoder frame.
-   * @param {Object} encTensor - Encoder frame tensor shaped [1, 1, D].
+   * @param {Object} encTensor - Encoder frame tensor shaped [1, D, 1].
    * @param {number} token - Previous token ID (uses blank when not numeric).
    * @param {{state1: Object, state2: Object}|null} [currentState=null] - Decoder LSTM state tensors.
    * @returns {Promise<{tokenLogits: Float32Array, step: number, newState: {state1: Object, state2: Object}, _logitsTensor: Object}>}
