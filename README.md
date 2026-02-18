@@ -118,7 +118,7 @@ yarn add parakeet.js
 
 TypeScript users:
 - The package ships bundled declarations via the top-level `"types"` field.
-- Subpath declaration resolution via `exports.types` works in newer TypeScript releases (for example TS 5.x). If your toolchain is older, use the root import (`parakeet.js`) or upgrade TypeScript.
+- Subpath declaration resolution via `exports.types` works in TS 4.7+ when `moduleResolution` is `node16`, `nodenext`, or `bundler`. If your toolchain is older, use the root import (`parakeet.js`) or upgrade TypeScript.
 
 ---
 

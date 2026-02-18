@@ -58,8 +58,8 @@ export interface TranscribeToken {
   token: string;
   raw_token?: string;
   is_word_start?: boolean;
-  start_time: number;
-  end_time: number;
+  start_time?: number;
+  end_time?: number;
   confidence?: number;
 }
 
@@ -166,7 +166,7 @@ export class StatefulStreamingTranscriber {
     chunkCount: number;
     is_final: boolean;
     tokenIds?: number[];
-    confidence_scores?: Record<string, number | null>;
+    confidence_scores?: TranscribeConfidenceScores;
     metrics?: TranscribeResult['metrics'];
   }>;
   finalize(): {

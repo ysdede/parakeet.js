@@ -37,5 +37,18 @@ export {
 import type { FromUrlsConfig, ParakeetModel } from './parakeet';
 import type { GetParakeetModelOptions } from './hub';
 
+export type {
+  TranscribeResult,
+  TranscribeOptions,
+  FromUrlsConfig,
+} from './parakeet';
+
+export type { ModelConfig } from './models';
+export type { GetParakeetModelOptions } from './hub';
+
+export type FromHubOptions =
+  GetParakeetModelOptions &
+  Partial<Pick<FromUrlsConfig, 'cpuThreads' | 'wasmPaths' | 'enableGraphCapture' | 'verbose' | 'subsampling' | 'windowStride' | 'enableProfiling' | 'nMels'>>;
+
 export function fromUrls(cfg: FromUrlsConfig): Promise<ParakeetModel>;
-export function fromHub(repoIdOrModelKey: string, options?: GetParakeetModelOptions): Promise<ParakeetModel>;
+export function fromHub(repoIdOrModelKey: string, options?: FromHubOptions): Promise<ParakeetModel>;
