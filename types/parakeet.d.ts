@@ -74,6 +74,10 @@ export interface TranscribeConfidenceScoresDetailed {
 }
 
 export interface TranscribeConfidenceScoresMinimal {
+  token?: null;
+  token_avg?: null;
+  word?: null;
+  word_avg?: null;
   overall_log_prob: null;
   frame: null;
   frame_avg: null;
