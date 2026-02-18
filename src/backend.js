@@ -8,6 +8,7 @@
  * @param {Object} opts
  * @param {('webgpu'|'wasm')} [opts.backend='webgpu'] Desired backend.
  * @param {string} [opts.wasmPaths] Optional path prefix for WASM binaries.
+ * @param {number} [opts.numThreads] Number of WASM threads to use when SharedArrayBuffer is available.
  * @returns {Promise<typeof import('onnxruntime-web').default>}
  */
 export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}) {
