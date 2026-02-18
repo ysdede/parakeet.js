@@ -4,6 +4,7 @@
  */
 
 import { MODELS, getModelConfig } from './models.js';
+/** @typedef {import('./models.js').ModelConfig} ModelConfig */
 
 const DB_NAME = 'parakeet-cache-db';
 const STORE_NAME = 'file-store';
@@ -79,7 +80,7 @@ async function getFileFromDb(key) {
  * Save a file blob into IndexedDB.
  * @param {string} key - Cache key.
  * @param {Blob} blob - Blob to store.
- * @returns {Promise<unknown>} IndexedDB request result.
+ * @returns {Promise<IDBValidKey | undefined>} IndexedDB request result.
  */
 async function saveFileToDb(key, blob) {
     const db = await getDb();
@@ -193,7 +194,7 @@ export async function getModelText(repoId, filename, options = {}) {
  * @param {('int8'|'fp32')} [options.decoderQuant='int8'] Decoder quantization
  * @param {('nemo80'|'nemo128')} [options.preprocessor] Preprocessor variant (auto-detected from model config if not specified)
  * @param {('js'|'onnx')} [options.preprocessorBackend='js'] Preprocessor backend selection.
- * @param {('webgpu-hybrid'|'webgpu-strict'|'wasm'|'webgpu')} [options.backend='webgpu'] Backend to use
+ * @param {('webgpu'|'webgpu-hybrid'|'webgpu-strict'|'wasm')} [options.backend='webgpu'] Backend mode (`webgpu` alias is accepted for compatibility)
  * @param {(progress: {loaded: number, total: number, file: string}) => void} [options.progress] Progress callback
  * @returns {Promise<{urls: {encoderUrl?: string, decoderUrl?: string, tokenizerUrl?: string, preprocessorUrl?: string, encoderDataUrl?: string|null, decoderDataUrl?: string|null}, filenames: {encoder: string, decoder: string}, quantisation: {encoder: ('int8'|'fp32'), decoder: ('int8'|'fp32')}, modelConfig: ModelConfig|null, preprocessorBackend: ('js'|'onnx')}>}
  */
