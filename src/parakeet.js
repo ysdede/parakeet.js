@@ -1215,12 +1215,42 @@ export class MelFeatureCache {
    * @returns {string} Cache key
    */
   _generateKey(audio) {
-    let hash = audio.length;
-    // Sample every 1000th sample for fast hashing
-    for (let i = 0; i < audio.length; i += 1000) {
-      hash = ((hash << 5) - hash + Math.floor(audio[i] * 32768)) | 0;
-    }
-    return `${audio.length}_${hash}`;
+    const n = audio.length;
+    if (n === 0) return '0_0';
+
+    // MurmurHash3-style 32-bit mix helper
+    const mix32 = (h, v) => {
+      // Quantise float to 16-bit signed integer range
+      let k = Math.floor(v * 32768) & 0xffff;
+      k = Math.imul(k, 0xcc9e2d51);
+      k = (k << 15) | (k >>> 17);
+      k = Math.imul(k, 0x1b873593);
+      h ^= k;
+      h = (h << 13) | (h >>> 19);
+      return (Math.imul(h, 5) + 0xe6546b64) | 0;
+    };
+
+    // fmix32 finaliser — avalanche remaining bits
+    const fmix32 = (h) => {
+      h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+      h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+      h ^= h >>> 16;
+      return h >>> 0; // force unsigned
+    };
+
+    // Seed with length so differently-sized arrays can never collide
+    let h = n | 0;
+
+    // Always include boundary samples (catches edits at the start/end)
+    const boundary = Math.min(4, n);
+    for (let i = 0; i < boundary; i++) h = mix32(h, audio[i]);
+    for (let i = Math.max(boundary, n - 4); i < n; i++) h = mix32(h, audio[i]);
+
+    // Uniform interior sampling — ~128 evenly spaced positions
+    const stride = Math.max(1, Math.floor(n / 128));
+    for (let i = 0; i < n; i += stride) h = mix32(h, audio[i]);
+
+    return `${n}_${fmix32(h)}`;
   }
 
   /**
