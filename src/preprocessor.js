@@ -66,14 +66,14 @@ export class OnnxPreprocessor {
     let buffer;
     if (audio instanceof Float32Array) {
       // Check if the array is contiguous (not a view with stride)
-      const isContiguous = audio.byteOffset === 0 || 
-                          (audio.byteLength === audio.length * 4); // 4 bytes per float32
+      const isContiguous = audio.byteOffset === 0 ||
+        (audio.byteLength === audio.length * 4); // 4 bytes per float32
       buffer = isContiguous ? audio : new Float32Array(audio);
     } else {
       // Convert other array types to Float32Array
       buffer = new Float32Array(audio);
     }
-    
+
     const waveforms = new this.ort.Tensor('float32', buffer, [1, buffer.length]);
 
     const lenArr = new BigInt64Array([BigInt(buffer.length)]);
@@ -85,9 +85,18 @@ export class OnnxPreprocessor {
     const featuresTensor = outs['features'];
     const features_lens = outs['features_lens'];
 
+    const featuresData = new Float32Array(featuresTensor.data);
+    const validLength = Number(features_lens.data[0]);
+
+    // Dispose of the tensors to prevent WASM memory leaks
+    waveforms.dispose?.();
+    waveforms_lens.dispose?.();
+    featuresTensor.dispose?.();
+    features_lens.dispose?.();
+
     return {
-      features: featuresTensor.data,
-      length: Number(features_lens.data[0])
+      features: featuresData,
+      length: validLength
     };
   }
 } 
