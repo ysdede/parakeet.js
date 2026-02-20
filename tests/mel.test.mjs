@@ -295,6 +295,22 @@ describe('JsPreprocessor', () => {
     expect(length).toBe(0);
   });
 
+  it('should reuse precomputed window/twiddles/filterbank across instances', () => {
+    const p1 = new JsPreprocessor({ nMels: 128 });
+    const p2 = new JsPreprocessor({ nMels: 128 });
+    const p3 = new JsPreprocessor({ nMels: 80 });
+
+    expect(p1.hannWindow).toBe(p2.hannWindow);
+    expect(p1.hannWindow).toBe(p3.hannWindow);
+
+    expect(p1.twiddles).toBe(p2.twiddles);
+    expect(p1.twiddles).toBe(p3.twiddles);
+    expect(p1.twiddles.bitrev.length).toBe(MEL_CONSTANTS.N_FFT);
+
+    expect(p1.melFilterbank).toBe(p2.melFilterbank);
+    expect(p3.melFilterbank).not.toBe(p1.melFilterbank);
+  });
+
   it('computeRawMel should zero skipped prefix frames when reusing an output buffer', () => {
     const p = new JsPreprocessor({ nMels: 128 });
     const audioA = new Float32Array(32000);

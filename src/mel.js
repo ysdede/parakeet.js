@@ -35,6 +35,11 @@ const PREEMPH = 0.97;
 const LOG_ZERO_GUARD = 2 ** -24; // float(2**-24) ≈ 5.96e-8
 const N_FREQ_BINS = (N_FFT >> 1) + 1; // 257
 
+// Shared precompute caches to avoid per-instance allocations.
+const MEL_FILTERBANK_CACHE = new Map();
+const FFT_TWIDDLE_CACHE = new Map();
+let SHARED_HANN_WINDOW = null;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Slaney Mel Scale (matching torchaudio.functional.melscale_fbanks)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -107,6 +112,15 @@ function createMelFilterbank(nMels) {
   return fb;
 }
 
+function getCachedMelFilterbank(nMels) {
+  let fb = MEL_FILTERBANK_CACHE.get(nMels);
+  if (!fb) {
+    fb = createMelFilterbank(nMels);
+    MEL_FILTERBANK_CACHE.set(nMels, fb);
+  }
+  return fb;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Hann Window (symmetric, zero-padded to N_FFT)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -131,6 +145,13 @@ function createPaddedHannWindow() {
   return window;
 }
 
+function getCachedPaddedHannWindow() {
+  if (!SHARED_HANN_WINDOW) {
+    SHARED_HANN_WINDOW = createPaddedHannWindow();
+  }
+  return SHARED_HANN_WINDOW;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FFT (Radix-2 Cooley-Tukey, in-place)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -141,6 +162,14 @@ function createPaddedHannWindow() {
  * @returns {{cos: Float64Array, sin: Float64Array}}
  */
 function precomputeTwiddles(N) {
+  const cached = FFT_TWIDDLE_CACHE.get(N);
+  if (cached) return cached;
+
+  const bits = Math.log2(N);
+  if ((1 << bits) !== N) {
+    throw new Error(`FFT size must be power-of-two. Received: ${N}`);
+  }
+
   const half = N >> 1;
   const cos = new Float64Array(half);
   const sin = new Float64Array(half);
@@ -149,7 +178,22 @@ function precomputeTwiddles(N) {
     cos[i] = Math.cos(angle);
     sin[i] = Math.sin(angle);
   }
-  return { cos, sin };
+
+  // Precompute bit-reversal indices once per FFT size.
+  const bitrev = new Uint32Array(N);
+  for (let i = 0; i < N; i++) {
+    let x = i;
+    let r = 0;
+    for (let b = 0; b < bits; b++) {
+      r = (r << 1) | (x & 1);
+      x >>= 1;
+    }
+    bitrev[i] = r;
+  }
+
+  const tw = { cos, sin, bitrev };
+  FFT_TWIDDLE_CACHE.set(N, tw);
+  return tw;
 }
 
 /**
@@ -162,22 +206,37 @@ function precomputeTwiddles(N) {
  */
 function fft(re, im, N, tw) {
   // Bit-reversal permutation
-  let j = 0;
-  for (let i = 0; i < N - 1; i++) {
-    if (i < j) {
-      let tmp = re[i];
-      re[i] = re[j];
-      re[j] = tmp;
-      tmp = im[i];
-      im[i] = im[j];
-      im[j] = tmp;
+  if (tw.bitrev && tw.bitrev.length === N) {
+    const bitrev = tw.bitrev;
+    for (let i = 0; i < N; i++) {
+      const j = bitrev[i];
+      if (i < j) {
+        let tmp = re[i];
+        re[i] = re[j];
+        re[j] = tmp;
+        tmp = im[i];
+        im[i] = im[j];
+        im[j] = tmp;
+      }
     }
-    let k = N >> 1;
-    while (k <= j) {
-      j -= k;
-      k >>= 1;
+  } else {
+    let j = 0;
+    for (let i = 0; i < N - 1; i++) {
+      if (i < j) {
+        let tmp = re[i];
+        re[i] = re[j];
+        re[j] = tmp;
+        tmp = im[i];
+        im[i] = im[j];
+        im[j] = tmp;
+      }
+      let k = N >> 1;
+      while (k <= j) {
+        j -= k;
+        k >>= 1;
+      }
+      j += k;
     }
-    j += k;
   }
 
   // Butterfly stages
@@ -222,9 +281,9 @@ export class JsPreprocessor {
   constructor(opts = {}) {
     this.nMels = opts.nMels || 128;
 
-    // Precompute constants
-    this.melFilterbank = createMelFilterbank(this.nMels);
-    this.hannWindow = createPaddedHannWindow();
+    // Share immutable precomputed constants across instances.
+    this.melFilterbank = getCachedMelFilterbank(this.nMels);
+    this.hannWindow = getCachedPaddedHannWindow();
     this.twiddles = precomputeTwiddles(N_FFT);
 
     // Pre-allocate reusable buffers
