@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ParakeetModel } from '../src/parakeet.js';
 
 describe('ParakeetModel Incremental Cache', () => {
@@ -102,5 +102,57 @@ describe('ParakeetModel Incremental Cache', () => {
     model.clearIncrementalCache();
 
     expect(model._incrementalCache.size).toBe(0);
+  });
+
+  it('should skip prefix frames only when cacheKey and prefixSeconds match', async () => {
+    const joinerRun = vi.fn().mockResolvedValue({
+      outputs: {
+        dims: [1, 1, 1, 3],
+        data: new Float32Array([0.8, 0.1, 0.1]), // blank
+      },
+      output_states_1: { data: new Float32Array(10), dims: [1, 1, 10] },
+      output_states_2: { data: new Float32Array(10), dims: [1, 1, 10] },
+    });
+
+    const model = new ParakeetModel({
+      tokenizer: mockTokenizer,
+      encoderSession: mockEncoderSession,
+      joinerSession: { run: joinerRun },
+      preprocessor: mockPreprocessor,
+      ort: mockOrt,
+      nMels: 128,
+    });
+
+    // First call seeds cache for key "k" at prefix=0.16s => 2 encoder frames
+    await model.transcribe(new Float32Array(16000), 16000, {
+      incremental: { cacheKey: 'k', prefixSeconds: 0.16 },
+      enableProfiling: false,
+    });
+    const callsAfterSeed = joinerRun.mock.calls.length;
+    expect(callsAfterSeed).toBe(10);
+
+    // Matching cacheKey + prefixSeconds should skip 2 frames => 8 decode steps
+    await model.transcribe(new Float32Array(16000), 16000, {
+      incremental: { cacheKey: 'k', prefixSeconds: 0.16 },
+      enableProfiling: false,
+    });
+    const callsAfterHit = joinerRun.mock.calls.length - callsAfterSeed;
+    expect(callsAfterHit).toBe(8);
+
+    // Different prefixSeconds for same key must miss cache => full 10 steps
+    await model.transcribe(new Float32Array(16000), 16000, {
+      incremental: { cacheKey: 'k', prefixSeconds: 0.24 },
+      enableProfiling: false,
+    });
+    const callsAfterPrefixMismatch = joinerRun.mock.calls.length - callsAfterSeed - callsAfterHit;
+    expect(callsAfterPrefixMismatch).toBe(10);
+
+    // Different key must also miss cache => full 10 steps
+    await model.transcribe(new Float32Array(16000), 16000, {
+      incremental: { cacheKey: 'k2', prefixSeconds: 0.16 },
+      enableProfiling: false,
+    });
+    const callsAfterKeyMismatch = joinerRun.mock.calls.length - callsAfterSeed - callsAfterHit - callsAfterPrefixMismatch;
+    expect(callsAfterKeyMismatch).toBe(10);
   });
 });
