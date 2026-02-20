@@ -286,6 +286,14 @@ export class ParakeetModel {
     const out = await this.joinerSession.run(feeds);
     const logits = out['outputs'];
 
+    // Dispose target tensors now that the joiner has run
+    this._targetTensor.dispose?.();
+    this._targetLenTensor.dispose?.();
+
+    // Create new target tensors for the next run (since we mutated the underlying array)
+    this._targetTensor = new this.ort.Tensor('int32', this._targetIdArray, [1, 1]);
+    this._targetLenTensor = new this.ort.Tensor('int32', this._targetLenArray, [1]);
+
     const vocab = this.tokenizer.id2token.length;
     const totalDim = logits.dims[3];
     const data = logits.data;
@@ -676,7 +684,7 @@ export class ParakeetModel {
         startFrame = prefixFrames;
         effectiveTimeOffset = timeOffset + prefixFrames * TIME_STRIDE;  // Preserve caller's timeOffset base
         decoderState = this._restoreDecoderState(cached.state);
-        if (debug) console.log(`[Parakeet] Incremental cache hit: skipping ${prefixFrames}/${Tenc} frames (${(prefixFrames/Tenc*100).toFixed(0)}%)`);
+        if (debug) console.log(`[Parakeet] Incremental cache hit: skipping ${prefixFrames}/${Tenc} frames (${(prefixFrames / Tenc * 100).toFixed(0)}%)`);
 
         // LRU update: move to end
         this._incrementalCache.delete(inc.cacheKey);
@@ -851,7 +859,7 @@ export class ParakeetModel {
       }
 
       // Dispose final decoder state tensors (snapshots already copied the data)
-      this._disposeDecoderState(decoderState);
+      this._disposeDecoderState(decoderState, previousDecoderState);
 
       return result;
     }
@@ -957,7 +965,7 @@ export class ParakeetModel {
     }
 
     // Dispose final decoder state tensors (snapshots already copied the data)
-    this._disposeDecoderState(decoderState);
+    this._disposeDecoderState(decoderState, previousDecoderState);
 
     return result;
   }
