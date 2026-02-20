@@ -286,7 +286,7 @@ export class JsPreprocessor {
   computeRawMel(audio, startFrame = 0, outBuffer = null) {
     const N = audio.length;
     if (N === 0) {
-      return { rawMel: new Float32Array(0), nFrames: 0, featuresLen: 0 };
+      return { rawMel: outBuffer ? outBuffer.subarray(0, 0) : new Float32Array(0), nFrames: 0, featuresLen: 0 };
     }
 
     // Pre-emphasis
@@ -319,6 +319,9 @@ export class JsPreprocessor {
     if (outBuffer && outBuffer.length >= reqSize) {
       // Reuse provided buffer
       rawMel = outBuffer.subarray(0, reqSize);
+      if (startFrame > 0) {
+        rawMel.fill(0, 0, startFrame * this.nMels);
+      }
     } else {
       rawMel = new Float32Array(reqSize);
     }
@@ -330,6 +333,7 @@ export class JsPreprocessor {
     const fb = this.melFilterbank;
     const nMels = this.nMels;
     const tw = this.twiddles;
+    const fbBounds = this.fbBounds;
 
     for (let t = startFrame; t < nFrames; t++) {
       const offset = t * HOP_LENGTH;
@@ -344,8 +348,8 @@ export class JsPreprocessor {
       for (let m = 0; m < nMels; m++) {
         let melVal = 0;
         const fbOff = m * N_FREQ_BINS;
-        const start = this.fbBounds[m * 2];
-        const end = this.fbBounds[m * 2 + 1];
+        const start = fbBounds[m * 2];
+        const end = fbBounds[m * 2 + 1];
         for (let k = start; k < end; k++) {
           melVal += powerBuf[k] * fb[fbOff + k];
         }
@@ -535,7 +539,7 @@ export class IncrementalMelProcessor {
       this._bufIdx ^= 1;
 
       return {
-        features,
+        features: new Float32Array(features),
         length: featuresLen,
         cached: false,
         cachedFrames: 0,
@@ -566,12 +570,7 @@ export class IncrementalMelProcessor {
       for (let m = 0; m < this.nMels; m++) {
         const srcBase = m * this._cachedNFrames;
         const dstBase = m * nFrames;
-        // Use set/subarray for faster block copy if safeFrames is large?
-        // rawMel.set(this._cachedRawMel.subarray(srcBase, srcBase + safeFrames), dstBase);
-        // Manual loop avoids creating subarray views (garbage).
-        for (let t = 0; t < safeFrames; t++) {
-          rawMel[dstBase + t] = this._cachedRawMel[srcBase + t];
-        }
+        rawMel.set(this._cachedRawMel.subarray(srcBase, srcBase + safeFrames), dstBase);
       }
     }
 
@@ -593,7 +592,7 @@ export class IncrementalMelProcessor {
     this._bufIdx ^= 1;
 
     return {
-      features,
+      features: new Float32Array(features),
       length: featuresLen,
       cached: true,
       cachedFrames: safeFrames,
