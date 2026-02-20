@@ -280,15 +280,17 @@ export class JsPreprocessor {
    *
    * @param {Float32Array} audio - Mono PCM [-1,1] at 16kHz
    * @param {number} [startFrame=0] - Frame index to start computation from (0 to nFrames-1). Frames before this are left as zero.
+   * @param {Float32Array} [outBuffer=null] - Optional buffer to reuse for rawMel output. If too small, a new buffer is allocated.
    * @returns {{rawMel: Float32Array, nFrames: number, featuresLen: number}}
    */
-  computeRawMel(audio, startFrame = 0) {
+  computeRawMel(audio, startFrame = 0, outBuffer = null) {
     const N = audio.length;
     if (N === 0) {
       return { rawMel: new Float32Array(0), nFrames: 0, featuresLen: 0 };
     }
 
     // Pre-emphasis
+    // TODO: Reuse preemph buffer too? For now, rawMel/features are the biggest allocs.
     const preemph = new Float32Array(N);
     preemph[0] = audio[0];
     for (let i = 1; i < N; i++) {
@@ -312,7 +314,15 @@ export class JsPreprocessor {
     }
 
     // STFT + power + mel + log (no normalization)
-    const rawMel = new Float32Array(this.nMels * nFrames);
+    const reqSize = this.nMels * nFrames;
+    let rawMel;
+    if (outBuffer && outBuffer.length >= reqSize) {
+      // Reuse provided buffer
+      rawMel = outBuffer.subarray(0, reqSize);
+    } else {
+      rawMel = new Float32Array(reqSize);
+    }
+
     const fftRe = this._fftRe;
     const fftIm = this._fftIm;
     const powerBuf = this._powerBuf;
@@ -353,11 +363,19 @@ export class JsPreprocessor {
    * @param {Float32Array} rawMel - Pre-normalization features [nMels, nFrames]
    * @param {number} nFrames - Total number of frames in rawMel
    * @param {number} featuresLen - Number of valid frames to normalize over
-   * @returns {Float32Array} Normalized features (new array)
+   * @param {Float32Array} [outBuffer=null] - Optional buffer to reuse for features output.
+   * @returns {Float32Array} Normalized features
    */
-  normalizeFeatures(rawMel, nFrames, featuresLen) {
+  normalizeFeatures(rawMel, nFrames, featuresLen, outBuffer = null) {
     const nMels = this.nMels;
-    const features = new Float32Array(nMels * featuresLen);
+    const reqSize = nMels * featuresLen;
+    let features;
+
+    if (outBuffer && outBuffer.length >= reqSize) {
+      features = outBuffer.subarray(0, reqSize);
+    } else {
+      features = new Float32Array(reqSize);
+    }
 
     for (let m = 0; m < nMels; m++) {
       const srcBase = m * nFrames;
@@ -413,10 +431,18 @@ export class IncrementalMelProcessor {
     this.boundaryFrames = opts.boundaryFrames || 3;
 
     // Cache state
-    this._cachedRawMel = null; // Float32Array [nMels, cachedFrames]
+    this._cachedRawMel = null; // Float32Array [nMels, cachedFrames] - VIEW into one of the _rawBuffers
     this._cachedNFrames = 0;
     this._cachedAudioLen = 0; // length of audio that produced the cache
     this._cachedFeaturesLen = 0;
+
+    // Double buffering for raw mel to allow safe reuse while copying from cache
+    // _rawBuffers[0] and [1] will grow as needed.
+    this._rawBuffers = [null, null];
+    this._bufIdx = 0;
+
+    // Single buffer for features (no dependency on previous features)
+    this._featuresBuffer = null;
   }
 
   /**
@@ -428,6 +454,8 @@ export class IncrementalMelProcessor {
     this._cachedNFrames = 0;
     this._cachedAudioLen = 0;
     this._cachedFeaturesLen = 0;
+    // We retain the allocated buffers to avoid re-allocation next time
+    this._bufIdx = 0;
   }
 
   /**
@@ -456,22 +484,55 @@ export class IncrementalMelProcessor {
       this._cachedRawMel !== null &&
       prefixSamples <= this._cachedAudioLen;
 
-    if (!canReuse) {
-      // Full computation (no cache or cache invalid)
-      const { rawMel, nFrames, featuresLen } =
-        this.preprocessor.computeRawMel(audio);
+    // Calculate required size for raw mel buffer
+    // nFrames = floor((N + 512 - 512) / 160) + 1 = floor(N / 160) + 1
+    const predictedNFrames = Math.floor(N / HOP_LENGTH) + 1;
+    const reqRawSize = this.nMels * predictedNFrames;
 
+    // Manage Raw Buffer (Double Buffering)
+    // We use double buffering because if we reuse the same buffer in-place,
+    // and nFrames changes (stride changes), we might overwrite data we need to copy from (the "cache").
+    // With two buffers, we always read from 'other' and write to 'current'.
+    let currentRawBuf = this._rawBuffers[this._bufIdx];
+    if (!currentRawBuf || currentRawBuf.length < reqRawSize) {
+      // Allocate with 20% growth factor to avoid frequent reallocs
+      const newSize = Math.ceil(reqRawSize * 1.2);
+      currentRawBuf = new Float32Array(newSize);
+      this._rawBuffers[this._bufIdx] = currentRawBuf;
+    }
+
+    // Manage Features Buffer (Single Buffer)
+    // featuresLen = floor(N / 160)
+    const predictedFeaturesLen = Math.floor(N / HOP_LENGTH);
+    const reqFeatSize = this.nMels * predictedFeaturesLen;
+
+    if (!this._featuresBuffer || this._featuresBuffer.length < reqFeatSize) {
+      const newSize = Math.ceil(reqFeatSize * 1.2);
+      this._featuresBuffer = new Float32Array(newSize);
+    }
+
+    if (!canReuse) {
+      // Full computation
+      // Pass currentRawBuf to reuse it.
+      const { rawMel, nFrames, featuresLen } =
+        this.preprocessor.computeRawMel(audio, 0, currentRawBuf);
+
+      // Pass featuresBuffer to reuse it.
       const features = this.preprocessor.normalizeFeatures(
         rawMel,
         nFrames,
-        featuresLen
+        featuresLen,
+        this._featuresBuffer
       );
 
-      // Cache raw mel for next call
+      // Cache raw mel for next call (view into currentRawBuf)
       this._cachedRawMel = rawMel;
       this._cachedNFrames = nFrames;
       this._cachedAudioLen = N;
       this._cachedFeaturesLen = featuresLen;
+
+      // Flip buffer for next time
+      this._bufIdx ^= 1;
 
       return {
         features,
@@ -483,35 +544,43 @@ export class IncrementalMelProcessor {
     }
 
     // ── Incremental path ──────────────────────────────────────────────
-    // Determine how many cached frames to reuse
-    // Frames from prefix audio: floor(prefixSamples / HOP_LENGTH)
-    // Subtract boundary frames for safety (STFT windowing overlap)
     const prefixFrames = Math.floor(prefixSamples / HOP_LENGTH);
     const safeFrames = Math.max(
       0,
       Math.min(prefixFrames - this.boundaryFrames, this._cachedFeaturesLen)
     );
 
-    // Compute mel for this audio, skipping the prefix we will reuse
+    // Compute mel, writing into currentRawBuf
     const { rawMel, nFrames, featuresLen } =
-      this.preprocessor.computeRawMel(audio, safeFrames);
+      this.preprocessor.computeRawMel(audio, safeFrames, currentRawBuf);
 
-    // Replace first safeFrames with cached values (they're identical)
+    // Copy cached prefix from previous buffer (this._cachedRawMel) to current buffer (rawMel)
+    // _cachedRawMel is a view into the *other* buffer (since we flipped _bufIdx last time).
+    // So this copy is safe (no overlap/overwrite issues).
     if (safeFrames > 0 && this._cachedRawMel) {
+      // Optimization: if both buffers are large and nFrames (stride) hasn't changed,
+      // and we happened to not flip buffers (not possible here due to logic), we could skip copy.
+      // But with double buffering, we MUST copy because we switched buffers.
+      // The copy is still fast (sequential memory).
+
       for (let m = 0; m < this.nMels; m++) {
         const srcBase = m * this._cachedNFrames;
         const dstBase = m * nFrames;
+        // Use set/subarray for faster block copy if safeFrames is large?
+        // rawMel.set(this._cachedRawMel.subarray(srcBase, srcBase + safeFrames), dstBase);
+        // Manual loop avoids creating subarray views (garbage).
         for (let t = 0; t < safeFrames; t++) {
           rawMel[dstBase + t] = this._cachedRawMel[srcBase + t];
         }
       }
     }
 
-    // Normalize the full sequence
+    // Normalize
     const features = this.preprocessor.normalizeFeatures(
       rawMel,
       nFrames,
-      featuresLen
+      featuresLen,
+      this._featuresBuffer
     );
 
     // Update cache
@@ -519,6 +588,9 @@ export class IncrementalMelProcessor {
     this._cachedNFrames = nFrames;
     this._cachedAudioLen = N;
     this._cachedFeaturesLen = featuresLen;
+
+    // Flip buffer
+    this._bufIdx ^= 1;
 
     return {
       features,
