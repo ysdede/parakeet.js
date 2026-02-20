@@ -163,4 +163,84 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
       expect(out.output_states_2.dispose).toHaveBeenCalledTimes(1);
     }
   });
+
+  it('should dispose previous decoder state tensors on non-blank state replacement', async () => {
+    const stateDisposes = [];
+
+    class SpyTensor {
+      constructor(type, data, dims) {
+        this.type = type;
+        this.data = data;
+        this.dims = dims;
+      }
+      dispose() {}
+    }
+
+    const spyOrt = { Tensor: SpyTensor };
+    const spyTokenizer = {
+      blankId: 0,
+      id2token: ['<blank>', 'a', 'b'],
+      blankToken: '<blank>',
+      decode: () => '',
+      sanitizedTokens: ['<blank>', 'a', 'b'],
+    };
+
+    const encOutput = { dims: [1, 64, 3], data: new Float32Array(64 * 3), dispose: vi.fn() };
+    const spyEncoderSession = {
+      run: vi.fn().mockResolvedValue({ outputs: encOutput }),
+    };
+
+    // Step sequence: token(1, step=1) -> token(1, step=1) -> blank(step=1)
+    // This guarantees at least one old-state replacement on non-blank.
+    const queue = [
+      { logits: [0.1, 9.0, 0.2], dur: [0.1, 9.0, 0.2] },
+      { logits: [0.1, 9.0, 0.2], dur: [0.1, 9.0, 0.2] },
+      { logits: [9.0, 0.1, 0.2], dur: [0.1, 9.0, 0.2] },
+    ];
+
+    let idx = 0;
+    const joinerOutputs = [];
+    const spyJoinerSession = {
+      run: vi.fn().mockImplementation(async () => {
+        const i = Math.min(idx, queue.length - 1);
+        idx += 1;
+        const q = queue[i];
+        const outputs = {
+          dims: [1, 1, 1, 6],
+          data: new Float32Array([...q.logits, ...q.dur]),
+          dispose: vi.fn(),
+        };
+        const s1 = { dims: [2, 1, 640], data: new Float32Array(1280), dispose: vi.fn(() => stateDisposes.push(`s1-${i}`)) };
+        const s2 = { dims: [2, 1, 640], data: new Float32Array(1280), dispose: vi.fn(() => stateDisposes.push(`s2-${i}`)) };
+        const out = { outputs, output_states_1: s1, output_states_2: s2 };
+        joinerOutputs.push(out);
+        return out;
+      }),
+    };
+
+    const spyPreprocessor = {
+      process: vi.fn().mockResolvedValue({ features: new Float32Array(128 * 3), length: 3 }),
+      nMels: 128,
+    };
+
+    const spyModel = new ParakeetModel({
+      tokenizer: spyTokenizer,
+      encoderSession: spyEncoderSession,
+      joinerSession: spyJoinerSession,
+      preprocessor: spyPreprocessor,
+      ort: spyOrt,
+      nMels: 128,
+    });
+
+    await spyModel.transcribe(new Float32Array(16000), 16000, {});
+
+    expect(joinerOutputs.length).toBeGreaterThanOrEqual(3);
+    // State created on first non-blank must be disposed when replaced by second non-blank.
+    expect(joinerOutputs[0].output_states_1.dispose).toHaveBeenCalledTimes(1);
+    expect(joinerOutputs[0].output_states_2.dispose).toHaveBeenCalledTimes(1);
+    // Final active state should also be disposed during transcribe teardown.
+    expect(joinerOutputs[1].output_states_1.dispose).toHaveBeenCalledTimes(1);
+    expect(joinerOutputs[1].output_states_2.dispose).toHaveBeenCalledTimes(1);
+    expect(stateDisposes.length).toBeGreaterThanOrEqual(4);
+  });
 });
