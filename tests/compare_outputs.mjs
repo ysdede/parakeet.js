@@ -150,7 +150,7 @@ async function main() {
     
     console.log('  Sample frames (showing state update pattern):');
     reference.debug_frames.slice(0, 20).forEach(f => {
-      const marker = f.state_updated ? '✓' : '·';
+      const marker = f.state_updated ? 'PASS' : '·';
       console.log(`    t=${f.t.toString().padStart(3)}: ${marker} token=${f.token_str?.padEnd(10) || '?'} step=${f.step} blank=${f.is_blank}`);
     });
     console.log();

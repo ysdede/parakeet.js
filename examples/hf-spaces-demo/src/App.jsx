@@ -261,7 +261,7 @@ export default function App() {
         language: selectedLanguage
       };
       setTranscriptions(prev => [newTranscription, ...prev]);
-      setStatus('Model ready ✔');
+      setStatus('Model ready');
 
     } catch (error) {
       console.error('[Dataset] Error:', error);
@@ -325,7 +325,7 @@ export default function App() {
 
         if (normalize(utterance_text).includes(normalize(expectedText))) {
           console.log('[App] Model verification successful.');
-          setStatus('Model ready ✔');
+          setStatus('Model ready');
           setModelLoaded(true);
         } else {
           console.error(`[App] Verification failed! Expected: "${expectedText}", Got: "${utterance_text}"`);
@@ -386,7 +386,7 @@ export default function App() {
 
       setTranscriptions(prev => [newTranscription, ...prev]);
       setText(res.utterance_text);
-      setStatus('Model ready ✔');
+      setStatus('Model ready');
 
     } catch (error) {
       console.error('Transcription failed:', error);

@@ -339,7 +339,7 @@ const { utterance_text } = await model.transcribe(pcm, 16000);
 
 const expected = 'the known transcript for your audio';
 if (utterance_text.toLowerCase().includes(expected)) {
-  setStatus('Model ready ✔');
+  setStatus('Model ready');
 } else {
   setStatus('Model verification failed!');
 }

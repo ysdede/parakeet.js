@@ -7,7 +7,7 @@ async function testWebGPU() {
   try {
     // Test WebGPU backend
     const ort = await initOrt({ backend: 'webgpu' });
-    console.log('✅ WebGPU backend initialized successfully');
+    console.log('PASS: WebGPU backend initialized successfully');
     console.log('Backend selected:', ort._selectedBackend);
     
     // Test creating a simple session to verify WebGPU works
@@ -32,10 +32,10 @@ async function testWebGPU() {
     console.log('Creating test session...');
     // This would normally create a session, but we'll just test the options
     console.log('Session options:', sessionOptions);
-    console.log('✅ WebGPU configuration looks good');
+    console.log('PASS: WebGPU configuration looks good');
     
   } catch (error) {
-    console.error('❌ WebGPU test failed:', error);
+    console.error('FAIL: WebGPU test failed:', error);
   }
 }
 
