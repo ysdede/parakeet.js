@@ -1,0 +1,127 @@
+name: Bug Report
+description: Report a reproducible bug in parakeet.js
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the bug in one or two sentences.
+      placeholder: What broke, and when?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model_variant
+    attributes:
+      label: Model Variant
+      description: Which Parakeet model are you using?
+      options:
+        - parakeet-tdt-0.6b-v2
+        - parakeet-tdt-0.6b-v3
+        - other
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      description: Language or locale used for transcription.
+      placeholder: en, tr, de, ...
+    validations:
+      required: true
+
+  - type: input
+    id: sample_rate
+    attributes:
+      label: Audio Sample Rate
+      description: Input sample rate in Hz.
+      placeholder: "16000"
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser + Version
+      placeholder: Chrome 133, Edge 132, Firefox 134...
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: Windows 11, macOS 15, Ubuntu 24.04...
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU
+      placeholder: RTX 3060, M2, Intel Iris Xe...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: webgpu_support
+    attributes:
+      label: WebGPU Support
+      options:
+        - available (navigator.gpu is truthy)
+        - unavailable (navigator.gpu is falsy)
+        - unknown
+    validations:
+      required: true
+
+  - type: input
+    id: ort_web_version
+    attributes:
+      label: ONNX Runtime Web Version
+      placeholder: "1.24.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction Steps
+      description: Include exact steps and a minimal snippet if possible.
+      placeholder: |
+        1) Load model ...
+        2) Call transcribe with ...
+        3) Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: input_audio
+    attributes:
+      label: Audio Sample or Reference
+      description: Provide an audio file/link or a deterministic way to reproduce.
+      placeholder: Link/file name and how to obtain it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: Expected vs Actual
+      placeholder: |
+        Expected:
+        Actual:
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs_metrics
+    attributes:
+      label: Logs / Metrics
+      description: Paste console logs and any preprocess/encode/decode/RTF metrics.
+      render: text
+    validations:
+      required: true
