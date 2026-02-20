@@ -86,10 +86,10 @@ export class OnnxPreprocessor {
     // Avoid copying if input is already Float32Array and contiguous
     let buffer;
     if (audio instanceof Float32Array) {
-      // Check if the array is contiguous (not a view with stride)
-      const isContiguous = audio.byteOffset === 0 ||
-        (audio.byteLength === audio.length * 4); // 4 bytes per float32
-      buffer = isContiguous ? audio : new Float32Array(audio);
+      // Only reuse the array directly if it is a full, unsliced buffer view to avoid
+      // passing a subarray whose underlying buffer contains extra data outside the view.
+      const isFullBufferView = audio.byteOffset === 0 && audio.buffer.byteLength === audio.byteLength;
+      buffer = isFullBufferView ? audio : new Float32Array(audio);
     } else {
       // Convert other array types to Float32Array
       buffer = new Float32Array(audio);

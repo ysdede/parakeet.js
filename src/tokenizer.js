@@ -44,6 +44,10 @@ export class ParakeetTokenizer {
     for (const line of lines) {
       const [tok, idStr] = line.split(/\s+/);
       const id = parseInt(idStr, 10);
+      if (isNaN(id) || !tok) {
+        console.warn(`[ParakeetTokenizer] Skipping invalid vocab line: ${JSON.stringify(line)}`);
+        continue;
+      }
       id2token[id] = tok;
     }
     return new ParakeetTokenizer(id2token);
@@ -65,10 +69,10 @@ export class ParakeetTokenizer {
       if (token === undefined) continue;
       tokens.push(token);
     }
-    
+
     // Join all tokens
     let text = tokens.join('');
-    
+
     // Apply the same regex pattern as Python reference:
     // Pattern: r"\A\s|\s\B|(\s)\b"
     // - \A\s: Remove leading whitespace
@@ -77,7 +81,7 @@ export class ParakeetTokenizer {
     text = text.replace(/^\s+/, '');  // Remove leading whitespace (\A\s)
     text = text.replace(/\s+(?=[^\w\s])/g, '');  // Remove space before punctuation (\s\B approximation)
     text = text.replace(/\s+/g, ' ');  // Normalize multiple spaces to single space
-    
+
     return text.trim();
   }
 } 
