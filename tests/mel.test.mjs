@@ -295,6 +295,32 @@ describe('JsPreprocessor', () => {
     expect(length).toBe(0);
   });
 
+  it('computeRawMel should zero skipped prefix frames when reusing an output buffer', () => {
+    const p = new JsPreprocessor({ nMels: 128 });
+    const audioA = new Float32Array(32000);
+    const audioB = new Float32Array(32000);
+
+    for (let i = 0; i < audioA.length; i++) {
+      audioA[i] = Math.sin(2 * Math.PI * 440 * i / 16000) * 0.5;
+      audioB[i] = Math.sin(2 * Math.PI * 660 * i / 16000) * 0.5;
+    }
+
+    const base = p.computeRawMel(audioA, 0);
+    const outBuffer = new Float32Array(base.rawMel.length + 32);
+    p.computeRawMel(audioA, 0, outBuffer);
+
+    const startFrame = Math.min(20, Math.max(1, base.nFrames - 1));
+    const reused = p.computeRawMel(audioB, startFrame, outBuffer);
+    const nFrames = reused.nFrames;
+
+    for (let m = 0; m < 128; m++) {
+      const rowBase = m * nFrames;
+      for (let t = 0; t < startFrame; t++) {
+        expect(reused.rawMel[rowBase + t]).toBe(0);
+      }
+    }
+  });
+
   it('should produce correct frame count for 1s audio', () => {
     const audio = new Float32Array(16000); // 1 second
     const { length } = preprocessor.process(audio);
@@ -443,6 +469,23 @@ describe('IncrementalMelProcessor', () => {
     inc.reset();
     const r3 = inc.process(audio, 0);
     expect(r3.cached).toBe(false);
+  });
+
+  it('should return features that remain stable across subsequent incremental calls', () => {
+    const inc = new IncrementalMelProcessor({ nMels: 128 });
+    const audio = new Float32Array(48000); // 3s
+    for (let i = 0; i < audio.length; i++) audio[i] = Math.sin(2 * Math.PI * 440 * i / 16000) * 0.5;
+
+    const first = inc.process(audio, 0);
+    const firstSnapshot = first.features.slice();
+
+    // Trigger a second run that reuses internal buffers
+    inc.process(audio, Math.floor(audio.length * 0.6));
+
+    expect(first.features.length).toBe(firstSnapshot.length);
+    for (let i = 0; i < firstSnapshot.length; i++) {
+      expect(first.features[i]).toBe(firstSnapshot[i]);
+    }
   });
 });
 
