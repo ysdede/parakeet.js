@@ -608,7 +608,7 @@ export class ParakeetModel {
     input.dispose?.();
     lenTensor.dispose?.();
 
-    // Transpose encoder output [B, D, T] ➔ [T, D] for B=1
+    // Transpose encoder output [B, D, T] -> [T, D] for B=1
     const [, D, Tenc] = enc.dims;
 
     // Fast-path check: if already in [T, D] format, skip transpose

@@ -25,7 +25,7 @@ async function discoverDataset() {
         
         // Check for parquet info
         if (url.includes('/parquet')) {
-          console.log(`  ✅ Parquet configs found!`);
+          console.log(`  PASS: Parquet configs found!`);
           const configs = Object.keys(data);
           console.log(`  Configs (${configs.length}): ${configs.slice(0, 15).join(', ')}...`);
           
@@ -44,7 +44,7 @@ async function discoverDataset() {
           return { parquet: data, configs };
         }
         
-        console.log(`  ✅ Response keys: ${Object.keys(data).slice(0, 10).join(', ')}`);
+        console.log(`  PASS: Response keys: ${Object.keys(data).slice(0, 10).join(', ')}`);
         
         // If it has configs, show them
         if (data.dataset_info) {
@@ -65,7 +65,7 @@ async function discoverDataset() {
         console.log(`  Sample: ${sample}...`);
       }
     } catch (error) {
-      console.log(`  ❌ Error: ${error.message}`);
+      console.log(`  FAIL: Error: ${error.message}`);
     }
     console.log('');
   }
@@ -117,7 +117,7 @@ async function testApiFormats(langCode, configOverride = null) {
       
       if (response.ok) {
         const data = await response.json();
-        console.log(`  ✅ SUCCESS!`);
+        console.log(`  PASS: SUCCESS!`);
         
         // Show structure
         if (data.rows) {
@@ -148,10 +148,10 @@ async function testApiFormats(langCode, configOverride = null) {
         return { url, data };
       } else {
         const errorText = await response.text();
-        console.log(`  ❌ Error: ${errorText.substring(0, 100)}`);
+        console.log(`  FAIL: Error: ${errorText.substring(0, 100)}`);
       }
     } catch (error) {
-      console.log(`  ❌ Fetch error: ${error.message}`);
+      console.log(`  FAIL: Fetch error: ${error.message}`);
     }
     console.log('');
   }
@@ -176,11 +176,11 @@ async function testAudioDownload(audioUrl) {
       // Download first few bytes to verify it's audio
       const buffer = await response.arrayBuffer();
       console.log(`Downloaded: ${buffer.byteLength} bytes`);
-      console.log(`✅ Audio download successful!`);
+      console.log(`PASS: Audio download successful!`);
       return true;
     }
   } catch (error) {
-    console.log(`❌ Audio download failed: ${error.message}`);
+    console.log(`FAIL: Audio download failed: ${error.message}`);
   }
   return false;
 }
@@ -247,7 +247,7 @@ async function testAlternativeDatasets() {
       if (response.ok) {
         const data = await response.json();
         const rows = data.rows || [];
-        console.log(`  ✅ Found ${rows.length} rows`);
+        console.log(`  PASS: Found ${rows.length} rows`);
         
         if (rows.length > 0) {
           const row = rows[0].row || rows[0];
@@ -283,10 +283,10 @@ async function testAlternativeDatasets() {
         }
       } else {
         const errorText = await response.text();
-        console.log(`  ❌ Error: ${errorText.substring(0, 80)}`);
+        console.log(`  FAIL: Error: ${errorText.substring(0, 80)}`);
       }
     } catch (error) {
-      console.log(`  ❌ Fetch error: ${error.message}`);
+      console.log(`  FAIL: Fetch error: ${error.message}`);
     }
     console.log('');
   }
@@ -312,7 +312,7 @@ async function main() {
   if (working.length > 0) {
     console.log('\n=== WORKING DATASETS ===\n');
     for (const ds of working) {
-      console.log(`✅ ${ds.name} (${ds.lang})`);
+      console.log(`PASS: ${ds.name} (${ds.lang})`);
       console.log(`   Audio: ${ds.audioField}, Text: ${ds.textField}`);
     }
     
@@ -326,7 +326,7 @@ async function main() {
       }
     }
   } else {
-    console.log('\n❌ No working datasets found!');
+    console.log('\nFAIL: No working datasets found!');
   }
 }
 

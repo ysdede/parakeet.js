@@ -14,7 +14,7 @@ npm install
 
 ## Development Modes
 
-### 🔧 Local Development (Test Local Changes)
+### Local Development (Test Local Changes)
 
 Use this when modifying the parakeet.js library source code:
 
@@ -29,7 +29,7 @@ This runs Vite with the `PARAKEET_LOCAL=true` environment variable, which aliase
 - Debugging issues in the library
 - Testing before publishing to npm
 
-### 📦 NPM Package Testing
+### NPM Package Testing
 
 Use this to test the published npm package (simulates end-user experience):
 
@@ -65,7 +65,7 @@ npm run build
 
 ## Deployment
 
-### 🤗 HuggingFace Spaces
+### HuggingFace Spaces
 
 Deploy to HuggingFace Spaces (uses npm package build):
 
@@ -83,7 +83,7 @@ This will:
 - HuggingFace CLI logged in (`huggingface-cli login`)
 - Write access to the Space repository
 
-### 🐙 GitHub Pages
+### GitHub Pages
 
 GitHub Pages deployment is automated via GitHub Actions and uses a **local source build** (`build:local`) so the live page always reflects the latest repository code, even before an npm publish.
 

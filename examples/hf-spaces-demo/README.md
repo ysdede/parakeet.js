@@ -21,7 +21,7 @@ tags:
 
 This is the unified demo application for parakeet.js, optimized for **Hugging Face Spaces** and **GitHub Pages**.
 
-## 🚀 Features
+## Features
 
 - **Multiple Models**: Support for parakeet-tdt-0.6b-v2, v3, etc.
 - **WebGPU & WASM**: High-performance GPU acceleration with CPU fallback.
@@ -29,7 +29,7 @@ This is the unified demo application for parakeet.js, optimized for **Hugging Fa
 - **Local & Remote Testing**: Test with built-in samples or upload your own.
 - **Version Display**: Shows the active `parakeet.js` version/source and the loaded `onnxruntime-web` runtime version.
 
-## 🛠 Development
+## Development
 
 ### Local Setup
 ```bash
@@ -43,7 +43,7 @@ If you are developing the `parakeet.js` library itself:
 npm run dev:local
 ```
 
-## 📦 Deployment to Hugging Face Spaces
+## Deployment to Hugging Face Spaces
 
 This project is configured to **build directly on Hugging Face**. Just push the source code to your Space repository.
 
@@ -52,10 +52,10 @@ This project is configured to **build directly on Hugging Face**. Just push the 
 - **Build Command**: `npm run build`
 - **Output Path**: `dist/index.html`
 
-## 🔗 Links
+## Links
 
-- **📚 [GitHub Repository](https://github.com/ysdede/parakeet.js)**
-- **📦 [npm Package](https://www.npmjs.com/package/parakeet.js)**
+- **[GitHub Repository](https://github.com/ysdede/parakeet.js)**
+- **[npm Package](https://www.npmjs.com/package/parakeet.js)**
 
 ---
-*Built with ❤️ using React and parakeet.js*
+*Built using React and parakeet.js*
