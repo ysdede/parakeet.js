@@ -285,14 +285,10 @@ export class ParakeetModel {
 
     const out = await this.joinerSession.run(feeds);
     const logits = out['outputs'];
-
-    // Dispose target tensors now that the joiner has run
-    this._targetTensor.dispose?.();
-    this._targetLenTensor.dispose?.();
-
-    // Create new target tensors for the next run (since we mutated the underlying array)
-    this._targetTensor = new this.ort.Tensor('int32', this._targetIdArray, [1, 1]);
-    this._targetLenTensor = new this.ort.Tensor('int32', this._targetLenArray, [1]);
+    // Note: _targetTensor and _targetLenTensor are intentionally NOT disposed here.
+    // They wrap a shared Int32Array (_targetIdArray / _targetLenArray) that is mutated
+    // each call. ORT-WASM does not copy the data on Tensor creation, so these tensors
+    // have no separate WASM allocation to leak — disposing them would be wrong.
 
     const vocab = this.tokenizer.id2token.length;
     const totalDim = logits.dims[3];

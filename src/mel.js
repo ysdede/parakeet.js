@@ -319,8 +319,14 @@ export class JsPreprocessor {
     if (outBuffer && outBuffer.length >= reqSize) {
       // Reuse provided buffer
       rawMel = outBuffer.subarray(0, reqSize);
+      // Zero out prefix frame slots across all mel rows to avoid stale data.
+      // Layout is [nMels × nFrames] row-major, so prefix frame t is at m*nFrames+t.
+      // We only need to zero the slots that computeRawMel won't write
+      // (i.e. frames 0..startFrame-1 for each mel row).
       if (startFrame > 0) {
-        rawMel.fill(0, 0, startFrame * this.nMels);
+        for (let m = 0; m < this.nMels; m++) {
+          rawMel.fill(0, m * nFrames, m * nFrames + startFrame);
+        }
       }
     } else {
       rawMel = new Float32Array(reqSize);
