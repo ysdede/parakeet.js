@@ -56,10 +56,22 @@ function createModelForDecodeLoop({ tEnc, joinerRun }) {
 
 function makeJoinerOutput(tokenLogits, durLogits) {
   const data = new Float32Array([...tokenLogits, ...durLogits]);
+  const state1 = new Float32Array([tokenLogits[0] || 0, tokenLogits[1] || 0, 0, 0]);
+  const state2 = new Float32Array([durLogits[0] || 0, durLogits[1] || 0, 0, 0]);
   return {
     outputs: {
       dims: [1, 1, 1, data.length],
       data,
+      dispose: vi.fn(),
+    },
+    output_states_1: {
+      dims: [1, 1, state1.length],
+      data: state1,
+      dispose: vi.fn(),
+    },
+    output_states_2: {
+      dims: [1, 1, state2.length],
+      data: state2,
       dispose: vi.fn(),
     },
   };
@@ -91,6 +103,7 @@ describe('ParakeetModel decode loop', () => {
     expect(result.tokenIds).toEqual([1, 2]);
     expect(result.frameIndices).toEqual([0, 0]);
     expect(result.tdtSteps).toEqual([0, 0]);
+    expect(result.utterance_text).toBe('AB');
     expect(joinerRun).toHaveBeenCalledTimes(3);
   });
 
@@ -121,5 +134,34 @@ describe('ParakeetModel decode loop', () => {
     expect(result.frameIndices).toEqual([0]);
     expect(result.tdtSteps).toEqual([2]);
     expect(joinerRun).toHaveBeenCalledTimes(4);
+  });
+
+  it('stops decoding when cumulative TDT step overshoots tEnc', async () => {
+    const queue = [
+      makeJoinerOutput([0.1, 9.0, 0.2], [0.1, 0.2, 9.0]), // token=1, step=2 at frame 0
+      makeJoinerOutput([0.1, 9.0, 0.2], [0.1, 0.2, 9.0]), // token=1, step=2 at frame 2 => overshoot
+    ];
+
+    let idx = 0;
+    const joinerRun = vi.fn().mockImplementation(async () => {
+      const out = queue[Math.min(idx, queue.length - 1)];
+      idx += 1;
+      return out;
+    });
+
+    const model = createModelForDecodeLoop({ tEnc: 3, joinerRun });
+    const result = await model.transcribe(new Float32Array(16000), 16000, {
+      returnTokenIds: true,
+      returnFrameIndices: true,
+      returnTdtSteps: true,
+      enableProfiling: false,
+    });
+
+    expect(result.tokenIds).toEqual([1, 1]);
+    expect(result.frameIndices).toEqual([0, 2]);
+    expect(result.tdtSteps).toEqual([2, 2]);
+    expect(result.utterance_text).toBe('AA');
+    expect(result.frameIndices.every((i) => i <= 2)).toBe(true);
+    expect(joinerRun).toHaveBeenCalledTimes(2);
   });
 });
