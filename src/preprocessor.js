@@ -18,6 +18,7 @@ export class OnnxPreprocessor {
     }
     this.session = null;
     this.ort = null;
+    this._sessionPromise = null; // in-flight init promise — deduplicates concurrent calls
   }
 
   /**
@@ -25,7 +26,16 @@ export class OnnxPreprocessor {
    * @returns {Promise<void>}
    */
   async _ensureSession() {
-    if (!this.session) {
+    // Already initialised — fast path
+    if (this.session) return;
+
+    // Deduplicate concurrent initialisations: share the in-flight promise
+    if (this._sessionPromise) {
+      await this._sessionPromise;
+      return;
+    }
+
+    this._sessionPromise = (async () => {
       this.ort = await initOrt(this.opts);
       // Build session options. Workaround for ORT-web bug where
       // passing `enableGraphCapture:false` still triggers the
@@ -51,6 +61,17 @@ export class OnnxPreprocessor {
         }
       };
       this.session = await create();
+    })();
+
+    try {
+      await this._sessionPromise;
+    } catch (e) {
+      // Clear promise on failure so the next caller can retry
+      this._sessionPromise = null;
+      throw e;
+    } finally {
+      // Clear the promise once resolved — session is set and the promise is no longer needed
+      if (this.session) this._sessionPromise = null;
     }
   }
 
