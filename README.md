@@ -116,6 +116,10 @@ yarn add parakeet.js
 
 `onnxruntime-web` is bundled as a dependency and supplies the runtime back-ends (WebGPU, WASM).
 
+TypeScript users:
+- The package ships bundled declarations via the top-level `"types"` field.
+- Subpath declaration resolution via `exports.types` works in TS 4.7+ when `moduleResolution` is `node16`, `nodenext`, or `bundler`. If your toolchain is older, use the root import (`parakeet.js`) or upgrade TypeScript.
+
 ---
 
 ## Model assets
