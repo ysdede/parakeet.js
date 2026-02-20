@@ -1,7 +1,7 @@
 import { initOrt } from './backend.js';
 import { ParakeetTokenizer } from './tokenizer.js';
 import { OnnxPreprocessor } from './preprocessor.js';
-import { JsPreprocessor, IncrementalMelProcessor } from './mel.js';
+import { JsPreprocessor, IncrementalMelProcessor, MEL_CONSTANTS } from './mel.js';
 
 /**
  * Lightweight Parakeet model wrapper designed for browser usage.
@@ -584,7 +584,7 @@ export class ParakeetModel {
     }
 
     // Compute audio duration for metrics (handle precomputed features where audio may be null)
-    const audioDur = audio ? audio.length / sampleRate : (T * 160 / sampleRate);
+    const audioDur = audio ? audio.length / sampleRate : (T * MEL_CONSTANTS.HOP_LENGTH / sampleRate);
 
     const input = new this.ort.Tensor('float32', features, [1, melBins, T]);
     // Per NeMo reference (onnx-asr): encoder receives the FULL tensor (including
