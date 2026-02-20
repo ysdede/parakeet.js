@@ -481,7 +481,7 @@ export class ParakeetModel {
       subsampling: this.subsampling,
       windowStride: this.windowStride,
       frameTimeStride: this.getFrameTimeStride(),
-      melBins: 80, // Standard for Parakeet models
+      melBins: this._nMels, // Dynamic based on initialized config
       blankId: this.blankId,
       maxTokensPerStep: this.maxTokensPerStep,
     };
