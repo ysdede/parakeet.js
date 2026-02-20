@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { ParakeetModel } from '../src/parakeet.js';
 
 describe('ParakeetModel Incremental Cache', () => {
+  const ENCODER_T = 10;
+
   const mockOrt = {
     Tensor: class {
       constructor(type, data, dims) {
@@ -23,8 +25,8 @@ describe('ParakeetModel Incremental Cache', () => {
   const mockEncoderSession = {
     run: async () => ({
       outputs: {
-        dims: [1, 64, 10], // B, D, T
-        data: new Float32Array(64 * 10).fill(0.1),
+        dims: [1, 64, ENCODER_T], // B, D, T
+        data: new Float32Array(64 * ENCODER_T).fill(0.1),
       }
     }),
   };
@@ -43,8 +45,8 @@ describe('ParakeetModel Incremental Cache', () => {
 
   const mockPreprocessor = {
     process: async () => ({
-      features: new Float32Array(128 * 10).fill(0.1),
-      length: 10,
+      features: new Float32Array(128 * ENCODER_T).fill(0.1),
+      length: ENCODER_T,
     }),
     nMels: 128
   };
@@ -123,36 +125,41 @@ describe('ParakeetModel Incremental Cache', () => {
       nMels: 128,
     });
 
-    // First call seeds cache for key "k" at prefix=0.16s => 2 encoder frames
+    const prefixSeconds = 0.16;
+    const mismatchPrefixSeconds = 0.24;
+    const totalSteps = ENCODER_T;
+    const cachedFrames = Math.floor((prefixSeconds + 1e-6) / model.getFrameTimeStride());
+
+    // First call seeds cache for key "k"
     await model.transcribe(new Float32Array(16000), 16000, {
-      incremental: { cacheKey: 'k', prefixSeconds: 0.16 },
+      incremental: { cacheKey: 'k', prefixSeconds },
       enableProfiling: false,
     });
     const callsAfterSeed = joinerRun.mock.calls.length;
-    expect(callsAfterSeed).toBe(10);
+    expect(callsAfterSeed).toBe(totalSteps);
 
-    // Matching cacheKey + prefixSeconds should skip 2 frames => 8 decode steps
+    // Matching cacheKey + prefixSeconds should skip the cached prefix frames
     await model.transcribe(new Float32Array(16000), 16000, {
-      incremental: { cacheKey: 'k', prefixSeconds: 0.16 },
+      incremental: { cacheKey: 'k', prefixSeconds },
       enableProfiling: false,
     });
     const callsAfterHit = joinerRun.mock.calls.length - callsAfterSeed;
-    expect(callsAfterHit).toBe(8);
+    expect(callsAfterHit).toBe(totalSteps - cachedFrames);
 
-    // Different prefixSeconds for same key must miss cache => full 10 steps
+    // Different prefixSeconds for same key must miss cache => full decode
     await model.transcribe(new Float32Array(16000), 16000, {
-      incremental: { cacheKey: 'k', prefixSeconds: 0.24 },
+      incremental: { cacheKey: 'k', prefixSeconds: mismatchPrefixSeconds },
       enableProfiling: false,
     });
     const callsAfterPrefixMismatch = joinerRun.mock.calls.length - callsAfterSeed - callsAfterHit;
-    expect(callsAfterPrefixMismatch).toBe(10);
+    expect(callsAfterPrefixMismatch).toBe(totalSteps);
 
-    // Different key must also miss cache => full 10 steps
+    // Different key must also miss cache => full decode
     await model.transcribe(new Float32Array(16000), 16000, {
-      incremental: { cacheKey: 'k2', prefixSeconds: 0.16 },
+      incremental: { cacheKey: 'k2', prefixSeconds },
       enableProfiling: false,
     });
     const callsAfterKeyMismatch = joinerRun.mock.calls.length - callsAfterSeed - callsAfterHit - callsAfterPrefixMismatch;
-    expect(callsAfterKeyMismatch).toBe(10);
+    expect(callsAfterKeyMismatch).toBe(totalSteps);
   });
 });
