@@ -290,6 +290,7 @@ export class JsPreprocessor {
     this._fftRe = new Float64Array(N_FFT);
     this._fftIm = new Float64Array(N_FFT);
     this._powerBuf = new Float32Array(N_FREQ_BINS);
+    this._paddedBuffer = null;
 
     // Precompute sparse filterbank bounds (start/end indices for each mel filter)
     this.fbBounds = new Int32Array(this.nMels * 2);
@@ -348,21 +349,29 @@ export class JsPreprocessor {
       return { rawMel: outBuffer ? outBuffer.subarray(0, 0) : new Float32Array(0), nFrames: 0, featuresLen: 0 };
     }
 
-    // Pre-emphasis
-    // TODO: Reuse preemph buffer too? For now, rawMel/features are the biggest allocs.
-    const preemph = new Float32Array(N);
-    preemph[0] = audio[0];
-    for (let i = 1; i < N; i++) {
-      preemph[i] = audio[i] - PREEMPH * audio[i - 1];
-    }
-
-    // Pad
+    // Reuse or allocate padded buffer (Float64 for FFT)
     const pad = N_FFT >> 1;
     const paddedLen = N + 2 * pad;
-    const padded = new Float64Array(paddedLen);
-    for (let i = 0; i < N; i++) {
-      padded[pad + i] = preemph[i];
+    if (!this._paddedBuffer || this._paddedBuffer.length < paddedLen) {
+      const newSize = Math.max(paddedLen, Math.floor(paddedLen * 1.2));
+      this._paddedBuffer = new Float64Array(newSize);
     }
+    const padded = this._paddedBuffer;
+
+    // Pre-emphasis directly into padded buffer
+    // Layout: [0...pad-1] (zeros) | [pad...pad+N-1] (data) | [pad+N...] (zeros)
+    // We only write the data part. The left padding is zero by default (never written).
+    // The right padding must be explicitly zeroed if reusing a larger buffer.
+    if (N > 0) {
+      padded[pad] = audio[0];
+      for (let i = 1; i < N; i++) {
+        padded[pad + i] = audio[i] - PREEMPH * audio[i - 1];
+      }
+    }
+
+    // Zero out the right padding area (up to effective length used by this call)
+    // This ensures no garbage from previous larger calls leaks into FFT window reads.
+    padded.fill(0, pad + N, paddedLen);
 
     // Frame counts
     const nFrames = Math.floor((paddedLen - N_FFT) / HOP_LENGTH) + 1;
