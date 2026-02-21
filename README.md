@@ -1,8 +1,10 @@
 # Parakeet.js
 
-[Live Demo](https://ysdede.github.io/parakeet.js/) | [NPM Package](https://www.npmjs.com/package/parakeet.js)
+[Keet Live Streaming](https://ysdede.github.io/keet/) | [Live Demo](https://ysdede.github.io/parakeet.js/) | [NPM Package](https://www.npmjs.com/package/parakeet.js)
 
-![Real-time transcription with Parakeet.js](https://raw.githubusercontent.com/ysdede/keet/refs/heads/master/public/img/streaming-preview.jpg)
+<a href="https://ysdede.github.io/keet/" target="_blank" rel="noopener noreferrer">
+  <img src="https://raw.githubusercontent.com/ysdede/keet/refs/heads/master/public/img/streaming-preview.jpg" alt="Real-time transcription with Parakeet.js" />
+</a>
 
 Browser-based speech-to-text using NVIDIA Parakeet models. Runs entirely client-side on **WebGPU** or **WASM** via [ONNX Runtime Web](https://onnxruntime.ai/).
 
