@@ -44,7 +44,10 @@
   ],
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "docs:clean": "node -e \"require('fs').rmSync('.typedoc-site', { recursive: true, force: true })\"",
+    "docs:api": "typedoc --options typedoc.json",
+    "docs:build": "npm run docs:clean && npm run docs:api"
   },
   "dependencies": {
     "onnxruntime-web": "1.24.1"
@@ -60,6 +63,7 @@
     "url": "https://github.com/ysdede/parakeet.js/issues"
   },
   "devDependencies": {
+    "typedoc": "^0.28.17",
     "vitest": "^4.0.18"
   }
 }

@@ -6,6 +6,9 @@ on:
     paths:
       - 'examples/demo/**'
       - 'src/**'
+      - 'types/**'
+      - 'README.md'
+      - 'typedoc.json'
       - 'package.json'
       - '.github/workflows/deploy-gh-pages.yml'
   workflow_dispatch:  # Allow manual trigger
@@ -28,10 +31,15 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: examples/demo/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            examples/demo/package-lock.json
 
       - name: Install root dependencies for local source build
         run: npm install
+
+      - name: Build API docs
+        run: npm run docs:api
 
       - name: Use local parakeet.js package for demo build
         working-directory: examples/demo
@@ -59,6 +67,9 @@ jobs:
           
           # Copy built assets
           cp -r examples/demo/dist/* deploy_temp/
+
+          # Copy generated TypeDoc site under /api
+          cp -r .typedoc-site deploy_temp/api
           
           # Add .nojekyll to prevent Jekyll processing
           touch deploy_temp/.nojekyll
