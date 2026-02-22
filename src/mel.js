@@ -352,26 +352,29 @@ export class JsPreprocessor {
     // Reuse or allocate padded buffer (Float64 for FFT)
     const pad = N_FFT >> 1;
     const paddedLen = N + 2 * pad;
+    let paddedWasReallocated = false;
     if (!this._paddedBuffer || this._paddedBuffer.length < paddedLen) {
-      const newSize = Math.max(paddedLen, Math.floor(paddedLen * 1.2));
+      const newSize = Math.ceil(paddedLen * 1.2);
       this._paddedBuffer = new Float64Array(newSize);
+      paddedWasReallocated = true;
     }
     const padded = this._paddedBuffer;
 
     // Pre-emphasis directly into padded buffer
     // Layout: [0...pad-1] (zeros) | [pad...pad+N-1] (data) | [pad+N...] (zeros)
-    // We only write the data part. The left padding is zero by default (never written).
+    // We only write the data part [pad...pad+N-1]. The left padding [0...pad-1]
+    // is never written by any call, so it stays zero from initial allocation.
     // The right padding must be explicitly zeroed if reusing a larger buffer.
-    if (N > 0) {
-      padded[pad] = audio[0];
-      for (let i = 1; i < N; i++) {
-        padded[pad + i] = audio[i] - PREEMPH * audio[i - 1];
-      }
+    padded[pad] = Math.fround(audio[0]);
+    for (let i = 1; i < N; i++) {
+      padded[pad + i] = Math.fround(audio[i] - PREEMPH * audio[i - 1]);
     }
 
     // Zero out the right padding area (up to effective length used by this call)
     // This ensures no garbage from previous larger calls leaks into FFT window reads.
-    padded.fill(0, pad + N, paddedLen);
+    if (!paddedWasReallocated) {
+      padded.fill(0, pad + N, paddedLen);
+    }
 
     // Frame counts
     const nFrames = Math.floor((paddedLen - N_FFT) / HOP_LENGTH) + 1;
