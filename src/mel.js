@@ -285,6 +285,7 @@ export class JsPreprocessor {
     this.melFilterbank = getCachedMelFilterbank(this.nMels);
     this.hannWindow = getCachedPaddedHannWindow();
     this.twiddles = precomputeTwiddles(N_FFT);
+    this.twiddlesHalf = precomputeTwiddles(N_FFT / 2);
 
     // Pre-allocate reusable buffers
     this._fftRe = new Float64Array(N_FFT);
@@ -403,25 +404,79 @@ export class JsPreprocessor {
       rawMel = new Float32Array(reqSize);
     }
 
-    const fftRe = this._fftRe;
+    const fftRe = this._fftRe; // reused as buffer for 256 complex (512 floats capacity)
     const fftIm = this._fftIm;
     const powerBuf = this._powerBuf;
     const window = this.hannWindow;
+    const twHalf = this.twiddlesHalf;
+    const twFull = this.twiddles;
     const fb = this.melFilterbank;
-    const nMels = this.nMels;
-    const tw = this.twiddles;
     const fbBounds = this.fbBounds;
+    const nMels = this.nMels;
+    const halfN = N_FFT / 2; // 256
+    const quarterN = halfN >> 1; // 128
 
     for (let t = startFrame; t < nFrames; t++) {
       const offset = t * HOP_LENGTH;
-      for (let k = 0; k < N_FFT; k++) {
-        fftRe[k] = padded[offset + k] * window[k];
-        fftIm[k] = 0;
+
+      // 1. Pack N real into N/2 complex
+      // Z[k] = x[2k] + j x[2k+1]
+      for (let k = 0; k < halfN; k++) {
+         fftRe[k] = padded[offset + 2*k] * window[2*k];
+         fftIm[k] = padded[offset + 2*k + 1] * window[2*k + 1];
       }
-      fft(fftRe, fftIm, N_FFT, tw);
-      for (let k = 0; k < N_FREQ_BINS; k++) {
-        powerBuf[k] = fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k];
+
+      // 2. FFT N/2
+      fft(fftRe, fftIm, halfN, twHalf);
+
+      // 3. Unpack & Compute Power
+
+      // k=0 (DC) and k=256 (Nyquist)
+      const z0_r = fftRe[0];
+      const z0_i = fftIm[0];
+      powerBuf[0] = (z0_r + z0_i) * (z0_r + z0_i);
+      powerBuf[halfN] = (z0_r - z0_i) * (z0_r - z0_i);
+
+      // Loop k=1 to 127
+      for (let k = 1; k < quarterN; k++) {
+         const rk = fftRe[k];
+         const ik = fftIm[k];
+         const rnk = fftRe[halfN - k];
+         const ink = fftIm[halfN - k];
+
+         const xe_r = 0.5 * (rk + rnk);
+         const xe_i = 0.5 * (ik - ink);
+
+         const xo_r = 0.5 * (ik + ink);
+         const xo_i = -0.5 * (rk - rnk);
+
+         const wc = twFull.cos[k];
+         const ws = twFull.sin[k]; // -sin(2pi k/N)
+
+         // Xo * W^k
+         // W^k = wc + j ws
+         // (xo_r + j xo_i)(wc + j ws) = (xo_r wc - xo_i ws) + j (xo_r ws + xo_i wc)
+         const t_r = xo_r * wc - xo_i * ws;
+         const t_i = xo_r * ws + xo_i * wc;
+
+         // X[k] = Xe + T
+         const xk_r = xe_r + t_r;
+         const xk_i = xe_i + t_i;
+         powerBuf[k] = xk_r * xk_r + xk_i * xk_i;
+
+         // X[N/2 - k] = conj(Xe - T)
+         // Power is same regardless of conj
+         const xnk_r = xe_r - t_r;
+         const xnk_i = xe_i - t_i;
+         powerBuf[halfN - k] = xnk_r * xnk_r + xnk_i * xnk_i;
       }
+
+      // k=128 (N/4)
+      const r128 = fftRe[quarterN];
+      const i128 = fftIm[quarterN];
+      powerBuf[quarterN] = r128*r128 + i128*i128;
+
+      // Mel Filterbank
       for (let m = 0; m < nMels; m++) {
         let melVal = 0;
         const fbOff = m * N_FREQ_BINS;
