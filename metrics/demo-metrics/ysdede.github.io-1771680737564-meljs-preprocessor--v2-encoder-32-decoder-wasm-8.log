@@ -1,0 +1,1369 @@
+index-d0f10e84.js:40 [Hub] Preprocessor: JS (mel.js) — skipping nemo128.onnx download
+index-d0f10e84.js:40 [Hub] Using cached encoder-model.onnx from IndexedDB
+index-d0f10e84.js:40 [Hub] Using cached decoder_joint-model.int8.onnx from IndexedDB
+index-d0f10e84.js:40 [Hub] Using cached vocab.txt from IndexedDB
+index-d0f10e84.js:40 [Hub] Using cached encoder-model.onnx.data from IndexedDB
+index-d0f10e84.js:40 [Parakeet.js] Preprocessor backend requested: 'js' → JS (mel.js)
+index-d0f10e84.js:40 [Parakeet.js] ORT structure: Object
+index-d0f10e84.js:40 [Parakeet.js] WASM configured with 10 threads, SIMD enabled
+index-d0f10e84.js:40 [Parakeet.js] WebGPU supported: true
+index-d0f10e84.js:40 [Parakeet.js] WebGPU will be initialized automatically when creating session
+index-d0f10e84.js:40 [Parakeet.js] Creating ONNX sessions with execution mode 'webgpu-hybrid'. Providers: Array(2)
+index-d0f10e84.js:40 [Parakeet.js] Active preprocessor: JS (mel.js) — no ONNX preprocessor needed, 128 mel bins
+53f8160e-99e8-4802-8af1-8da74d0126e1:68 2026-02-21 16:26:20.639345 [W:onnxruntime:Default, cpuid_info.cc:95 LogEarlyWarning] Unknown CPU vendor. cpuinfo_vendor value: 0
+Ec @ 53f8160e-99e8-4802-8af1-8da74d0126e1:68
+53f8160e-99e8-4802-8af1-8da74d0126e1:68 2026-02-21 16:26:26.196380 [W:onnxruntime:, session_state.cc:1327 VerifyEachNodeIsAssignedToAnEp] Some nodes were not assigned to the preferred execution providers which may or may not have an negative impact on performance. e.g. ORT explicitly assigns shape related ops to CPU to improve perf.
+Ec @ 53f8160e-99e8-4802-8af1-8da74d0126e1:68
+53f8160e-99e8-4802-8af1-8da74d0126e1:68 2026-02-21 16:26:26.197695 [W:onnxruntime:, session_state.cc:1329 VerifyEachNodeIsAssignedToAnEp] Rerunning with verbose output on a non-minimal build will show node assignments.
+Ec @ 53f8160e-99e8-4802-8af1-8da74d0126e1:68
+index-d0f10e84.js:40 [Cache] Using cached audio: life_Jim.wav
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 254 frames × 128 mel bins, 9.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 1.07x (audio 2.54 s, time 2.37 s)
+index-d0f10e84.js:40 Object
+index-d0f10e84.js:40 [App] Model verification successful.
+index-d0f10e84.js:40 LoadModel: 11799.2001953125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "don't let them build a house that is gonna cost them three thousand five hundred a year to heat when we can build them a house for almost no more money fifty more down but no more outofpocket per month money that they'll be able to heat for four hundred a month in the winter"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1762 frames × 128 mel bins, 67.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 32.83x (audio 17.62 s, time 0.54 s)
+index-d0f10e84.js:40 Object
+index-d0f10e84.js:40 Transcribe-Sample: 537.14697265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i've been to their house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 5.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 10.93x (audio 1.99 s, time 0.18 s)
+index-d0f10e84.js:40 ObjectDecode: "15.1 ms"Encode: "160.4 ms"Preprocess: "5.8 ms"Tokenize: "0.0 ms"Total: "182.1 ms"[[Prototype]]: Object
+index-d0f10e84.js:40 Transcribe-Sample: 182.299072265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "we've also done buttonedup workshops"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 195 frames × 128 mel bins, 4.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 9.07x (audio 1.95 s, time 0.22 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.8 ms'Encode'158.2 ms'Decode'51.5 ms'Tokenize'0.0 ms'Total'215.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 215.450927734375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i had a hydronic heating or baseboard heating"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 219 frames × 128 mel bins, 5.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 16.03x (audio 2.19 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.4 ms'Encode'76.4 ms'Decode'53.6 ms'Tokenize'0.0 ms'Total'136.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 137.02392578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "here's the window bucks that we put in using this nice jig"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 450 frames × 128 mel bins, 10.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 27.62x (audio 4.50 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.8 ms'Encode'79.3 ms'Decode'69.8 ms'Tokenize'0.0 ms'Total'162.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 164.158935546875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "why however is that so high why is this one using three times the heating energy of that it happens that that family is being lived in by the family that lives there was from the sudan and they'd like to keep their house at ninety degrees"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1618 frames × 128 mel bins, 45.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 44.78x (audio 16.18 s, time 0.36 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'45.3 ms'Encode'117.7 ms'Decode'196.4 ms'Tokenize'0.0 ms'Total'361.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 361.798095703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the last two are passive houses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 214 frames × 128 mel bins, 4.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 11.51x (audio 2.14 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.8 ms'Encode'155.8 ms'Decode'24.9 ms'Tokenize'0.0 ms'Total'185.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 186.248046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "perm rating is the amount of moisture that it'll led in"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 377 frames × 128 mel bins, 10.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 28.60x (audio 3.77 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.1 ms'Encode'73.4 ms'Decode'47.8 ms'Tokenize'0.0 ms'Total'131.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 132.14404296875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "you have a very nice house feelingwise"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 282 frames × 128 mel bins, 8.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.88x (audio 2.82 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.4 ms'Encode'87.0 ms'Decode'32.9 ms'Tokenize'0.0 ms'Total'129.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 129.34912109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you leave that stuff out in the rain a week later you can just squeeze the water out of it"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 424 frames × 128 mel bins, 12.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 27.62x (audio 4.25 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.1 ms'Encode'78.4 ms'Decode'62.7 ms'Tokenize'0.0 ms'Total'153.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 154.1240234375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and every one of these hungry cold mice are thinking nirvana"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 366 frames × 128 mel bins, 8.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 9.76x (audio 3.66 s, time 0.38 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.7 ms'Encode'313.5 ms'Decode'52.2 ms'Tokenize'0.0 ms'Total'375.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 375.800048828125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and as soon as the energy that you're using goes up in price then because your passive house is using ninety less than that house your incremental increase in cost is smaller"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1290 frames × 128 mel bins, 30.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 50.26x (audio 12.90 s, time 0.26 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'30.7 ms'Encode'108.0 ms'Decode'116.4 ms'Tokenize'0.0 ms'Total'256.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 257.08203125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "here's my house here's my deck"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 275 frames × 128 mel bins, 6.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 22.93x (audio 2.75 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.3 ms'Encode'79.8 ms'Decode'33.3 ms'Tokenize'0.0 ms'Total'119.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 120.2470703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and what that means is that we're actually drawing air through the house the whole time and it gives a nice fresh air all the way through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 976 frames × 128 mel bins, 22.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 44.10x (audio 9.76 s, time 0.22 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'22.0 ms'Encode'98.2 ms'Decode'96.3 ms'Tokenize'0.0 ms'Total'221.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 221.665771484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "are there questions i got one"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 205 frames × 128 mel bins, 6.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 17.10x (audio 2.06 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.1 ms'Encode'82.3 ms'Decode'31.5 ms'Tokenize'0.0 ms'Total'120.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 120.569091796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is a passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 113 frames × 128 mel bins, 3.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 10.86x (audio 1.13 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.3 ms'Encode'77.0 ms'Decode'23.5 ms'Tokenize'0.0 ms'Total'104.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 104.340087890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now we like our bedrooms a little chilly but we didn't like them that chilly"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 409 frames × 128 mel bins, 9.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.89x (audio 4.09 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.0 ms'Encode'83.9 ms'Decode'58.5 ms'Tokenize'0.0 ms'Total'152.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 152.43994140625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "we like using extruded sorry expanded polystyrene which is what we know as styrofoam"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 626 frames × 128 mel bins, 14.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.59x (audio 6.26 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.8 ms'Encode'85.9 ms'Decode'64.9 ms'Tokenize'0.0 ms'Total'166.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 166.905029296875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they just love it it's a great place to raise a family"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 267 frames × 128 mel bins, 6.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.20x (audio 2.67 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.4 ms'Encode'79.5 ms'Decode'39.8 ms'Tokenize'0.0 ms'Total'126.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 126.447021484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and what that means is that we're actually drawing air through the house the whole time and it gives a nice fresh air all the way through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 976 frames × 128 mel bins, 22.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 45.70x (audio 9.76 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'22.0 ms'Encode'97.1 ms'Decode'93.1 ms'Tokenize'0.0 ms'Total'213.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 213.908935546875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "that was pretty much it"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 116 frames × 128 mel bins, 2.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 4.19x (audio 1.17 s, time 0.28 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.8 ms'Encode'253.5 ms'Decode'21.9 ms'Tokenize'0.0 ms'Total'278.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 278.7041015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "when i'm doing my air sealing when i am in a passive house or in a house that i'm trying to make really tight every hole in your wall is going to increase your air changes per hour"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1046 frames × 128 mel bins, 24.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 43.49x (audio 10.46 s, time 0.24 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'24.3 ms'Encode'98.1 ms'Decode'116.7 ms'Tokenize'0.0 ms'Total'240.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 240.869873046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "net zero means that your house uses a certain amount of energy and you have a certain amount of renewable energies that covers the amount of energy your house uses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 982 frames × 128 mel bins, 24.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.79x (audio 9.82 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'24.0 ms'Encode'99.9 ms'Decode'121.7 ms'Tokenize'0.0 ms'Total'246.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 247.18603515625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they even have grades of insulation installation one two and three where one is the best and three is the worst"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 763 frames × 128 mel bins, 18.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.94x (audio 7.63 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'18.6 ms'Encode'92.9 ms'Decode'78.5 ms'Tokenize'0.0 ms'Total'191.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 191.35693359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i work with a contractor who does energy audits and we walk around the thermal imaging camera"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 784 frames × 128 mel bins, 17.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 42.43x (audio 7.84 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.9 ms'Encode'93.0 ms'Decode'72.9 ms'Tokenize'0.0 ms'Total'184.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 185.16796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now you can build a passive house with lots of foam either the blue boards that you see at lowe's or with polyiso or any of these foam products"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1188 frames × 128 mel bins, 29.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 47.80x (audio 11.88 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'29.6 ms'Encode'99.3 ms'Decode'118.5 ms'Tokenize'0.0 ms'Total'248.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 248.92919921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and if you get there then you do this"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 268 frames × 128 mel bins, 6.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 24.97x (audio 2.68 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.3 ms'Encode'75.6 ms'Decode'24.8 ms'Tokenize'0.0 ms'Total'107.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 107.62109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i have houses that i've helped design that if you invite fifteen friends over you're heating your house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 545 frames × 128 mel bins, 12.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.80x (audio 5.45 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.5 ms'Encode'80.3 ms'Decode'75.6 ms'Tokenize'0.0 ms'Total'171.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 171.726806640625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "what's fascinating about vermont is that it's got a very democratic legislature overall but there's also a very deep libertarian democratic bent which says we cannot force things on people because that's not what we do and every time they appoint someone and say look what we'd really like to do is to say you cannot sell a house unless you have an energy audit and i talked to the people in those groups who are representing the bank and the real estate side of things"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 3955 frames × 128 mel bins, 98.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 58.84x (audio 39.55 s, time 0.67 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'98.7 ms'Encode'227.3 ms'Decode'341.2 ms'Tokenize'0.0 ms'Total'672.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 672.656005859375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there's no heating system on in this house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 217 frames × 128 mel bins, 4.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 17.95x (audio 2.17 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.8 ms'Encode'87.7 ms'Decode'28.0 ms'Tokenize'0.0 ms'Total'120.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 121.202880859375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now i'm gonna ask the question"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 161 frames × 128 mel bins, 4.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 15.03x (audio 1.61 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.9 ms'Encode'79.6 ms'Decode'22.4 ms'Tokenize'0.0 ms'Total'107.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 107.410888671875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there was a lot of work"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 97 frames × 128 mel bins, 2.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 10.08x (audio 0.97 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.3 ms'Encode'77.2 ms'Decode'16.6 ms'Tokenize'0.0 ms'Total'96.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 96.538818359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i work with a contractor who does energy audits and we walk around the thermal imaging camera"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 784 frames × 128 mel bins, 17.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 40.69x (audio 7.84 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.5 ms'Encode'96.7 ms'Decode'77.5 ms'Tokenize'0.0 ms'Total'192.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 193.115966796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that costs me another three thousand more than expected and that brought me up to my about fifty thousand that i paid jim to do work"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 640 frames × 128 mel bins, 15.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.18x (audio 6.40 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'15.0 ms'Encode'77.7 ms'Decode'109.2 ms'Tokenize'0.0 ms'Total'205.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 205.569091796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they're the best thing around so i said well you're the expert"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 362 frames × 128 mel bins, 8.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.89x (audio 3.62 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.2 ms'Encode'76.1 ms'Decode'54.9 ms'Tokenize'0.0 ms'Total'139.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 140.151123046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "that's where you have a lot of windows in the south no actually that's passive solar and passive solar is something that was developed and designed in the 1960s and 70s and it was a great thing for what it was at the time but it's not a passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1508 frames × 128 mel bins, 36.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 49.19x (audio 15.08 s, time 0.31 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'36.3 ms'Encode'96.6 ms'Decode'171.8 ms'Tokenize'0.0 ms'Total'306.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 307.0439453125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and then i wanted that bay window replaced with a flat window and that costed me another four thousand"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 510 frames × 128 mel bins, 11.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.77x (audio 5.10 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'11.9 ms'Encode'77.2 ms'Decode'70.8 ms'Tokenize'0.0 ms'Total'160.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 160.840087890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that's the first presentation"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 212 frames × 128 mel bins, 5.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.05x (audio 2.12 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.0 ms'Encode'74.9 ms'Decode'31.0 ms'Tokenize'0.0 ms'Total'111.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 111.59521484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there's a maximum overheating of twelve"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 283 frames × 128 mel bins, 7.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.32x (audio 2.83 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.3 ms'Encode'91.4 ms'Decode'40.0 ms'Tokenize'0.0 ms'Total'139.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 139.558837890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "are there questions i got one"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 205 frames × 128 mel bins, 5.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 17.77x (audio 2.06 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.2 ms'Encode'80.9 ms'Decode'29.2 ms'Tokenize'0.0 ms'Total'115.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 115.985107421875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i was amazed i thought that i had a great view with this window with the fivebyfive and then the two side windows"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 723 frames × 128 mel bins, 17.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.83x (audio 7.23 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.1 ms'Encode'89.4 ms'Decode'83.9 ms'Tokenize'0.0 ms'Total'191.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 191.46484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so there's your four thousand five hundred what do you do here's the modified chainsaw so here's my wall coming up and here's my ceiling joist coming out and that's my roof joist my truss my it's actually gusset this is called a gusset"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1529 frames × 128 mel bins, 34.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 44.64x (audio 15.29 s, time 0.34 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'34.5 ms'Encode'110.9 ms'Decode'195.8 ms'Tokenize'0.0 ms'Total'342.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 342.89306640625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i cannot say to you build a house with these walls and you'll have a passive house because there are too many factors involved"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 685 frames × 128 mel bins, 16.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.62x (audio 6.85 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'16.3 ms'Encode'85.9 ms'Decode'78.9 ms'Tokenize'0.0 ms'Total'182.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 182.475830078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "not me i have a chimney outside the house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 262 frames × 128 mel bins, 7.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.83x (audio 2.62 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.5 ms'Encode'72.3 ms'Decode'45.5 ms'Tokenize'0.0 ms'Total'125.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 126.052978515625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "what does it cost for this person who's living in this house now this is a habitat house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 345 frames × 128 mel bins, 7.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.86x (audio 3.45 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.9 ms'Encode'79.8 ms'Decode'69.4 ms'Tokenize'0.0 ms'Total'157.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 158.101806640625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "when i'm doing my air sealing when i am in a passive house or in a house that i'm trying to make really tight every hole in your wall is going to increase your air changes per hour"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1046 frames × 128 mel bins, 25.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 41.20x (audio 10.46 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'25.9 ms'Encode'103.9 ms'Decode'123.3 ms'Tokenize'0.0 ms'Total'253.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 254.240966796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and nobody knew then that they were creating a convective pathway cause it's not more expensive or take more time to put the sheet rock up first it's just something they didn't do because the sheet rock guy came next week and that was easier"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1430 frames × 128 mel bins, 36.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 51.23x (audio 14.30 s, time 0.28 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'36.3 ms'Encode'95.7 ms'Decode'145.7 ms'Tokenize'0.0 ms'Total'279.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 279.51611328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so it's its own payback"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 217 frames × 128 mel bins, 5.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 13.02x (audio 2.17 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.1 ms'Encode'132.4 ms'Decode'28.9 ms'Tokenize'0.0 ms'Total'166.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 167.011962890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i just make up a number"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 132 frames × 128 mel bins, 4.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.48x (audio 1.33 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.1 ms'Encode'79.7 ms'Decode'22.4 ms'Tokenize'0.0 ms'Total'106.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 106.7138671875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i've been to their house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 6.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 15.56x (audio 1.99 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.4 ms'Encode'98.6 ms'Decode'22.4 ms'Tokenize'0.0 ms'Total'127.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 128.177978515625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "very complex really hard to get through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 264 frames × 128 mel bins, 6.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.12x (audio 2.64 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.3 ms'Encode'78.8 ms'Decode'28.8 ms'Tokenize'0.0 ms'Total'114.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 114.529052734375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is actual data from actual houses in vermont"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 275 frames × 128 mel bins, 6.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 22.20x (audio 2.75 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.6 ms'Encode'81.2 ms'Decode'35.7 ms'Tokenize'0.0 ms'Total'123.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 124.18408203125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "net zero means that your house uses a certain amount of energy and you have a certain amount of renewable energies that covers the amount of energy your house uses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 982 frames × 128 mel bins, 23.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 40.58x (audio 9.82 s, time 0.24 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'23.7 ms'Encode'100.7 ms'Decode'116.6 ms'Tokenize'0.0 ms'Total'242.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 242.3369140625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and if you get there then you do this"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 268 frames × 128 mel bins, 6.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.80x (audio 2.68 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.4 ms'Encode'79.9 ms'Decode'26.0 ms'Tokenize'0.0 ms'Total'112.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 112.9228515625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "gaseous water can move into the wall and move out of the wall"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 351 frames × 128 mel bins, 8.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.44x (audio 3.51 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.3 ms'Encode'78.8 ms'Decode'45.2 ms'Tokenize'0.0 ms'Total'132.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 133.098876953125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and this is the path that we're working on ph is just my abbreviation for passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 526 frames × 128 mel bins, 12.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 33.16x (audio 5.26 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.3 ms'Encode'80.0 ms'Decode'65.8 ms'Tokenize'0.0 ms'Total'158.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 159.051025390625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "energy star is a department of energy program"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 351 frames × 128 mel bins, 8.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.93x (audio 3.51 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.0 ms'Encode'73.2 ms'Decode'48.7 ms'Tokenize'0.0 ms'Total'130.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 130.6298828125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the cost was all the work that had to be done"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 244 frames × 128 mel bins, 5.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.58x (audio 2.44 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.8 ms'Encode'81.5 ms'Decode'31.0 ms'Tokenize'0.0 ms'Total'118.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 119.005126953125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the cost was all the work that had to be done"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 244 frames × 128 mel bins, 5.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.52x (audio 2.44 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.5 ms'Encode'82.4 ms'Decode'30.8 ms'Tokenize'0.0 ms'Total'119.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 119.366943359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you build a house and someone says let's put tyvek on the outside and make sure that when we put the fiberglass in the wall make sure you put a thing of poly of that clear plastic on the inside that's death to a wall"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1193 frames × 128 mel bins, 28.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 42.98x (audio 11.93 s, time 0.28 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'28.2 ms'Encode'96.5 ms'Decode'151.9 ms'Tokenize'0.0 ms'Total'277.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 277.887939453125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and what that means is that we're actually drawing air through the house the whole time and it gives a nice fresh air all the way through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 976 frames × 128 mel bins, 24.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 43.43x (audio 9.76 s, time 0.22 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'24.1 ms'Encode'108.3 ms'Decode'91.2 ms'Tokenize'0.1 ms'Total'224.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 225.058837890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it seemed like a good idea at the time"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 137 frames × 128 mel bins, 3.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.79x (audio 1.37 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.2 ms'Encode'76.9 ms'Decode'26.8 ms'Tokenize'0.0 ms'Total'107.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 107.44091796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you're jumping around you can give off more but you're putting off as much as a hundred watt light bulb"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 484 frames × 128 mel bins, 11.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 27.04x (audio 4.84 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'11.2 ms'Encode'89.4 ms'Decode'77.9 ms'Tokenize'0.0 ms'Total'179.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 179.3359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "that's where you have a lot of windows in the south no actually that's passive solar and passive solar is something that was developed and designed in the 1960s and 70s and it was a great thing for what it was at the time but it's not a passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1508 frames × 128 mel bins, 33.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 48.47x (audio 15.08 s, time 0.31 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'33.4 ms'Encode'106.4 ms'Decode'170.0 ms'Tokenize'0.0 ms'Total'311.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 311.5927734375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the other thing we'll notice is that this orange dot is the room that has that heat pump blowing that warm air in"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 700 frames × 128 mel bins, 17.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 38.90x (audio 7.00 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.2 ms'Encode'90.8 ms'Decode'71.3 ms'Tokenize'0.0 ms'Total'180.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 180.3779296875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and then i wanted that bay window replaced with a flat window and that costed me another four thousand"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 510 frames × 128 mel bins, 11.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 30.71x (audio 5.10 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'11.9 ms'Encode'85.3 ms'Decode'68.3 ms'Tokenize'0.0 ms'Total'166.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 166.406982421875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so the energy triangle says the first thing we do is we reduce the load that we have"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 595 frames × 128 mel bins, 14.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.31x (audio 5.96 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.1 ms'Encode'91.9 ms'Decode'57.5 ms'Tokenize'0.0 ms'Total'164.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 164.39404296875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i am a passive house consultant"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 278 frames × 128 mel bins, 6.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.43x (audio 2.78 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.6 ms'Encode'80.7 ms'Decode'31.1 ms'Tokenize'0.0 ms'Total'118.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 119.195068359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that's the standard"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 129 frames × 128 mel bins, 2.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.50x (audio 1.29 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.9 ms'Encode'79.4 ms'Decode'20.7 ms'Tokenize'0.0 ms'Total'103.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 103.52294921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and okay"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 134 frames × 128 mel bins, 3.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 11.83x (audio 1.35 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.1 ms'Encode'80.5 ms'Decode'30.0 ms'Tokenize'0.0 ms'Total'113.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 114.157958984375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and nobody knew then that they were creating a convective pathway cause it's not more expensive or take more time to put the sheet rock up first it's just something they didn't do because the sheet rock guy came next week and that was easier"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1430 frames × 128 mel bins, 32.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 48.42x (audio 14.30 s, time 0.30 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'32.0 ms'Encode'103.2 ms'Decode'158.6 ms'Tokenize'0.0 ms'Total'295.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 295.696044921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "something i did myself because i happened to have had the time to do it is that i bought myself a tagalong backhoe for three grand cause renting them was one hundred and fifty a day"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1028 frames × 128 mel bins, 23.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 40.66x (audio 10.28 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'23.8 ms'Encode'95.1 ms'Decode'132.7 ms'Tokenize'0.0 ms'Total'252.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 253.197998046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "not me i have a chimney outside the house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 262 frames × 128 mel bins, 6.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 17.71x (audio 2.62 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.0 ms'Encode'79.1 ms'Decode'62.5 ms'Tokenize'0.0 ms'Total'148.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 148.30712890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "we've also done buttonedup workshops"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 195 frames × 128 mel bins, 4.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 15.42x (audio 1.95 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.5 ms'Encode'84.5 ms'Decode'37.1 ms'Tokenize'0.0 ms'Total'126.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 126.760986328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so the energy triangle says the first thing we do is we reduce the load that we have"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 595 frames × 128 mel bins, 14.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 33.68x (audio 5.96 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.0 ms'Encode'94.9 ms'Decode'67.2 ms'Tokenize'0.0 ms'Total'176.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 177.25390625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that's the first presentation"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 212 frames × 128 mel bins, 4.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.37x (audio 2.12 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.8 ms'Encode'79.3 ms'Decode'25.0 ms'Tokenize'0.0 ms'Total'109.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 109.7861328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and this is the path that we're working on ph is just my abbreviation for passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 526 frames × 128 mel bins, 12.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 30.71x (audio 5.26 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.2 ms'Encode'85.7 ms'Decode'72.8 ms'Tokenize'0.0 ms'Total'171.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 171.719970703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and nobody knew then that they were creating a convective pathway cause it's not more expensive or take more time to put the sheet rock up first it's just something they didn't do because the sheet rock guy came next week and that was easier"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1430 frames × 128 mel bins, 34.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 47.34x (audio 14.30 s, time 0.30 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'34.1 ms'Encode'112.3 ms'Decode'154.2 ms'Tokenize'0.0 ms'Total'302.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 302.391845703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it seemed like a good idea at the time"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 137 frames × 128 mel bins, 3.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.42x (audio 1.37 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.1 ms'Encode'81.0 ms'Decode'26.0 ms'Tokenize'0.0 ms'Total'110.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 110.64990234375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and every one of these hungry cold mice are thinking nirvana"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 366 frames × 128 mel bins, 8.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.40x (audio 3.66 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.2 ms'Encode'82.9 ms'Decode'52.6 ms'Tokenize'0.0 ms'Total'144.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 144.54296875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "very complex really hard to get through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 264 frames × 128 mel bins, 6.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 22.61x (audio 2.64 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.3 ms'Encode'78.8 ms'Decode'31.3 ms'Tokenize'0.0 ms'Total'116.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 117.0791015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they're the best thing around so i said well you're the expert"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 362 frames × 128 mel bins, 8.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.99x (audio 3.62 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.8 ms'Encode'84.2 ms'Decode'45.8 ms'Tokenize'0.0 ms'Total'139.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 139.60888671875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is the actual blower door test it was four hundred and twenty five"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 350 frames × 128 mel bins, 7.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.27x (audio 3.50 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.9 ms'Encode'81.9 ms'Decode'43.0 ms'Tokenize'0.0 ms'Total'133.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 133.544921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "first of all if you've seen black when you open up a wall if you see black in your fiberglass you have airwashing"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 738 frames × 128 mel bins, 19.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.40x (audio 7.38 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'19.5 ms'Encode'93.8 ms'Decode'88.6 ms'Tokenize'0.0 ms'Total'202.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 203.06787109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it's tied to something called the international energy commission code which is the minimum that you can build to"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 907 frames × 128 mel bins, 21.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 46.79x (audio 9.07 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'21.0 ms'Encode'93.9 ms'Decode'78.4 ms'Tokenize'0.0 ms'Total'193.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 194.2099609375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is the code house and what the mortgage would have been and the energy costs"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 589 frames × 128 mel bins, 13.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.16x (audio 5.89 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'13.6 ms'Encode'93.0 ms'Decode'55.7 ms'Tokenize'0.0 ms'Total'162.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 163.212890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i work with a contractor who does energy audits and we walk around the thermal imaging camera"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 784 frames × 128 mel bins, 20.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 42.61x (audio 7.84 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'20.3 ms'Encode'91.6 ms'Decode'71.6 ms'Tokenize'0.0 ms'Total'184.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 184.333984375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it's tied to something called the international energy commission code which is the minimum that you can build to"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 907 frames × 128 mel bins, 20.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 44.90x (audio 9.07 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'20.4 ms'Encode'101.1 ms'Decode'79.6 ms'Tokenize'0.0 ms'Total'202.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 202.328857421875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they just love it it's a great place to raise a family"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 267 frames × 128 mel bins, 6.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.87x (audio 2.67 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.4 ms'Encode'78.8 ms'Decode'42.6 ms'Tokenize'0.0 ms'Total'128.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 128.407958984375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and if you get there then you do this"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 268 frames × 128 mel bins, 7.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 24.67x (audio 2.68 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.0 ms'Encode'78.3 ms'Decode'23.0 ms'Tokenize'0.0 ms'Total'108.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 108.94921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and these slides are just to show you the variety of what a passive house can look like"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 426 frames × 128 mel bins, 9.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 28.14x (audio 4.26 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.8 ms'Encode'73.6 ms'Decode'67.5 ms'Tokenize'0.0 ms'Total'151.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 151.718994140625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and water is conductive"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 159 frames × 128 mel bins, 5.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 16.52x (audio 1.59 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.2 ms'Encode'70.1 ms'Decode'20.7 ms'Tokenize'0.0 ms'Total'96.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 96.614990234375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they even have grades of insulation installation one two and three where one is the best and three is the worst"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 763 frames × 128 mel bins, 17.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.73x (audio 7.63 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.6 ms'Encode'92.4 ms'Decode'91.5 ms'Tokenize'0.0 ms'Total'202.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 202.568115234375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "something i did myself because i happened to have had the time to do it is that i bought myself a tagalong backhoe for three grand cause renting them was one hundred and fifty a day"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1028 frames × 128 mel bins, 24.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 42.71x (audio 10.28 s, time 0.24 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'24.2 ms'Encode'94.1 ms'Decode'121.3 ms'Tokenize'0.0 ms'Total'240.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 241.072021484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there's no heating system on in this house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 217 frames × 128 mel bins, 4.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.47x (audio 2.17 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.9 ms'Encode'81.5 ms'Decode'24.7 ms'Tokenize'0.0 ms'Total'111.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 111.784912109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "as a matter of fact i had an pendleton avalon and i thought that i could buy an outside air unit for it and i found out afterwards that i couldn't so i had to get rid of my wood stove and buy a brand new wood stove"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1191 frames × 128 mel bins, 28.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 41.56x (audio 11.91 s, time 0.29 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'28.1 ms'Encode'100.1 ms'Decode'157.5 ms'Tokenize'0.0 ms'Total'286.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 286.94189453125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "you've got a walkout basement which is where the garage is"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 264 frames × 128 mel bins, 6.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.88x (audio 2.64 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.2 ms'Encode'88.2 ms'Decode'45.0 ms'Tokenize'0.0 ms'Total'139.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 140.22802734375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i am a passive house consultant"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 278 frames × 128 mel bins, 8.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.41x (audio 2.78 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.5 ms'Encode'79.3 ms'Decode'30.7 ms'Tokenize'0.0 ms'Total'118.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 119.195068359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "net zero means that your house uses a certain amount of energy and you have a certain amount of renewable energies that covers the amount of energy your house uses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 982 frames × 128 mel bins, 22.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.18x (audio 9.82 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'22.8 ms'Encode'99.8 ms'Decode'126.9 ms'Tokenize'0.0 ms'Total'250.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 251.095947265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i cannot say to you build a house with these walls and you'll have a passive house because there are too many factors involved"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 685 frames × 128 mel bins, 15.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.90x (audio 6.85 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'15.8 ms'Encode'86.6 ms'Decode'82.7 ms'Tokenize'0.0 ms'Total'185.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 185.953125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i don't have any access to the house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 177 frames × 128 mel bins, 4.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 15.14x (audio 1.77 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.0 ms'Encode'83.5 ms'Decode'29.2 ms'Tokenize'0.0 ms'Total'116.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 117.31591796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "something i did myself because i happened to have had the time to do it is that i bought myself a tagalong backhoe for three grand cause renting them was one hundred and fifty a day"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1028 frames × 128 mel bins, 28.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 40.16x (audio 10.28 s, time 0.26 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'28.2 ms'Encode'100.9 ms'Decode'125.7 ms'Tokenize'0.0 ms'Total'256.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 256.3271484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "hot air rises"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 83 frames × 128 mel bins, 4.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 8.39x (audio 0.83 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.0 ms'Encode'70.5 ms'Decode'24.5 ms'Tokenize'0.0 ms'Total'99.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 99.57177734375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "that was passed in the last legislative session"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 305 frames × 128 mel bins, 7.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.71x (audio 3.05 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.3 ms'Encode'73.4 ms'Decode'37.5 ms'Tokenize'0.0 ms'Total'118.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 118.948974609375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now i'm gonna ask the question"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 161 frames × 128 mel bins, 4.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 15.05x (audio 1.61 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.0 ms'Encode'78.5 ms'Decode'24.3 ms'Tokenize'0.0 ms'Total'107.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 107.299072265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "hot air rises"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 83 frames × 128 mel bins, 2.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 7.82x (audio 0.83 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.0 ms'Encode'80.1 ms'Decode'24.3 ms'Tokenize'0.0 ms'Total'106.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 106.904052734375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i've been to their house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 4.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.71x (audio 1.99 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.5 ms'Encode'79.0 ms'Decode'22.5 ms'Tokenize'0.0 ms'Total'106.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 106.68017578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "you've got a walkout basement which is where the garage is"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 264 frames × 128 mel bins, 6.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.78x (audio 2.64 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.3 ms'Encode'81.8 ms'Decode'45.0 ms'Tokenize'0.0 ms'Total'133.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 133.81005859375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i've been to their house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 4.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.91x (audio 1.99 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.5 ms'Encode'73.5 ms'Decode'21.7 ms'Tokenize'0.0 ms'Total'99.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 100.277099609375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so the first thing you noticed is that the temperatures inside this house are very even"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 458 frames × 128 mel bins, 10.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.75x (audio 4.58 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.9 ms'Encode'78.7 ms'Decode'54.2 ms'Tokenize'0.0 ms'Total'144.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 144.58203125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so there's your four thousand five hundred what do you do here's the modified chainsaw so here's my wall coming up and here's my ceiling joist coming out and that's my roof joist my truss my it's actually gusset this is called a gusset"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1529 frames × 128 mel bins, 33.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 46.23x (audio 15.29 s, time 0.33 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'33.7 ms'Encode'95.3 ms'Decode'200.4 ms'Tokenize'0.0 ms'Total'330.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 331.0888671875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so i said instead of doing that i'm gonna put a bunch of fourbyfours on stilts into the ground"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 634 frames × 128 mel bins, 14.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.01x (audio 6.34 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.9 ms'Encode'87.0 ms'Decode'73.6 ms'Tokenize'0.0 ms'Total'176.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 176.427001953125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and what that means is that we're actually drawing air through the house the whole time and it gives a nice fresh air all the way through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 976 frames × 128 mel bins, 22.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 45.66x (audio 9.76 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'22.3 ms'Encode'97.6 ms'Decode'92.9 ms'Tokenize'0.0 ms'Total'213.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 214.078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there's no heating system on in this house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 217 frames × 128 mel bins, 4.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.30x (audio 2.17 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.9 ms'Encode'81.3 ms'Decode'25.9 ms'Tokenize'0.0 ms'Total'112.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 112.745849609375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so the energy triangle says the first thing we do is we reduce the load that we have"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 595 frames × 128 mel bins, 15.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.78x (audio 5.96 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'15.4 ms'Encode'86.6 ms'Decode'59.3 ms'Tokenize'0.0 ms'Total'161.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 162.31494140625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so i said instead of doing that i'm gonna put a bunch of fourbyfours on stilts into the ground"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 634 frames × 128 mel bins, 14.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.73x (audio 6.34 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.0 ms'Encode'85.7 ms'Decode'99.5 ms'Tokenize'0.0 ms'Total'199.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 200.14697265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i just make up a number"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 132 frames × 128 mel bins, 3.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 13.08x (audio 1.33 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.0 ms'Encode'78.9 ms'Decode'19.4 ms'Tokenize'0.0 ms'Total'101.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 101.873046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you leave that stuff out in the rain a week later you can just squeeze the water out of it"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 424 frames × 128 mel bins, 12.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.69x (audio 4.25 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.5 ms'Encode'86.4 ms'Decode'65.8 ms'Tokenize'0.0 ms'Total'165.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 165.642822265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it's tied to something called the international energy commission code which is the minimum that you can build to"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 907 frames × 128 mel bins, 20.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 45.26x (audio 9.07 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'20.8 ms'Encode'95.6 ms'Decode'83.0 ms'Tokenize'0.0 ms'Total'200.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 200.705078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "a lot of houses have thermal bridging and in passive house we need to eliminate that thermal bridging in order to get to a super energy efficient house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 875 frames × 128 mel bins, 19.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.48x (audio 8.75 s, time 0.23 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'19.8 ms'Encode'93.9 ms'Decode'119.0 ms'Tokenize'0.0 ms'Total'233.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 233.865234375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "first of all if you've seen black when you open up a wall if you see black in your fiberglass you have airwashing"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 738 frames × 128 mel bins, 17.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.65x (audio 7.38 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.1 ms'Encode'98.7 ms'Decode'84.8 ms'Tokenize'0.0 ms'Total'201.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 201.71484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i have houses that i've helped design that if you invite fifteen friends over you're heating your house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 545 frames × 128 mel bins, 12.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 32.16x (audio 5.45 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.3 ms'Encode'88.2 ms'Decode'68.4 ms'Tokenize'0.0 ms'Total'169.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 169.794921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the last two are passive houses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 214 frames × 128 mel bins, 6.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.65x (audio 2.14 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.0 ms'Encode'84.7 ms'Decode'23.7 ms'Tokenize'0.0 ms'Total'114.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 115.048095703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "as a matter of fact i had an pendleton avalon and i thought that i could buy an outside air unit for it and i found out afterwards that i couldn't so i had to get rid of my wood stove and buy a brand new wood stove"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1191 frames × 128 mel bins, 29.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.80x (audio 11.91 s, time 0.30 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'29.8 ms'Encode'111.2 ms'Decode'157.1 ms'Tokenize'0.0 ms'Total'299.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 299.587158203125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i've been to their house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 4.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.08x (audio 1.99 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.7 ms'Encode'81.6 ms'Decode'23.5 ms'Tokenize'0.0 ms'Total'110.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 110.389892578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so i said instead of doing that i'm gonna put a bunch of fourbyfours on stilts into the ground"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 634 frames × 128 mel bins, 14.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.29x (audio 6.34 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.5 ms'Encode'84.8 ms'Decode'74.9 ms'Tokenize'0.0 ms'Total'174.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 175.0361328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is actual data from actual houses in vermont"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 275 frames × 128 mel bins, 8.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.06x (audio 2.75 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.9 ms'Encode'83.4 ms'Decode'37.9 ms'Tokenize'0.0 ms'Total'130.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 130.888916015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is all the spray foam that he did against that osb that you just saw giving me an rvalue here"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 720 frames × 128 mel bins, 16.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.48x (audio 7.20 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'16.8 ms'Encode'91.8 ms'Decode'73.0 ms'Tokenize'0.0 ms'Total'182.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 182.703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "here's the window bucks that we put in using this nice jig"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 450 frames × 128 mel bins, 10.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.05x (audio 4.50 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.4 ms'Encode'86.5 ms'Decode'47.6 ms'Tokenize'0.0 ms'Total'144.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 145.2998046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "what does it cost for this person who's living in this house now this is a habitat house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 345 frames × 128 mel bins, 7.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.48x (audio 3.45 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.9 ms'Encode'81.3 ms'Decode'71.0 ms'Tokenize'0.0 ms'Total'160.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 161.06103515625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and what that means is that we're actually drawing air through the house the whole time and it gives a nice fresh air all the way through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 976 frames × 128 mel bins, 21.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 45.76x (audio 9.76 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'21.9 ms'Encode'95.6 ms'Decode'95.0 ms'Tokenize'0.0 ms'Total'213.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 213.617919921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now you can build a passive house with lots of foam either the blue boards that you see at lowe's or with polyiso or any of these foam products"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1188 frames × 128 mel bins, 29.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 47.96x (audio 11.88 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'29.6 ms'Encode'96.8 ms'Decode'119.9 ms'Tokenize'0.0 ms'Total'247.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 248.057861328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "here's my house here's my deck"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 275 frames × 128 mel bins, 7.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.37x (audio 2.75 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.6 ms'Encode'74.4 ms'Decode'35.3 ms'Tokenize'0.0 ms'Total'117.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 118.02197265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it's tied to something called the international energy commission code which is the minimum that you can build to"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 907 frames × 128 mel bins, 22.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 48.65x (audio 9.07 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'22.1 ms'Encode'84.3 ms'Decode'79.2 ms'Tokenize'0.0 ms'Total'186.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 186.76611328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it seemed like a good idea at the time"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 137 frames × 128 mel bins, 3.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 13.15x (audio 1.37 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.9 ms'Encode'67.9 ms'Decode'32.2 ms'Tokenize'0.0 ms'Total'104.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 104.550048828125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "what we're seeing here is the nice warmth inside"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 276 frames × 128 mel bins, 7.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.76x (audio 2.76 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.6 ms'Encode'83.1 ms'Decode'42.0 ms'Tokenize'0.0 ms'Total'133.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 133.31591796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is the solar hot water tank and this is the backup because vermont does not have enough sun in the winter we have very cold winters to give you all of your hot water through that system people were worried that because we're only putting heat into this room without any distribution system or ductworks that this room up here would be cold"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 2139 frames × 128 mel bins, 47.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 53.42x (audio 21.39 s, time 0.40 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'47.5 ms'Encode'128.9 ms'Decode'222.5 ms'Tokenize'0.0 ms'Total'400.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 400.758056640625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i just make up a number"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 132 frames × 128 mel bins, 3.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 6.61x (audio 1.33 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.4 ms'Encode'176.9 ms'Decode'20.4 ms'Tokenize'0.0 ms'Total'201.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 201.364990234375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and we found through studies that people are comfortable at a lower set temperature if all the surfaces are radiating the same temperature"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 882 frames × 128 mel bins, 20.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 45.57x (audio 8.82 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'20.3 ms'Encode'88.1 ms'Decode'84.4 ms'Tokenize'0.0 ms'Total'193.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 193.988037109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "as a matter of fact i had an pendleton avalon and i thought that i could buy an outside air unit for it and i found out afterwards that i couldn't so i had to get rid of my wood stove and buy a brand new wood stove"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1191 frames × 128 mel bins, 27.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 42.75x (audio 11.91 s, time 0.28 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'27.2 ms'Encode'93.2 ms'Decode'157.2 ms'Tokenize'0.0 ms'Total'278.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 278.967041015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you leave that stuff out in the rain a week later you can just squeeze the water out of it"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 424 frames × 128 mel bins, 9.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.86x (audio 4.25 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.4 ms'Encode'84.8 ms'Decode'63.4 ms'Tokenize'0.0 ms'Total'158.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 158.505859375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it's tied to something called the international energy commission code which is the minimum that you can build to"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 907 frames × 128 mel bins, 21.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 43.86x (audio 9.07 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'21.0 ms'Encode'103.6 ms'Decode'81.3 ms'Tokenize'0.0 ms'Total'206.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 207.14697265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so a lot of people who've heard about passive house say it's really expensive"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 468 frames × 128 mel bins, 12.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 30.18x (audio 4.68 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.4 ms'Encode'87.7 ms'Decode'54.4 ms'Tokenize'0.0 ms'Total'155.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 155.39111328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there was a lot of work"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 97 frames × 128 mel bins, 3.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 10.25x (audio 0.97 s, time 0.09 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.1 ms'Encode'72.5 ms'Decode'18.8 ms'Tokenize'0.0 ms'Total'94.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 95.0068359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and every one of these hungry cold mice are thinking nirvana"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 366 frames × 128 mel bins, 8.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.64x (audio 3.66 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.5 ms'Encode'85.3 ms'Decode'75.0 ms'Tokenize'0.0 ms'Total'169.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 169.635009765625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "here's my house here's my deck"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 275 frames × 128 mel bins, 7.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 22.52x (audio 2.75 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.0 ms'Encode'79.9 ms'Decode'34.8 ms'Tokenize'0.0 ms'Total'122.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 122.460205078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and the thermal bridging is insignificant"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 308 frames × 128 mel bins, 7.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.92x (audio 3.08 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.2 ms'Encode'82.2 ms'Decode'39.1 ms'Tokenize'0.0 ms'Total'128.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 129.235107421875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and this is the path that we're working on ph is just my abbreviation for passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 526 frames × 128 mel bins, 16.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 24.16x (audio 5.26 s, time 0.22 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'16.6 ms'Encode'112.4 ms'Decode'88.1 ms'Tokenize'0.0 ms'Total'217.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 218.125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they're the best thing around so i said well you're the expert"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 362 frames × 128 mel bins, 10.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.11x (audio 3.62 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.1 ms'Encode'86.3 ms'Decode'47.3 ms'Tokenize'0.0 ms'Total'144.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 144.50390625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "something i did myself because i happened to have had the time to do it is that i bought myself a tagalong backhoe for three grand cause renting them was one hundred and fifty a day"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1028 frames × 128 mel bins, 26.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 40.79x (audio 10.28 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'26.8 ms'Encode'99.9 ms'Decode'124.4 ms'Tokenize'0.0 ms'Total'252.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 252.344970703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they even have grades of insulation installation one two and three where one is the best and three is the worst"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 763 frames × 128 mel bins, 18.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 41.75x (audio 7.63 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'18.0 ms'Encode'88.7 ms'Decode'75.4 ms'Tokenize'0.0 ms'Total'182.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 183.126220703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and water is conductive"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 159 frames × 128 mel bins, 3.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 15.60x (audio 1.59 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.9 ms'Encode'79.2 ms'Decode'18.6 ms'Tokenize'0.0 ms'Total'101.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 102.26611328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "we've also done buttonedup workshops"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 195 frames × 128 mel bins, 4.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 16.48x (audio 1.95 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.5 ms'Encode'79.5 ms'Decode'34.0 ms'Tokenize'0.0 ms'Total'118.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 118.657958984375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there's a maximum overheating of twelve"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 283 frames × 128 mel bins, 6.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.08x (audio 2.83 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.8 ms'Encode'79.2 ms'Decode'36.3 ms'Tokenize'0.0 ms'Total'122.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 122.9580078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so it's its own payback"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 217 frames × 128 mel bins, 4.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 16.92x (audio 2.17 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.9 ms'Encode'89.6 ms'Decode'33.4 ms'Tokenize'0.0 ms'Total'128.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 128.58984375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that costs me another three thousand more than expected and that brought me up to my about fifty thousand that i paid jim to do work"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 640 frames × 128 mel bins, 14.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 29.92x (audio 6.40 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.7 ms'Encode'94.1 ms'Decode'104.4 ms'Tokenize'0.0 ms'Total'213.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 214.239990234375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i was amazed i thought that i had a great view with this window with the fivebyfive and then the two side windows"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 723 frames × 128 mel bins, 16.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 38.13x (audio 7.23 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'16.6 ms'Encode'88.6 ms'Decode'83.7 ms'Tokenize'0.0 ms'Total'189.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 189.971923828125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "what does it cost for this person who's living in this house now this is a habitat house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 345 frames × 128 mel bins, 7.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.44x (audio 3.45 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.7 ms'Encode'81.4 ms'Decode'71.4 ms'Tokenize'0.0 ms'Total'160.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 161.29296875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now i have to explain something about that"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 312 frames × 128 mel bins, 7.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.86x (audio 3.12 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.7 ms'Encode'85.4 ms'Decode'27.2 ms'Tokenize'0.0 ms'Total'120.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 120.967041015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now i have to explain something about that"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 312 frames × 128 mel bins, 7.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.77x (audio 3.12 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.1 ms'Encode'81.8 ms'Decode'27.3 ms'Tokenize'0.0 ms'Total'116.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 116.8798828125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and water is conductive"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 159 frames × 128 mel bins, 3.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 16.59x (audio 1.59 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.6 ms'Encode'71.2 ms'Decode'20.8 ms'Tokenize'0.0 ms'Total'95.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 96.18701171875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is the actual blower door test it was four hundred and twenty five"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 350 frames × 128 mel bins, 8.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.17x (audio 3.50 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.0 ms'Encode'84.2 ms'Decode'41.1 ms'Tokenize'0.0 ms'Total'133.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 134.067138671875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "that was pretty much it"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 116 frames × 128 mel bins, 2.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 11.83x (audio 1.17 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.7 ms'Encode'73.9 ms'Decode'21.8 ms'Tokenize'0.0 ms'Total'98.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 98.912109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so i have six inches of that poly of that styrofoam outside i put two inches on the inside and i'm building the whole wall out to meet that"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 777 frames × 128 mel bins, 18.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.41x (audio 7.78 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'18.7 ms'Encode'83.9 ms'Decode'110.2 ms'Tokenize'0.0 ms'Total'213.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 213.945068359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is the code house and what the mortgage would have been and the energy costs"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 589 frames × 128 mel bins, 13.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.18x (audio 5.89 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'13.9 ms'Encode'85.8 ms'Decode'58.1 ms'Tokenize'0.0 ms'Total'158.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 158.7509765625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that's the standard"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 129 frames × 128 mel bins, 3.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.72x (audio 1.29 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.3 ms'Encode'79.6 ms'Decode'18.3 ms'Tokenize'0.0 ms'Total'101.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 101.739013671875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and nobody knew then that they were creating a convective pathway cause it's not more expensive or take more time to put the sheet rock up first it's just something they didn't do because the sheet rock guy came next week and that was easier"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1430 frames × 128 mel bins, 31.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 47.54x (audio 14.30 s, time 0.30 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'31.8 ms'Encode'122.0 ms'Decode'145.6 ms'Tokenize'0.0 ms'Total'300.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 301.162109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and these slides are just to show you the variety of what a passive house can look like"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 426 frames × 128 mel bins, 9.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.85x (audio 4.26 s, time 0.33 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.5 ms'Encode'255.8 ms'Decode'65.6 ms'Tokenize'0.0 ms'Total'331.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 331.75390625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "yeah"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 83 frames × 128 mel bins, 4.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 8.69x (audio 0.83 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.6 ms'Encode'68.7 ms'Decode'22.2 ms'Tokenize'0.0 ms'Total'95.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 96.14892578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "never mind the wood"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 86 frames × 128 mel bins, 2.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 8.93x (audio 0.86 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.7 ms'Encode'73.5 ms'Decode'19.8 ms'Tokenize'0.0 ms'Total'96.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 96.60400390625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i have houses that i've helped design that if you invite fifteen friends over you're heating your house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 545 frames × 128 mel bins, 12.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.56x (audio 5.45 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.4 ms'Encode'89.6 ms'Decode'70.1 ms'Tokenize'0.0 ms'Total'172.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 173.045166015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "first of all if you've seen black when you open up a wall if you see black in your fiberglass you have airwashing"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 738 frames × 128 mel bins, 17.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 38.46x (audio 7.38 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.5 ms'Encode'89.6 ms'Decode'84.3 ms'Tokenize'0.0 ms'Total'191.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 192.2451171875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "first of all if you've seen black when you open up a wall if you see black in your fiberglass you have airwashing"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 738 frames × 128 mel bins, 16.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 38.52x (audio 7.38 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'16.4 ms'Encode'86.7 ms'Decode'87.8 ms'Tokenize'0.0 ms'Total'191.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 191.93212890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and okay"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 134 frames × 128 mel bins, 3.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.21x (audio 1.35 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.5 ms'Encode'84.8 ms'Decode'21.8 ms'Tokenize'0.0 ms'Total'110.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 110.681884765625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i'm also adding seven twelve inches of rock wool downstairs on the inside because you have that bump out with the cinder block wall and i decided i just wanted to fill that up"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 956 frames × 128 mel bins, 22.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.99x (audio 9.56 s, time 0.35 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'22.2 ms'Encode'202.5 ms'Decode'128.4 ms'Tokenize'0.0 ms'Total'354.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 354.5859375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "when i'm doing my air sealing when i am in a passive house or in a house that i'm trying to make really tight every hole in your wall is going to increase your air changes per hour"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1046 frames × 128 mel bins, 23.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.92x (audio 10.46 s, time 0.28 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'23.8 ms'Encode'100.9 ms'Decode'149.9 ms'Tokenize'0.0 ms'Total'275.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 276.197998046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that's the first presentation"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 212 frames × 128 mel bins, 6.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.21x (audio 2.12 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.6 ms'Encode'81.1 ms'Decode'22.4 ms'Tokenize'0.0 ms'Total'110.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 110.6748046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is an intelligent membrane"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 4.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 16.33x (audio 1.99 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.5 ms'Encode'90.3 ms'Decode'26.7 ms'Tokenize'0.0 ms'Total'121.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 122.150146484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the last two are passive houses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 214 frames × 128 mel bins, 5.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 17.65x (audio 2.14 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.1 ms'Encode'91.3 ms'Decode'24.6 ms'Tokenize'0.0 ms'Total'121.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 121.56494140625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "it'll be a little worse than the passive house standard"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 187 frames × 128 mel bins, 5.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 15.12x (audio 1.87 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.5 ms'Encode'80.3 ms'Decode'37.7 ms'Tokenize'0.0 ms'Total'123.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 123.993896484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "something i did myself because i happened to have had the time to do it is that i bought myself a tagalong backhoe for three grand cause renting them was one hundred and fifty a day"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1028 frames × 128 mel bins, 24.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 41.55x (audio 10.28 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'24.1 ms'Encode'98.3 ms'Decode'124.0 ms'Tokenize'0.0 ms'Total'247.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 247.778076171875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "that was pretty much it"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 116 frames × 128 mel bins, 2.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 11.49x (audio 1.17 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.7 ms'Encode'79.3 ms'Decode'19.3 ms'Tokenize'0.0 ms'Total'101.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 101.842041015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i'm also adding seven twelve inches of rock wool downstairs on the inside because you have that bump out with the cinder block wall and i decided i just wanted to fill that up"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 956 frames × 128 mel bins, 21.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.68x (audio 9.56 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'21.9 ms'Encode'101.5 ms'Decode'129.0 ms'Tokenize'0.0 ms'Total'253.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 254.06591796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i've been to their house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 4.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.10x (audio 1.99 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.5 ms'Encode'76.0 ms'Decode'23.4 ms'Tokenize'0.0 ms'Total'104.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 104.632080078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "how do i have six inches sticking out but the window starts here how do i actually make that work in the new i just decided to rip it out"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 687 frames × 128 mel bins, 15.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 35.40x (audio 6.87 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'15.3 ms'Encode'81.3 ms'Decode'96.9 ms'Tokenize'0.0 ms'Total'194.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 194.490966796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and nobody knew then that they were creating a convective pathway cause it's not more expensive or take more time to put the sheet rock up first it's just something they didn't do because the sheet rock guy came next week and that was easier"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1430 frames × 128 mel bins, 34.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 42.37x (audio 14.30 s, time 0.34 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'34.2 ms'Encode'110.4 ms'Decode'191.4 ms'Tokenize'0.0 ms'Total'337.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 337.865966796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and okay"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 134 frames × 128 mel bins, 3.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.67x (audio 1.35 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.4 ms'Encode'79.4 ms'Decode'23.3 ms'Tokenize'0.0 ms'Total'106.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 106.64697265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "as a matter of fact i had an pendleton avalon and i thought that i could buy an outside air unit for it and i found out afterwards that i couldn't so i had to get rid of my wood stove and buy a brand new wood stove"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1191 frames × 128 mel bins, 32.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.03x (audio 11.91 s, time 0.31 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'32.7 ms'Encode'103.8 ms'Decode'167.5 ms'Tokenize'0.0 ms'Total'305.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 305.51611328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they just love it it's a great place to raise a family"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 267 frames × 128 mel bins, 6.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.84x (audio 2.67 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.3 ms'Encode'94.1 ms'Decode'41.1 ms'Tokenize'0.0 ms'Total'141.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 142.217041015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i am a passive house consultant"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 278 frames × 128 mel bins, 9.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.55x (audio 2.78 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.0 ms'Encode'89.6 ms'Decode'36.4 ms'Tokenize'0.0 ms'Total'135.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 135.760009765625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you build a house and someone says let's put tyvek on the outside and make sure that when we put the fiberglass in the wall make sure you put a thing of poly of that clear plastic on the inside that's death to a wall"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1193 frames × 128 mel bins, 39.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 34.09x (audio 11.93 s, time 0.35 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'39.5 ms'Encode'106.8 ms'Decode'202.3 ms'Tokenize'0.0 ms'Total'350.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 350.31103515625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is an intelligent membrane"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 4.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 15.21x (audio 1.99 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.7 ms'Encode'82.1 ms'Decode'43.8 ms'Tokenize'0.0 ms'Total'130.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 131.2080078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and nobody knew then that they were creating a convective pathway cause it's not more expensive or take more time to put the sheet rock up first it's just something they didn't do because the sheet rock guy came next week and that was easier"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1430 frames × 128 mel bins, 32.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 50.53x (audio 14.30 s, time 0.28 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'32.0 ms'Encode'103.6 ms'Decode'146.0 ms'Tokenize'0.0 ms'Total'283.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 283.4150390625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now we like our bedrooms a little chilly but we didn't like them that chilly"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 409 frames × 128 mel bins, 10.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.71x (audio 4.09 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.1 ms'Encode'86.6 ms'Decode'55.9 ms'Tokenize'0.0 ms'Total'153.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 153.4990234375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now we like our bedrooms a little chilly but we didn't like them that chilly"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 409 frames × 128 mel bins, 9.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.46x (audio 4.09 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.8 ms'Encode'87.1 ms'Decode'57.3 ms'Tokenize'0.0 ms'Total'154.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 154.93701171875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and okay"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 134 frames × 128 mel bins, 3.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.01x (audio 1.35 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.4 ms'Encode'83.7 ms'Decode'24.7 ms'Tokenize'0.0 ms'Total'112.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 112.431884765625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and these slides are just to show you the variety of what a passive house can look like"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 426 frames × 128 mel bins, 9.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.38x (audio 4.26 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.7 ms'Encode'88.0 ms'Decode'63.3 ms'Tokenize'0.0 ms'Total'161.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 161.813232421875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "very complex really hard to get through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 264 frames × 128 mel bins, 6.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.08x (audio 2.64 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.1 ms'Encode'96.2 ms'Decode'28.9 ms'Tokenize'0.0 ms'Total'131.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 131.7841796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i put another stud on just a twobyfour stud so i could get two layers of three 12inch rock wool in there making seven inches"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 741 frames × 128 mel bins, 17.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.77x (audio 7.41 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.0 ms'Encode'88.1 ms'Decode'95.8 ms'Tokenize'0.0 ms'Total'201.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 201.924072265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "fortunately the basement was not all that finished so i have an opportunity"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 574 frames × 128 mel bins, 16.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 35.13x (audio 5.74 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'16.5 ms'Encode'89.2 ms'Decode'57.1 ms'Tokenize'0.0 ms'Total'163.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 163.718017578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and if you get there then you do this"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 268 frames × 128 mel bins, 7.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.37x (audio 2.68 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.1 ms'Encode'82.8 ms'Decode'24.4 ms'Tokenize'0.0 ms'Total'114.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 114.9970703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i've been to their house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 4.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.63x (audio 1.99 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.9 ms'Encode'79.8 ms'Decode'21.8 ms'Tokenize'0.0 ms'Total'106.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 107.1201171875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that's the first presentation"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 212 frames × 128 mel bins, 5.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.74x (audio 2.12 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.1 ms'Encode'73.4 ms'Decode'28.6 ms'Tokenize'0.0 ms'Total'107.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 107.737060546875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so i said instead of doing that i'm gonna put a bunch of fourbyfours on stilts into the ground"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 634 frames × 128 mel bins, 14.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.46x (audio 6.34 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.5 ms'Encode'81.9 ms'Decode'76.9 ms'Tokenize'0.0 ms'Total'173.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 174.27294921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and this is the path that we're working on ph is just my abbreviation for passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 526 frames × 128 mel bins, 11.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 33.44x (audio 5.26 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'11.6 ms'Encode'80.8 ms'Decode'64.5 ms'Tokenize'0.0 ms'Total'157.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 157.7431640625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and we found through studies that people are comfortable at a lower set temperature if all the surfaces are radiating the same temperature"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 882 frames × 128 mel bins, 21.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 44.06x (audio 8.82 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'21.3 ms'Encode'92.0 ms'Decode'86.1 ms'Tokenize'0.0 ms'Total'200.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 200.578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and what that means is that we're actually drawing air through the house the whole time and it gives a nice fresh air all the way through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 976 frames × 128 mel bins, 21.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 46.62x (audio 9.76 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'21.7 ms'Encode'95.2 ms'Decode'91.5 ms'Tokenize'0.0 ms'Total'209.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 209.69287109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that costs me another three thousand more than expected and that brought me up to my about fifty thousand that i paid jim to do work"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 640 frames × 128 mel bins, 17.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 27.09x (audio 6.40 s, time 0.24 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.7 ms'Encode'111.7 ms'Decode'106.1 ms'Tokenize'0.0 ms'Total'236.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 236.594970703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is all the spray foam that he did against that osb that you just saw giving me an rvalue here"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 720 frames × 128 mel bins, 16.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.18x (audio 7.20 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'16.7 ms'Encode'93.2 ms'Decode'73.3 ms'Tokenize'0.0 ms'Total'183.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 184.112060546875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and nobody knew then that they were creating a convective pathway cause it's not more expensive or take more time to put the sheet rock up first it's just something they didn't do because the sheet rock guy came next week and that was easier"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1430 frames × 128 mel bins, 34.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 49.59x (audio 14.30 s, time 0.29 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'34.7 ms'Encode'102.7 ms'Decode'149.4 ms'Tokenize'0.0 ms'Total'288.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 288.775146484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the last two are passive houses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 214 frames × 128 mel bins, 4.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.13x (audio 2.14 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.9 ms'Encode'89.9 ms'Decode'23.0 ms'Tokenize'0.0 ms'Total'118.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 118.384033203125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you're jumping around you can give off more but you're putting off as much as a hundred watt light bulb"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 484 frames × 128 mel bins, 11.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 24.82x (audio 4.84 s, time 0.19 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'11.6 ms'Encode'104.1 ms'Decode'78.8 ms'Tokenize'0.0 ms'Total'195.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 195.39697265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "you have a right as a person who's selling that to go to the bank and say i'm selling a horse farm"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 460 frames × 128 mel bins, 11.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.07x (audio 4.61 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'11.8 ms'Encode'84.8 ms'Decode'79.6 ms'Tokenize'0.0 ms'Total'176.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 177.066162109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i work with a contractor who does energy audits and we walk around the thermal imaging camera"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 784 frames × 128 mel bins, 17.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.33x (audio 7.84 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.8 ms'Encode'90.8 ms'Decode'100.5 ms'Tokenize'0.0 ms'Total'210.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 210.369873046875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so i have six inches of that poly of that styrofoam outside i put two inches on the inside and i'm building the whole wall out to meet that"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 777 frames × 128 mel bins, 17.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 35.71x (audio 7.78 s, time 0.22 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.4 ms'Encode'87.0 ms'Decode'112.6 ms'Tokenize'0.0 ms'Total'217.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 218.134033203125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you build a house and someone says let's put tyvek on the outside and make sure that when we put the fiberglass in the wall make sure you put a thing of poly of that clear plastic on the inside that's death to a wall"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1193 frames × 128 mel bins, 27.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 41.33x (audio 11.93 s, time 0.29 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'27.7 ms'Encode'105.5 ms'Decode'154.5 ms'Tokenize'0.0 ms'Total'288.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 289.0361328125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and these slides are just to show you the variety of what a passive house can look like"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 426 frames × 128 mel bins, 10.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.51x (audio 4.26 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.1 ms'Encode'100.4 ms'Decode'70.2 ms'Tokenize'0.0 ms'Total'181.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 181.5849609375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so it's its own payback"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 217 frames × 128 mel bins, 5.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.33x (audio 2.17 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.5 ms'Encode'84.3 ms'Decode'28.3 ms'Tokenize'0.0 ms'Total'118.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 118.72900390625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is the actual blower door test it was four hundred and twenty five"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 350 frames × 128 mel bins, 7.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 26.22x (audio 3.50 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.9 ms'Encode'85.2 ms'Decode'40.1 ms'Tokenize'0.0 ms'Total'133.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 133.857177734375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i had a hydronic heating or baseboard heating"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 219 frames × 128 mel bins, 5.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 16.62x (audio 2.19 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.4 ms'Encode'83.1 ms'Decode'42.9 ms'Tokenize'0.0 ms'Total'131.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 132.0830078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "are there questions i got one"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 205 frames × 128 mel bins, 5.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 17.09x (audio 2.06 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.2 ms'Encode'80.7 ms'Decode'34.1 ms'Tokenize'0.0 ms'Total'120.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 120.6640625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so a lot of people who've heard about passive house say it's really expensive"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 468 frames × 128 mel bins, 10.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 30.57x (audio 4.68 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.5 ms'Encode'86.9 ms'Decode'55.1 ms'Tokenize'0.0 ms'Total'153.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 153.39892578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and okay"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 134 frames × 128 mel bins, 3.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.78x (audio 1.35 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.2 ms'Encode'78.3 ms'Decode'23.7 ms'Tokenize'0.0 ms'Total'105.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 105.7041015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is an intelligent membrane"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 199 frames × 128 mel bins, 4.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 17.46x (audio 1.99 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.5 ms'Encode'80.7 ms'Decode'28.4 ms'Tokenize'0.0 ms'Total'113.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 114.275146484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "hot air rises"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 83 frames × 128 mel bins, 2.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 8.17x (audio 0.83 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.0 ms'Encode'76.8 ms'Decode'23.0 ms'Tokenize'0.0 ms'Total'102.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 102.306884765625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "why however is that so high why is this one using three times the heating energy of that it happens that that family is being lived in by the family that lives there was from the sudan and they'd like to keep their house at ninety degrees"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1618 frames × 128 mel bins, 36.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 52.14x (audio 16.18 s, time 0.31 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'36.2 ms'Encode'115.0 ms'Decode'157.5 ms'Tokenize'0.0 ms'Total'310.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 310.6708984375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i just make up a number"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 132 frames × 128 mel bins, 3.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.22x (audio 1.33 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.1 ms'Encode'85.5 ms'Decode'19.9 ms'Tokenize'0.0 ms'Total'108.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 108.986083984375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so i said instead of doing that i'm gonna put a bunch of fourbyfours on stilts into the ground"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 634 frames × 128 mel bins, 14.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 34.73x (audio 6.34 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.0 ms'Encode'89.5 ms'Decode'78.5 ms'Tokenize'0.0 ms'Total'182.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 182.892822265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now i have to explain something about that"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 312 frames × 128 mel bins, 6.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 24.96x (audio 3.12 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.9 ms'Encode'91.0 ms'Decode'26.6 ms'Tokenize'0.0 ms'Total'125.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 125.30517578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i'm also adding seven twelve inches of rock wool downstairs on the inside because you have that bump out with the cinder block wall and i decided i just wanted to fill that up"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 956 frames × 128 mel bins, 21.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.33x (audio 9.56 s, time 0.26 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'21.6 ms'Encode'102.7 ms'Decode'137.9 ms'Tokenize'0.0 ms'Total'263.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 263.5419921875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there's no heating system on in this house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 217 frames × 128 mel bins, 5.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.35x (audio 2.17 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.0 ms'Encode'86.2 ms'Decode'26.8 ms'Tokenize'0.0 ms'Total'118.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 118.56005859375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "i was amazed i thought that i had a great view with this window with the fivebyfive and then the two side windows"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 723 frames × 128 mel bins, 19.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 36.53x (audio 7.23 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'19.1 ms'Encode'94.5 ms'Decode'83.6 ms'Tokenize'0.0 ms'Total'197.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 198.259033203125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "that was passed in the last legislative session"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 305 frames × 128 mel bins, 8.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.52x (audio 3.05 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.9 ms'Encode'85.9 ms'Decode'34.6 ms'Tokenize'0.0 ms'Total'129.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 130.014892578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the cost was all the work that had to be done"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 244 frames × 128 mel bins, 8.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 20.65x (audio 2.44 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.2 ms'Encode'81.0 ms'Decode'28.7 ms'Tokenize'0.0 ms'Total'118.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 118.633056640625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so the first thing you noticed is that the temperatures inside this house are very even"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 458 frames × 128 mel bins, 11.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 30.89x (audio 4.58 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'11.2 ms'Encode'80.8 ms'Decode'55.9 ms'Tokenize'0.0 ms'Total'148.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 148.632080078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "fortunately the basement was not all that finished so i have an opportunity"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 574 frames × 128 mel bins, 13.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 34.58x (audio 5.74 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'13.2 ms'Encode'91.0 ms'Decode'61.2 ms'Tokenize'0.0 ms'Total'166.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 166.345947265625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that costs me another three thousand more than expected and that brought me up to my about fifty thousand that i paid jim to do work"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 640 frames × 128 mel bins, 17.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.76x (audio 6.40 s, time 0.20 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'17.0 ms'Encode'81.1 ms'Decode'102.8 ms'Tokenize'0.0 ms'Total'201.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 201.858154296875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "this is all the spray foam that he did against that osb that you just saw giving me an rvalue here"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 720 frames × 128 mel bins, 16.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.56x (audio 7.20 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'16.4 ms'Encode'91.5 ms'Decode'73.3 ms'Tokenize'0.0 ms'Total'182.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 182.31396484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that's the standard"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 129 frames × 128 mel bins, 3.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 12.31x (audio 1.29 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.0 ms'Encode'81.8 ms'Decode'19.8 ms'Tokenize'0.0 ms'Total'104.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 105.0859375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "you've got a walkout basement which is where the garage is"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 264 frames × 128 mel bins, 6.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 19.28x (audio 2.64 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.0 ms'Encode'84.3 ms'Decode'46.2 ms'Tokenize'0.0 ms'Total'136.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 137.218017578125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and okay"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 134 frames × 128 mel bins, 5.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 10.87x (audio 1.35 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.2 ms'Encode'88.3 ms'Decode'30.2 ms'Tokenize'0.0 ms'Total'124.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 124.291015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "as a matter of fact i had an pendleton avalon and i thought that i could buy an outside air unit for it and i found out afterwards that i couldn't so i had to get rid of my wood stove and buy a brand new wood stove"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1191 frames × 128 mel bins, 29.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 39.59x (audio 11.91 s, time 0.30 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'29.0 ms'Encode'111.7 ms'Decode'158.9 ms'Tokenize'0.0 ms'Total'300.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 301.23095703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "if you leave that stuff out in the rain a week later you can just squeeze the water out of it"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 424 frames × 128 mel bins, 12.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 27.03x (audio 4.25 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.7 ms'Encode'80.2 ms'Decode'63.8 ms'Tokenize'0.0 ms'Total'157.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 157.460205078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now i have to explain something about that"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 312 frames × 128 mel bins, 7.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.94x (audio 3.12 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.3 ms'Encode'84.6 ms'Decode'28.0 ms'Tokenize'0.0 ms'Total'120.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 120.596923828125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "very complex really hard to get through"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 264 frames × 128 mel bins, 5.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 22.08x (audio 2.64 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'5.9 ms'Encode'83.2 ms'Decode'30.1 ms'Tokenize'0.0 ms'Total'119.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 119.8720703125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "what we're seeing here is the nice warmth inside"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 276 frames × 128 mel bins, 6.7 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.16x (audio 2.76 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.7 ms'Encode'82.6 ms'Decode'40.7 ms'Tokenize'0.0 ms'Total'130.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 130.76708984375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "here's the window bucks that we put in using this nice jig"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 450 frames × 128 mel bins, 10.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 28.80x (audio 4.50 s, time 0.16 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.0 ms'Encode'91.1 ms'Decode'54.6 ms'Tokenize'0.0 ms'Total'156.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 156.588134765625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "yeah"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 83 frames × 128 mel bins, 2.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 7.99x (audio 0.83 s, time 0.10 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.2 ms'Encode'77.6 ms'Decode'24.2 ms'Tokenize'0.0 ms'Total'104.3 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 104.5830078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now why polyiso polyisocyanurate board is got a very high rvalue and you can buy used very cheaply which means that i'm saving it from going into a landfill i'm not causing them to make more for me and i'm getting a high rvalue"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1559 frames × 128 mel bins, 38.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 44.81x (audio 15.59 s, time 0.35 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'38.4 ms'Encode'123.1 ms'Decode'185.0 ms'Tokenize'0.0 ms'Total'347.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 348.342041015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "when i'm doing my air sealing when i am in a passive house or in a house that i'm trying to make really tight every hole in your wall is going to increase your air changes per hour"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1046 frames × 128 mel bins, 23.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 28.85x (audio 10.46 s, time 0.36 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'23.5 ms'Encode'222.7 ms'Decode'115.5 ms'Tokenize'0.0 ms'Total'362.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 362.967041015625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there's no heating system on in this house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 217 frames × 128 mel bins, 4.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 16.13x (audio 2.17 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.9 ms'Encode'95.1 ms'Decode'34.2 ms'Tokenize'0.0 ms'Total'134.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 134.91796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "internal heat gains your refrigerator your washing machine your television all of your electronics your light bulbs everything your dog everything that you have in that house that's giving off heat is a heat source"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1373 frames × 128 mel bins, 33.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 47.23x (audio 13.73 s, time 0.29 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'33.9 ms'Encode'104.0 ms'Decode'151.7 ms'Tokenize'0.0 ms'Total'290.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 291.176025390625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the last two are passive houses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 214 frames × 128 mel bins, 4.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 18.97x (audio 2.14 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'4.8 ms'Encode'85.1 ms'Decode'22.6 ms'Tokenize'0.0 ms'Total'112.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 113.156005859375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and if you get there then you do this"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 268 frames × 128 mel bins, 6.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 23.02x (audio 2.68 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.1 ms'Encode'83.5 ms'Decode'26.4 ms'Tokenize'0.0 ms'Total'116.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 116.787841796875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now you can build a passive house with lots of foam either the blue boards that you see at lowe's or with polyiso or any of these foam products"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1188 frames × 128 mel bins, 28.1 ms
+index-d0f10e84.js:40 [Perf] RTF: 46.82x (audio 11.88 s, time 0.25 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'28.1 ms'Encode'110.3 ms'Decode'114.2 ms'Tokenize'0.0 ms'Total'253.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 254.076904296875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "here's the window bucks that we put in using this nice jig"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 450 frames × 128 mel bins, 10.3 ms
+index-d0f10e84.js:40 [Perf] RTF: 29.25x (audio 4.50 s, time 0.15 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'10.3 ms'Encode'92.7 ms'Decode'50.4 ms'Tokenize'0.0 ms'Total'153.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 154.1318359375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "net zero means that your house uses a certain amount of energy and you have a certain amount of renewable energies that covers the amount of energy your house uses"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 982 frames × 128 mel bins, 22.9 ms
+index-d0f10e84.js:40 [Perf] RTF: 42.63x (audio 9.82 s, time 0.23 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'22.9 ms'Encode'88.2 ms'Decode'118.3 ms'Tokenize'0.0 ms'Total'230.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 230.743896484375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "gaseous water can move into the wall and move out of the wall"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 351 frames × 128 mel bins, 8.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.86x (audio 3.51 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'8.4 ms'Encode'80.7 ms'Decode'46.1 ms'Tokenize'0.0 ms'Total'135.7 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 136.052978515625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "the other thing we'll notice is that this orange dot is the room that has that heat pump blowing that warm air in"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 700 frames × 128 mel bins, 15.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 38.48x (audio 7.00 s, time 0.18 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'15.5 ms'Encode'94.8 ms'Decode'71.0 ms'Tokenize'0.0 ms'Total'182.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 182.308837890625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "never mind the wood"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 86 frames × 128 mel bins, 2.0 ms
+index-d0f10e84.js:40 [Perf] RTF: 6.80x (audio 0.86 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'2.0 ms'Encode'88.9 ms'Decode'35.2 ms'Tokenize'0.0 ms'Total'126.4 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 126.81494140625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "so that costs me another three thousand more than expected and that brought me up to my about fifty thousand that i paid jim to do work"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 640 frames × 128 mel bins, 14.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 30.01x (audio 6.40 s, time 0.21 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'14.6 ms'Encode'90.0 ms'Decode'108.0 ms'Tokenize'0.0 ms'Total'213.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 213.566162109375 ms
+index-d0f10e84.js:40 [Dataset] Reference: "and this is the path that we're working on ph is just my abbreviation for passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 526 frames × 128 mel bins, 12.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 31.80x (audio 5.26 s, time 0.17 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'12.8 ms'Encode'87.8 ms'Decode'64.3 ms'Tokenize'0.0 ms'Total'165.5 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 165.85888671875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "hot air rises"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 83 frames × 128 mel bins, 3.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 7.73x (audio 0.83 s, time 0.11 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'3.4 ms'Encode'82.8 ms'Decode'21.3 ms'Tokenize'0.0 ms'Total'107.8 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 108.135009765625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "a lot of houses have thermal bridging and in passive house we need to eliminate that thermal bridging in order to get to a super energy efficient house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 875 frames × 128 mel bins, 21.8 ms
+index-d0f10e84.js:40 [Perf] RTF: 37.05x (audio 8.75 s, time 0.24 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'21.8 ms'Encode'98.4 ms'Decode'115.1 ms'Tokenize'0.0 ms'Total'236.2 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 236.574951171875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "we like cellulose which is recycled newspapers"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 391 frames × 128 mel bins, 9.2 ms
+index-d0f10e84.js:40 [Perf] RTF: 27.32x (audio 3.91 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.2 ms'Encode'90.2 ms'Decode'43.2 ms'Tokenize'0.0 ms'Total'143.1 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 143.47705078125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "now you can build a passive house with lots of foam either the blue boards that you see at lowe's or with polyiso or any of these foam products"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 1188 frames × 128 mel bins, 28.5 ms
+index-d0f10e84.js:40 [Perf] RTF: 46.07x (audio 11.88 s, time 0.26 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'28.5 ms'Encode'114.5 ms'Decode'113.8 ms'Tokenize'0.0 ms'Total'257.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 258.265869140625 ms
+index-d0f10e84.js:40 [Dataset] Reference: "there are four things you have to hit on passive house"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 321 frames × 128 mel bins, 7.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.49x (audio 3.21 s, time 0.13 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'7.6 ms'Encode'79.9 ms'Decode'38.0 ms'Tokenize'0.0 ms'Total'125.9 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 126.27685546875 ms
+index-d0f10e84.js:40 [Dataset] Reference: "they just love it it's a great place to raise a family"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 267 frames × 128 mel bins, 6.4 ms
+index-d0f10e84.js:40 [Perf] RTF: 21.62x (audio 2.67 s, time 0.12 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'6.4 ms'Encode'73.6 ms'Decode'43.2 ms'Tokenize'0.0 ms'Total'123.6 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 123.971923828125 ms
+index-d0f10e84.js:40 [Dataset] Reference: "gaseous water can move into the wall and move out of the wall"
+index-d0f10e84.js:40 [Parakeet] Preprocessor: js, 351 frames × 128 mel bins, 9.6 ms
+index-d0f10e84.js:40 [Perf] RTF: 25.62x (audio 3.51 s, time 0.14 s)
+index-d0f10e84.js:40 (index)Value(index)ValuePreprocess'9.6 ms'Encode'83.2 ms'Decode'43.9 ms'Tokenize'0.0 ms'Total'137.0 ms'Object
+index-d0f10e84.js:40 Transcribe-Sample: 137.330078125 ms
