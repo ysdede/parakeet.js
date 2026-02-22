@@ -1,0 +1,15 @@
+{
+  "entryPoints": [
+    "types/index.d.ts",
+    "types/parakeet.d.ts",
+    "types/hub.d.ts",
+    "types/models.d.ts",
+    "types/mel.d.ts"
+  ],
+  "out": ".typedoc-site",
+  "name": "parakeet.js API",
+  "sort": [
+    "source-order"
+  ],
+  "categorizeByGroup": false
+}
