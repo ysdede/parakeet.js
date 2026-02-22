@@ -92,14 +92,13 @@ const model = await fromUrls({
 ## Transcribing a file (single-shot)
 
 The demo flow in `examples/demo/src/App.jsx` is:
-1. Load model assets via `getParakeetModel(...)` and create a model with `ParakeetModel.fromUrls(...)`.
+1. Load a model with public APIs (`fromHub(...)` for hub loading, or `fromUrls(...)` for explicit URLs).
 2. Decode uploaded audio with `AudioContext({ sampleRate: 16000 })` + `decodeAudioData(...)`.
-3. Read mono PCM from `decoded.getChannelData(0)`.
+3. Convert decoded audio to mono 16 kHz PCM (`Float32Array`) by averaging channels when needed.
 4. Call `model.transcribe(pcm, 16000, options)` and render `utterance_text`.
 
 Reference code:
-- `examples/demo/src/App.jsx:275`
-- `examples/demo/src/App.jsx:348`
+- `App` component in `examples/demo/src/App.jsx` (`loadModel` / `transcribeFile` flow)
 
 ## Results
 
