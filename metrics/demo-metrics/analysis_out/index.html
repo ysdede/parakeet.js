@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Transcription Performance Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <!-- Load generated data -->
+  <script src="data.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --border: #334155;
+      --onnx-color: #fca5a5; /* Light Red */
+      --meljs-color: #93c5fd; /* Light Blue */
+    }
+    body {
+      margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; height: 100vh; overflow: hidden;
+    }
+    .sidebar {
+      width: 320px; background: var(--panel-bg); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto;
+      padding: 20px; box-sizing: border-box;
+    }
+    .main {
+      flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px;
+    }
+    h1, h2, h3 { margin-top: 0; }
+    h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 20px; }
+    h2 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 15px;}
+    .control-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: var(--text-muted); }
+    input[type="range"] { width: 100%; }
+    input[type="text"], select {
+      width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); box-sizing: border-box;
+    }
+    .checkbox-lbl { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); font-size: 0.95rem; }
+    button {
+      background: var(--primary); color: white; border: none; padding: 8px 12px;
+      border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.9rem;
+      width: 100%; margin-top: 5px;
+    }
+    button:hover { filter: brightness(1.1); }
+    
+    .stats-panel {
+      background: var(--panel-bg); border-radius: 8px; padding: 15px; margin-bottom: 20px;
+      border: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;
+    }
+    .stat-box { display: flex; flex-direction: column; }
+    .stat-name { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-val { font-size: 1.2rem; font-weight: 600; margin-top: 4px; }
+    
+    .plots-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    }
+    .plot-container {
+      background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border); padding: 10px;
+      height: 350px;
+    }
+    .plot-container.wide { grid-column: span 2; }
+    
+    .outliers-list { font-size: 0.85rem; max-height: 200px; overflow-y: auto; }
+    .outlier-item { margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <h1>Performance Dashboard</h1>
+
+    <div class="control-group">
+      <label>Datasets</label>
+      <label class="checkbox-lbl"><input type="checkbox" id="chk-onnx" checked> ONNX</label>
+      <label class="checkbox-lbl"><input type="checkbox" id="chk-meljs" checked> meljs</label>
+    </div>
+
+    <div class="control-group">
+      <label>Duration Range (s): <span id="dur-val">0 - 45</span></label>
+      <input type="range" id="dur-max" min="1" max="60" value="60">
+    </div>
+
+    <div class="control-group">
+      <label>Search Audio ID</label>
+      <input type="text" id="search-text" placeholder="Type filename/id...">
+    </div>
+
+    <div class="control-group">
+      <label>Max RTFx Threshold</label>
+      <input type="range" id="rtfx-max" min="1" max="100" value="100">
+      <p style="margin:0; font-size:0.8rem" id="rtfx-val">100</p>
+    </div>
+    
+    <div class="control-group" id="comp-mode-group">
+      <label>Comparison Mode</label>
+      <select id="comp-mode">
+        <option value="exact">Exact Matches</option>
+        <option value="binned">Similar Duration (Binned)</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <button onclick="exportCSV()">Export Filtered CSV</button>
+    </div>
+
+    <hr style="border-color:var(--border); width:100%; margin: 20px 0;">
+
+    <div class="outliers-list">
+      <label>Worst RTFx Outliers</label>
+      <div id="outliers-content"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="stats-panel" id="stats">
+      <!-- Stats populated by JS -->
+    </div>
+
+    <div class="plots-grid" id="plots">
+      <div class="plot-container" id="plot-rtfx-scatter"></div>
+      <div class="plot-container" id="plot-total-scatter"></div>
+      <div class="plot-container" id="plot-rtfx-dist"></div>
+      <div class="plot-container" id="plot-stage-scatter"></div>
+      
+      <!-- Comparison plots -->
+      <div class="plot-container wide" id="plot-comp-delta" style="display:none;"></div>
+      <div class="plot-container" id="plot-comp-dist" style="display:none;"></div>
+      <div class="plot-container" id="plot-comp-binned" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script>
+    const G_DATA = window.DASHBOARD_DATA || {dataset_onnx:[], dataset_meljs:[], comparison_exact:[], comparison_binned:[]};
+    
+    const ui = {
+      chkOnnx: document.getElementById('chk-onnx'),
+      chkMeljs: document.getElementById('chk-meljs'),
+      durMax: document.getElementById('dur-max'),
+      durVal: document.getElementById('dur-val'),
+      rtfxMax: document.getElementById('rtfx-max'),
+      rtfxVal: document.getElementById('rtfx-val'),
+      searchText: document.getElementById('search-text'),
+      compMode: document.getElementById('comp-mode'),
+      compGroup: document.getElementById('comp-mode-group')
+    };
+
+    let currentData = { onnx: [], meljs: [] };
+    
+    // Config colors to match CSS variables using hex code exactly
+    const COLORS = { onnx: '#fca5a5', meljs: '#93c5fd' }; 
+    const PLOT_LAYOUT = {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      font: { color: '#94a3b8' },
+      margin: { t: 40, l: 50, r: 20, b: 40 },
+      xaxis: { gridcolor: '#334155', zerolinecolor: '#334155' },
+      yaxis: { gridcolor: '#334155', zerolinecolor: '#334155' }
+    };
+
+    function init() {
+      // Find true max bounds
+      let dMax = 0, rMax = 0;
+      [...G_DATA.dataset_onnx, ...G_DATA.dataset_meljs].forEach(d => {
+        dMax = Math.max(dMax, d.duration_s || 0);
+        rMax = Math.max(rMax, d.rtfx_total || 0);
+      });
+      ui.durMax.max = Math.ceil(dMax);
+      ui.durMax.value = Math.ceil(dMax);
+      ui.rtfxMax.max = Math.ceil(rMax);
+      ui.rtfxMax.value = Math.ceil(rMax);
+
+      // Event listeners
+      Object.values(ui).forEach(el => {
+        if(el.nodeName === 'INPUT' || el.nodeName === 'SELECT') {
+          el.addEventListener('input', updateView);
+        }
+      });
+
+      updateView();
+    }
+
+    function filterData(dataset) {
+      if(!dataset) return [];
+      const d = parseFloat(ui.durMax.value);
+      const r = parseFloat(ui.rtfxMax.value);
+      const s = ui.searchText.value.toLowerCase();
+      
+      return dataset.filter(x => {
+        if((x.duration_s || 0) > d) return false;
+        if((x.rtfx_total || 0) > r) return false;
+        if(s && !(x.reference || x.audio_id || "").toLowerCase().includes(s)) return false;
+        return true;
+      });
+    }
+
+    function computeStats(arr, key) {
+      if(!arr.length) return {mean:0, median:0, p90:0};
+      const vals = arr.map(x => x[key]).filter(x => x != null).sort((a,b) => a-b);
+      if(!vals.length) return {mean:0, median:0, p90:0};
+      const sum = vals.reduce((a,b)=>a+b, 0);
+      return {
+        mean: sum / vals.length,
+        median: vals[Math.floor(vals.length/2)],
+        p90: vals[Math.floor(vals.length * 0.9)]
+      };
+    }
+
+    function updateView() {
+      ui.durVal.textContent = `0 - ${ui.durMax.value}`;
+      ui.rtfxVal.textContent = `0 - ${ui.rtfxMax.value}`;
+      
+      const showOnnx = ui.chkOnnx.checked;
+      const showMeljs = ui.chkMeljs.checked;
+      
+      ui.compGroup.style.display = (showOnnx && showMeljs) ? 'block' : 'none';
+
+      currentData.onnx = showOnnx ? filterData(G_DATA.dataset_onnx) : [];
+      currentData.meljs = showMeljs ? filterData(G_DATA.dataset_meljs) : [];
+
+      renderStats();
+      renderPlots();
+      renderComparison();
+      renderOutliers();
+    }
+
+    function renderStats() {
+      const p = document.getElementById('stats');
+      p.innerHTML = '';
+      
+      const makeBox = (title, val) => `<div class="stat-box"><span class="stat-name">${title}</span><span class="stat-val">${val}</span></div>`;
+      
+      if(ui.chkOnnx.checked) {
+        let s = computeStats(currentData.onnx, 'rtfx_total');
+        p.innerHTML += makeBox('ONNX Count', currentData.onnx.length);
+        p.innerHTML += makeBox('ONNX RTFx Mean', s.mean.toFixed(2));
+      }
+      if(ui.chkMeljs.checked) {
+        let s = computeStats(currentData.meljs, 'rtfx_total');
+        p.innerHTML += makeBox('meljs Count', currentData.meljs.length);
+        p.innerHTML += makeBox('meljs RTFx Mean', s.mean.toFixed(2));
+      }
+    }
+
+    function genericScatter(id, yKey, title, yLabel) {
+      let traces = [];
+      if(ui.chkOnnx.checked) {
+        traces.push({
+          x: currentData.onnx.map(d => d.duration_s),
+          y: currentData.onnx.map(d => d[yKey]),
+          mode: 'markers', type: 'scatter', name: 'ONNX',
+          marker: { color: COLORS.onnx, size: 6, opacity: 0.7 }
+        });
+      }
+      if(ui.chkMeljs.checked) {
+        traces.push({
+          x: currentData.meljs.map(d => d.duration_s),
+          y: currentData.meljs.map(d => d[yKey]),
+          mode: 'markers', type: 'scatter', name: 'meljs',
+          marker: { color: COLORS.meljs, size: 6, opacity: 0.7 }
+        });
+      }
+      Plotly.newPlot(id, traces, { ...PLOT_LAYOUT, title: title, yaxis: { ...PLOT_LAYOUT.yaxis, title: yLabel } });
+    }
+
+    function renderPlots() {
+      genericScatter('plot-rtfx-scatter', 'rtfx_total', 'Duration vs RTFx', 'RTFx');
+      genericScatter('plot-total-scatter', 'total_ms', 'Duration vs Total Time', 'Time (ms)');
+      
+      // Stage plot - total stack
+      let tracesStage = [];
+      if (ui.chkOnnx.checked) {
+        tracesStage.push({ x: currentData.onnx.map(d=>d.duration_s), y: currentData.onnx.map(d=>d.preprocess_ms), mode:'markers', name:'O-Pre', marker:{color:COLORS.onnx, opacity:0.3} });
+        tracesStage.push({ x: currentData.onnx.map(d=>d.duration_s), y: currentData.onnx.map(d=>d.encoder_ms), mode:'markers', name:'O-Enc', marker:{color:'#dc2626', opacity:0.3} });
+        tracesStage.push({ x: currentData.onnx.map(d=>d.duration_s), y: currentData.onnx.map(d=>d.decoder_ms), mode:'markers', name:'O-Dec', marker:{color:'#991b1b', opacity:0.3} });
+      }
+      if(ui.chkMeljs.checked) {
+         tracesStage.push({ x: currentData.meljs.map(d=>d.duration_s), y: currentData.meljs.map(d=>d.preprocess_ms), mode:'markers', name:'M-Pre', marker:{color:COLORS.meljs, opacity:0.8} });
+         tracesStage.push({ x: currentData.meljs.map(d=>d.duration_s), y: currentData.meljs.map(d=>d.encoder_ms), mode:'markers', name:'M-Enc', marker:{color:'#2563eb', opacity:0.8} });
+         tracesStage.push({ x: currentData.meljs.map(d=>d.duration_s), y: currentData.meljs.map(d=>d.decoder_ms), mode:'markers', name:'M-Dec', marker:{color:'#1e3a8a', opacity:0.8} });
+      }
+      Plotly.newPlot('plot-stage-scatter', tracesStage, { ...PLOT_LAYOUT, title: 'Stage Times', yaxis: { title: 'ms' } });
+
+      // RTFx Hist
+      let tracesHist = [];
+      if(ui.chkOnnx.checked) tracesHist.push({ x: currentData.onnx.map(d=>d.rtfx_total), type:'histogram', name:'ONNX', marker:{color:COLORS.onnx}, opacity:0.6 });
+      if(ui.chkMeljs.checked) tracesHist.push({ x: currentData.meljs.map(d=>d.rtfx_total), type:'histogram', name:'meljs', marker:{color:COLORS.meljs}, opacity:0.6 });
+      Plotly.newPlot('plot-rtfx-dist', tracesHist, { ...PLOT_LAYOUT, title:'RTFx Distribution', barmode:'overlay' });
+    }
+
+    function renderComparison() {
+      const mode = ui.compMode.value;
+      const dDelta = document.getElementById('plot-comp-delta');
+      const dDist = document.getElementById('plot-comp-dist');
+      const dBinned = document.getElementById('plot-comp-binned');
+
+      if (!ui.chkOnnx.checked || !ui.chkMeljs.checked) {
+        dDelta.style.display = 'none'; dDist.style.display = 'none'; dBinned.style.display = 'none';
+        return;
+      }
+
+      if (mode === 'exact') {
+        dDelta.style.display = 'block'; dDist.style.display = 'block'; dBinned.style.display = 'none';
+        
+        let fd = G_DATA.comparison_exact.filter(x => x.duration_s <= parseFloat(ui.durMax.value));
+        
+        let tDelta = [{
+          x: fd.map(d=>d.duration_s), y: fd.map(d=>d.delta_rtfx), mode:'markers', type:'scatter',
+          marker: { color: '#a78bfa' }
+        }];
+        Plotly.newPlot('plot-comp-delta', tDelta, {...PLOT_LAYOUT, title:'Exact Match: Delta RTFx (meljs - ONNX)'});
+
+        let tDist = [{ x: fd.map(d=>d.delta_rtfx), type:'histogram', marker:{color:'#a78bfa'} }];
+        Plotly.newPlot('plot-comp-dist', tDist, {...PLOT_LAYOUT, title:'Delta RTFx Dist'});
+
+      } else {
+        dDelta.style.display = 'none'; dDist.style.display = 'none'; dBinned.style.display = 'block';
+        
+        let bd = G_DATA.comparison_binned;
+        let tBinOnnx = { x: bd.map(b=>b.bin_label), y: bd.map(b=>b.rtfx_mean_onnx), type:'bar', name:'ONNX', marker:{color:COLORS.onnx} };
+        let tBinMeljs = { x: bd.map(b=>b.bin_label), y: bd.map(b=>b.rtfx_mean_meljs), type:'bar', name:'meljs', marker:{color:COLORS.meljs} };
+        Plotly.newPlot('plot-comp-binned', [tBinOnnx, tBinMeljs], {...PLOT_LAYOUT, title:'Mean RTFx by Duration Bin', barmode:'group'});
+      }
+    }
+
+    function renderOutliers() {
+      const el = document.getElementById('outliers-content');
+      let combined = [];
+      if(ui.chkOnnx.checked) combined = combined.concat(currentData.onnx.map(o => ({...o, _mode:'ONNX'})));
+      if(ui.chkMeljs.checked) combined = combined.concat(currentData.meljs.map(o => ({...o, _mode:'meljs'})));
+      
+      combined.sort((a,b) => (b.rtfx_total||0) - (a.rtfx_total||0));
+      let top10 = combined.slice(0, 10);
+      
+      el.innerHTML = top10.map(d => `
+        <div class="outlier-item">
+          <strong>${d._mode}</strong>: ${d.rtfx_total.toFixed(2)}x <br>
+          <span style="color:#94a3b8">${(d.reference || "no-ref").substring(0, 30)}... (Dur: ${d.duration_s}s)</span>
+        </div>
+      `).join('');
+    }
+
+    function exportCSV() {
+      // Export current filtered as simple CSV
+      let rows = [];
+      if(ui.chkOnnx.checked) rows = rows.concat(currentData.onnx);
+      if(ui.chkMeljs.checked) rows = rows.concat(currentData.meljs);
+      if(!rows.length) return alert('No data');
+      
+      let keys = ['mode', 'duration_s', 'rtfx_total', 'preprocess_ms', 'encoder_ms', 'decoder_ms', 'total_ms', 'reference'];
+      let header = keys.join(',') + '\n';
+      let csv = header + rows.map(r => keys.map(k => `"${(r[k]||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+      
+      let blob = new Blob([csv], {type: 'text/csv'});
+      let a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'filtered_logs.csv';
+      a.click();
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
