@@ -15,7 +15,9 @@ dist/
 # Documentation and Scripts
 docs/
 scripts/
+.typedoc-site/
 
 # Internal
 *OPTIMIZATION*.md
 audio/
+*.pyc
