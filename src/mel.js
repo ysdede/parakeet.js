@@ -285,10 +285,11 @@ export class JsPreprocessor {
     this.melFilterbank = getCachedMelFilterbank(this.nMels);
     this.hannWindow = getCachedPaddedHannWindow();
     this.twiddles = precomputeTwiddles(N_FFT);
+    this.halfTwiddles = precomputeTwiddles(N_FFT / 2);
 
     // Pre-allocate reusable buffers
-    this._fftRe = new Float64Array(N_FFT);
-    this._fftIm = new Float64Array(N_FFT);
+    this._fftRe = new Float64Array(N_FFT / 2);
+    this._fftIm = new Float64Array(N_FFT / 2);
     this._powerBuf = new Float32Array(N_FREQ_BINS);
     this._paddedBuffer = null;
 
@@ -409,19 +410,76 @@ export class JsPreprocessor {
     const window = this.hannWindow;
     const fb = this.melFilterbank;
     const nMels = this.nMels;
-    const tw = this.twiddles;
+    const tw = this.twiddles; // needed for unpacking
+    const halfTw = this.halfTwiddles; // needed for FFT
     const fbBounds = this.fbBounds;
+
+    // Real-valued FFT Optimization:
+    // Treat N real samples as N/2 complex samples, do N/2 complex FFT, then unpack.
+    const halfN = N_FFT >> 1; // 256
+    const quartN = halfN >> 1; // 128
 
     for (let t = startFrame; t < nFrames; t++) {
       const offset = t * HOP_LENGTH;
-      for (let k = 0; k < N_FFT; k++) {
-        fftRe[k] = padded[offset + k] * window[k];
-        fftIm[k] = 0;
+
+      // Pack N real inputs into N/2 complex inputs
+      // z[k] = x[2k] + j * x[2k+1]
+      for (let k = 0; k < halfN; k++) {
+        fftRe[k] = padded[offset + 2 * k] * window[2 * k];
+        fftIm[k] = padded[offset + 2 * k + 1] * window[2 * k + 1];
       }
-      fft(fftRe, fftIm, N_FFT, tw);
-      for (let k = 0; k < N_FREQ_BINS; k++) {
-        powerBuf[k] = fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k];
+
+      // N/2-point FFT
+      fft(fftRe, fftIm, halfN, halfTw);
+
+      // Unpack & Compute Power Spectrum
+      // 1. DC (k=0) and Nyquist (k=N/2) of original N-point FFT
+      // X[0] = Re(Z[0]) + Im(Z[0])
+      // X[N/2] = Re(Z[0]) - Im(Z[0])
+      const x0 = fftRe[0] + fftIm[0];
+      const xN2 = fftRe[0] - fftIm[0];
+      powerBuf[0] = x0 * x0;
+      powerBuf[halfN] = xN2 * xN2;
+
+      // 2. Remaining positive frequencies k=1..N/2-1
+      // We process k up to quartN.
+      for (let k = 1; k <= quartN; k++) {
+        const k2 = halfN - k; // Index N/2 - k in Z (which maps to N/2 - k in X)
+
+        const zRe_k = fftRe[k];
+        const zIm_k = fftIm[k];
+        const zRe_mk = fftRe[k2];
+        const zIm_mk = fftIm[k2];
+
+        // Even/Odd decomposition
+        const evRe = 0.5 * (zRe_k + zRe_mk);
+        const evIm = 0.5 * (zIm_k - zIm_mk);
+        const odRe = 0.5 * (zIm_k + zIm_mk);
+        const odIm = -0.5 * (zRe_k - zRe_mk);
+
+        // Twiddle factor W_N^k from full-size twiddles
+        const wCos = tw.cos[k];
+        const wSin = tw.sin[k];
+
+        // term = od * W_N^k
+        const termRe = odRe * wCos - odIm * wSin;
+        const termIm = odRe * wSin + odIm * wCos;
+
+        // X[k] = ev + term
+        const xkRe = evRe + termRe;
+        const xkIm = evIm + termIm;
+        powerBuf[k] = xkRe * xkRe + xkIm * xkIm;
+
+        // X[N/2 - k] = conj(ev - term)
+        // |X[N/2-k]|^2 = |ev - term|^2
+        // ev - term = (evRe - termRe) + j(evIm - termIm)
+        // Real part: evRe - termRe
+        // Imag part: evIm - termIm (magnitude square ignores sign)
+        const xk2Re = evRe - termRe;
+        const xk2Im = evIm - termIm;
+        powerBuf[k2] = xk2Re * xk2Re + xk2Im * xk2Im;
       }
+
       for (let m = 0; m < nMels; m++) {
         let melVal = 0;
         const fbOff = m * N_FREQ_BINS;
