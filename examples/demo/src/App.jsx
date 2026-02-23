@@ -151,8 +151,8 @@ export default function App() {
   // Auto-adjust quant presets when backend changes
   useEffect(() => {
     if (backend.startsWith('webgpu')) {
-      setEncoderQuant('fp32');
-      setDecoderQuant('int8');
+      setEncoderQuant('fp16');
+      setDecoderQuant('fp16');
     } else {
       setEncoderQuant('int8');
       setDecoderQuant('int8');
@@ -293,9 +293,11 @@ export default function App() {
         backend,
         progress: progressCallback
       });
+      const resolvedQuant = `Resolved quantization: encoder=${modelUrls.quantisation.encoder}, decoder=${modelUrls.quantisation.decoder}`;
+      console.log(`[App] ${resolvedQuant}`);
 
       setStatus('Compiling model…');
-      setProgressText('This may take ~10s on first load');
+      setProgressText(`${resolvedQuant} · compiling may take ~10s on first load`);
       setProgressPct(null);
 
       modelRef.current = await ParakeetModel.fromUrls({
@@ -535,6 +537,7 @@ export default function App() {
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
+                      <option value="fp16">fp16</option>
                       <option value="fp32">fp32</option>
                       <option value="int8">int8</option>
                     </select>
@@ -556,6 +559,7 @@ export default function App() {
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
+                      <option value="fp16">fp16</option>
                       <option value="int8">int8</option>
                       <option value="fp32">fp32</option>
                     </select>

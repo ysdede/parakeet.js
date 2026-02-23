@@ -12,6 +12,15 @@ let dbPromise = null;
 
 // Cache for repo file listings so we only hit the HF API once per page load
 const repoFileCache = new Map();
+const QUANT_SUFFIX = {
+  int8: '.int8.onnx',
+  fp16: '.fp16.onnx',
+  fp32: '.onnx',
+};
+
+function getQuantizedModelName(baseName, quant) {
+  return `${baseName}${QUANT_SUFFIX[quant] || QUANT_SUFFIX.fp32}`;
+}
 
 /**
  * List model repository files from the Hugging Face model API.
@@ -190,13 +199,13 @@ export async function getModelText(repoId, filename, options = {}) {
  * Convenience function to get all Parakeet model files for a given architecture.
  * @param {string} repoIdOrModelKey HF repo (e.g., 'nvidia/parakeet-tdt-1.1b') or model key (e.g., 'parakeet-tdt-0.6b-v3')
  * @param {Object} [options]
- * @param {('int8'|'fp32')} [options.encoderQuant='int8'] Encoder quantization
- * @param {('int8'|'fp32')} [options.decoderQuant='int8'] Decoder quantization
+ * @param {('int8'|'fp32'|'fp16')} [options.encoderQuant='int8'] Encoder quantization
+ * @param {('int8'|'fp32'|'fp16')} [options.decoderQuant='int8'] Decoder quantization
  * @param {('nemo80'|'nemo128')} [options.preprocessor] Preprocessor variant (auto-detected from model config if not specified)
  * @param {('js'|'onnx')} [options.preprocessorBackend='js'] Preprocessor backend selection.
  * @param {('webgpu'|'webgpu-hybrid'|'webgpu-strict'|'wasm')} [options.backend='webgpu'] Backend mode (`webgpu` alias is accepted for compatibility)
  * @param {(progress: {loaded: number, total: number, file: string}) => void} [options.progress] Progress callback
- * @returns {Promise<{urls: {encoderUrl: string, decoderUrl: string, tokenizerUrl: string, preprocessorUrl?: string, encoderDataUrl?: string|null, decoderDataUrl?: string|null}, filenames: {encoder: string, decoder: string}, quantisation: {encoder: ('int8'|'fp32'), decoder: ('int8'|'fp32')}, modelConfig: ModelConfig|null, preprocessorBackend: ('js'|'onnx')}>}
+ * @returns {Promise<{urls: {encoderUrl: string, decoderUrl: string, tokenizerUrl: string, preprocessorUrl?: string, encoderDataUrl?: string|null, decoderDataUrl?: string|null}, filenames: {encoder: string, decoder: string}, quantisation: {encoder: ('int8'|'fp32'|'fp16'), decoder: ('int8'|'fp32'|'fp16')}, modelConfig: ModelConfig|null, preprocessorBackend: ('js'|'onnx')}>}
  */
 export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   // Resolve model key to repo ID and get config
@@ -217,17 +226,47 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
     encoderQ = 'fp32';
   }
 
-  const encoderSuffix = encoderQ === 'int8' ? '.int8.onnx' : '.onnx';
-  const decoderSuffix = decoderQ === 'int8' ? '.int8.onnx' : '.onnx';
-
-  const encoderName = `encoder-model${encoderSuffix}`;
-  const decoderName = `decoder_joint-model${decoderSuffix}`;
-
   const repoFiles = await listRepoFiles(repoId, options.revision || 'main');
+  const hasRepoListing = repoFiles.length > 0;
+
+  const components = {
+    encoder: {
+      key: 'encoderUrl',
+      baseName: 'encoder-model',
+      filename: getQuantizedModelName('encoder-model', encoderQ),
+      quant: encoderQ,
+    },
+    decoder: {
+      key: 'decoderUrl',
+      baseName: 'decoder_joint-model',
+      filename: getQuantizedModelName('decoder_joint-model', decoderQ),
+      quant: decoderQ,
+    },
+  };
+
+  for (const [name, component] of Object.entries(components)) {
+    if (component.quant !== 'fp16') continue;
+    if (!hasRepoListing) continue;
+
+    const fp16Name = getQuantizedModelName(component.baseName, 'fp16');
+    const fp32Name = getQuantizedModelName(component.baseName, 'fp32');
+
+    if (repoFiles.includes(fp16Name)) continue;
+    if (repoFiles.includes(fp32Name)) {
+      console.warn(`[Hub] ${name} FP16 file missing in ${repoId}; falling back to FP32 (${fp32Name})`);
+      component.filename = fp32Name;
+      component.quant = 'fp32';
+      continue;
+    }
+
+    throw new Error(
+      `[Hub] Missing ${name} model in ${repoId}: requested ${fp16Name}, fallback ${fp32Name} is also unavailable`
+    );
+  }
 
   const filesToGet = [
-    { key: 'encoderUrl', name: encoderName },
-    { key: 'decoderUrl', name: decoderName },
+    { key: components.encoder.key, name: components.encoder.filename },
+    { key: components.decoder.key, name: components.decoder.filename },
     { key: 'tokenizerUrl', name: 'vocab.txt' },
   ];
 
@@ -239,36 +278,68 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
     console.log(`[Hub] Preprocessor: JS (mel.js) — skipping ${preprocessor}.onnx download`);
   }
 
-  // Conditionally include external data files only if they exist in the repo file list.
-  if (repoFiles.includes(`${encoderName}.data`)) {
-    filesToGet.push({ key: 'encoderDataUrl', name: `${encoderName}.data` });
-  }
-
-  if (repoFiles.includes(`${decoderName}.data`)) {
-    filesToGet.push({ key: 'decoderDataUrl', name: `${decoderName}.data` });
-  }
-
   const results = {
       urls: {},
       filenames: {
-          encoder: encoderName,
-          decoder: decoderName
+          encoder: components.encoder.filename,
+          decoder: components.decoder.filename
       },
-      quantisation: { encoder: encoderQ, decoder: decoderQ },
+      quantisation: { encoder: components.encoder.quant, decoder: components.decoder.quant },
       modelConfig: modelConfig || null,  // Include model config for downstream use
       preprocessorBackend,  // Pass through so callers know which backend to use
   };
-  
-  for (const { key, name } of filesToGet) {
+
+  for (const file of filesToGet) {
+    const { key, name } = file;
     try {
-        results.urls[key] = await getModelFile(repoId, name, { ...options, progress });
+      results.urls[key] = await getModelFile(repoId, name, { ...options, progress });
     } catch (e) {
-        if (key.endsWith('DataUrl')) {
-            console.warn(`[Hub] Optional external data file not found: ${name}. This is expected if the model is small.`);
-            results.urls[key] = null;
-        } else {
-            throw e;
+      if (key !== 'encoderUrl' && key !== 'decoderUrl') {
+        throw e;
+      }
+
+      const componentName = key === 'encoderUrl' ? 'encoder' : 'decoder';
+      const component = components[componentName];
+      const fallbackName = getQuantizedModelName(component.baseName, 'fp32');
+
+      // If FP16 was optimistically selected (repo listing unavailable), fallback at download time.
+      if (component.quant === 'fp16' && fallbackName !== name) {
+        console.warn(
+          `[Hub] ${componentName} FP16 download failed (${name}); retrying with FP32 (${fallbackName})`,
+          e
+        );
+        try {
+          results.urls[key] = await getModelFile(repoId, fallbackName, { ...options, progress });
+          component.filename = fallbackName;
+          component.quant = 'fp32';
+          results.filenames[componentName] = fallbackName;
+          results.quantisation[componentName] = 'fp32';
+          continue;
+        } catch (fallbackError) {
+          throw new Error(
+            `[Hub] Missing ${componentName} model in ${repoId}: requested ${name}, fallback ${fallbackName} failed (${fallbackError.message || fallbackError})`
+          );
         }
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  // Conditionally include external data files.
+  // If repo listing is unavailable, try optimistic fetch for compatibility.
+  const externalDataCandidates = [
+    { key: 'encoderDataUrl', name: `${components.encoder.filename}.data` },
+    { key: 'decoderDataUrl', name: `${components.decoder.filename}.data` },
+  ];
+
+  for (const { key, name } of externalDataCandidates) {
+    if (hasRepoListing && !repoFiles.includes(name)) continue;
+    try {
+      results.urls[key] = await getModelFile(repoId, name, { ...options, progress });
+    } catch (e) {
+      console.warn(`[Hub] Optional external data file not found: ${name}. This is expected if the model is small.`);
+      results.urls[key] = null;
     }
   }
   

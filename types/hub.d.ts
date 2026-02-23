@@ -15,8 +15,8 @@ export interface GetModelFileOptions {
 
 export interface GetParakeetModelOptions {
   revision?: string;
-  encoderQuant?: 'int8' | 'fp32';
-  decoderQuant?: 'int8' | 'fp32';
+  encoderQuant?: 'int8' | 'fp32' | 'fp16';
+  decoderQuant?: 'int8' | 'fp32' | 'fp16';
   preprocessor?: 'nemo80' | 'nemo128';
   preprocessorBackend?: PreprocessorBackend;
   backend?: BackendMode;
@@ -37,8 +37,8 @@ export interface GetParakeetModelResult {
     decoder: string;
   };
   quantisation: {
-    encoder: 'int8' | 'fp32';
-    decoder: 'int8' | 'fp32';
+    encoder: 'int8' | 'fp32' | 'fp16';
+    decoder: 'int8' | 'fp32' | 'fp16';
   };
   modelConfig: ModelConfig | null;
   preprocessorBackend: PreprocessorBackend;
