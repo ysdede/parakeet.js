@@ -32,19 +32,39 @@ async function listRepoFiles(repoId, revision = 'main') {
   const cacheKey = `${repoId}@${revision}`;
   if (repoFileCache.has(cacheKey)) return repoFileCache.get(cacheKey);
 
-  const url = `https://huggingface.co/api/models/${repoId}?revision=${encodeURIComponent(revision)}`;
+  const encodedRevision = encodeURIComponent(revision);
+  const treeUrl = `https://huggingface.co/api/models/${repoId}/tree/${encodedRevision}?recursive=1`;
+  const modelUrl = `https://huggingface.co/api/models/${repoId}?revision=${encodedRevision}`;
   try {
-    const resp = await fetch(url);
+    const resp = await fetch(treeUrl);
     if (!resp.ok) throw new Error(`Failed to list repo files: ${resp.status}`);
     const json = await resp.json();
-    const files = json.siblings?.map(s => s.rfilename) || [];
+    let files = [];
+    if (Array.isArray(json)) {
+      files = json
+        .filter((entry) => entry?.type === 'file' && typeof entry?.path === 'string')
+        .map((entry) => entry.path);
+    } else {
+      // Backward-compatible fallback for mocked/legacy response shape.
+      files = json.siblings?.map((s) => s.rfilename) || [];
+    }
     repoFileCache.set(cacheKey, files);
     return files;
   } catch (err) {
-    console.warn('[Hub] Could not fetch repo file list – falling back to optimistic fetch', err);
-    // Return empty list so caller behaves like old code (may attempt fetch and catch 404)
-    repoFileCache.set(cacheKey, []);
-    return [];
+    console.warn('[Hub] Could not fetch repo tree listing; trying model metadata listing', err);
+    try {
+      const resp = await fetch(modelUrl);
+      if (!resp.ok) throw new Error(`Failed to list repo files: ${resp.status}`);
+      const json = await resp.json();
+      const files = json.siblings?.map((s) => s.rfilename) || [];
+      repoFileCache.set(cacheKey, files);
+      return files;
+    } catch (fallbackErr) {
+      console.warn('[Hub] Could not fetch repo file list – falling back to optimistic fetch', fallbackErr);
+      // Return empty list so caller behaves like old code (may attempt fetch and catch 404)
+      repoFileCache.set(cacheKey, []);
+      return [];
+    }
   }
 }
 

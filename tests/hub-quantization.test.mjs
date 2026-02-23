@@ -168,7 +168,7 @@ describe('getParakeetModel quantization resolution', () => {
     });
 
     expect(res.filenames.encoder).toBe('encoder-model.fp16.onnx');
-    expect(calls.some((x) => x.includes(`/api/models/${repoId}?revision=feat%2Ffp16-canonical-v2`))).toBe(true);
+    expect(calls.some((x) => x.includes(`/api/models/${repoId}/tree/feat%2Ffp16-canonical-v2`))).toBe(true);
     expect(calls.some((x) => x.includes('/resolve/feat%2Ffp16-canonical-v2/encoder-model.fp16.onnx'))).toBe(true);
   });
 });
