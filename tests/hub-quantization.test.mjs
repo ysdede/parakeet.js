@@ -146,4 +146,29 @@ describe('getParakeetModel quantization resolution', () => {
     expect(res.filenames.decoder).toBe('decoder_joint-model.int8.onnx');
     expect(res.quantisation.decoder).toBe('int8');
   });
+
+  it('encodes slash branch names in API and resolve URLs', async () => {
+    const repoId = 'test/repo-branch-slash';
+    const revision = 'feat/fp16-canonical-v2';
+    const { calls } = installFetchMock({
+      repoId,
+      siblings: [
+        'encoder-model.fp16.onnx',
+        'decoder_joint-model.fp16.onnx',
+        'vocab.txt',
+      ],
+    });
+
+    const res = await getParakeetModel(repoId, {
+      revision,
+      backend: 'webgpu-hybrid',
+      encoderQuant: 'fp16',
+      decoderQuant: 'fp16',
+      preprocessorBackend: 'js',
+    });
+
+    expect(res.filenames.encoder).toBe('encoder-model.fp16.onnx');
+    expect(calls.some((x) => x.includes(`/api/models/${repoId}?revision=feat%2Ffp16-canonical-v2`))).toBe(true);
+    expect(calls.some((x) => x.includes('/resolve/feat%2Ffp16-canonical-v2/encoder-model.fp16.onnx'))).toBe(true);
+  });
 });

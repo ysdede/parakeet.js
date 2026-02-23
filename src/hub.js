@@ -32,7 +32,7 @@ async function listRepoFiles(repoId, revision = 'main') {
   const cacheKey = `${repoId}@${revision}`;
   if (repoFileCache.has(cacheKey)) return repoFileCache.get(cacheKey);
 
-  const url = `https://huggingface.co/api/models/${repoId}?revision=${revision}`;
+  const url = `https://huggingface.co/api/models/${repoId}?revision=${encodeURIComponent(revision)}`;
   try {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Failed to list repo files: ${resp.status}`);
@@ -114,12 +114,20 @@ async function saveFileToDb(key, blob) {
  */
 export async function getModelFile(repoId, filename, options = {}) {
   const { revision = 'main', subfolder = '', progress } = options;
+  const encodedRevision = encodeURIComponent(revision);
+  const encodedSubfolder = subfolder
+    ? subfolder.split('/').map((part) => encodeURIComponent(part)).join('/')
+    : '';
+  const encodedFilename = filename
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
   
   // Construct HF URL
   const baseUrl = 'https://huggingface.co';
-  const pathParts = [repoId, 'resolve', revision];
-  if (subfolder) pathParts.push(subfolder);
-  pathParts.push(filename);
+  const pathParts = [repoId, 'resolve', encodedRevision];
+  if (encodedSubfolder) pathParts.push(encodedSubfolder);
+  pathParts.push(encodedFilename);
   const url = `${baseUrl}/${pathParts.join('/')}`;
   
   // Check IndexedDB first
