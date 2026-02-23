@@ -11,6 +11,12 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
   languages: config.languages,
 }));
 
+const MODEL_REVISIONS = [
+  'main',
+  'feat/fp16-canonical-v2',
+  'feat/fp16-canonical-v3',
+];
+
 // Cache audio file from GitHub raw URL to IndexedDB
 async function getCachedAudioFile(url, cacheKey) {
   const dbName = 'parakeet-demo-cache';
@@ -106,6 +112,7 @@ function pcmToWavBlob(pcm, sampleRate = 16000) {
 
 export default function App() {
   const [selectedModel, setSelectedModel] = useState('parakeet-tdt-0.6b-v2');
+  const [modelRevision, setModelRevision] = useState('main');
   const modelConfig = MODELS[selectedModel];
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   // Use hybrid mode by default (WebGPU encoder + WASM decoder)
@@ -286,6 +293,7 @@ export default function App() {
       };
 
       const modelUrls = await getParakeetModel(selectedModel, {
+        revision: modelRevision,
         encoderQuant,
         decoderQuant,
         preprocessor,
@@ -466,6 +474,28 @@ export default function App() {
                       {MODEL_OPTIONS.map(opt => (
                         <option key={opt.key} value={opt.key}>
                           {opt.displayName}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                      expand_more
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                    Model Branch
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={modelRevision}
+                      onChange={e => setModelRevision(e.target.value)}
+                      disabled={isLoading || isModelReady}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                    >
+                      {MODEL_REVISIONS.map(rev => (
+                        <option key={rev} value={rev}>
+                          {rev}
                         </option>
                       ))}
                     </select>
