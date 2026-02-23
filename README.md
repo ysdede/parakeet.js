@@ -68,11 +68,11 @@ console.log(result.utterance_text);
 import { fromUrls } from 'parakeet.js';
 
 const model = await fromUrls({
-  encoderUrl: 'https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/encoder-model.onnx',
-  decoderUrl: 'https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.int8.onnx',
-  tokenizerUrl: 'https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt',
+  encoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/encoder-model.onnx',
+  decoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.int8.onnx',
+  tokenizerUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt',
   // Only needed if you choose preprocessorBackend: 'onnx'
-  preprocessorUrl: 'https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/nemo128.onnx',
+  preprocessorUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/nemo128.onnx',
   backend: 'webgpu-hybrid',
   preprocessorBackend: 'js',
 });
@@ -112,9 +112,9 @@ Use explicit FP16 URLs:
 import { fromUrls } from 'parakeet.js';
 
 const model = await fromUrls({
-  encoderUrl: 'https://huggingface.co/grikdotnet/parakeet-tdt-0.6b-fp16/resolve/main/encoder-model.fp16.onnx',
-  decoderUrl: 'https://huggingface.co/grikdotnet/parakeet-tdt-0.6b-fp16/resolve/main/decoder_joint-model.fp16.onnx',
-  tokenizerUrl: 'https://huggingface.co/grikdotnet/parakeet-tdt-0.6b-fp16/resolve/main/vocab.txt',
+  encoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/feat/fp16-canonical-v3/encoder-model.fp16.onnx',
+  decoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/feat/fp16-canonical-v3/decoder_joint-model.fp16.onnx',
+  tokenizerUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/feat/fp16-canonical-v3/vocab.txt',
   preprocessorBackend: 'js',
   backend: 'webgpu-hybrid',
 });

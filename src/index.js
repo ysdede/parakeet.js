@@ -26,7 +26,7 @@ export async function fromUrls(cfg) {
  * @returns {Promise<ParakeetModel>} Loaded Parakeet model instance.
  * @example
  * import { fromHub } from 'parakeet.js';
- * const model = await fromHub('istupakov/parakeet-tdt-0.6b-v3-onnx', { decoderQuant: 'int8' });
+ * const model = await fromHub('ysdede/parakeet-tdt-0.6b-v3-onnx', { decoderQuant: 'int8' });
  *
  * // Or use a model key for known models:
  * const model = await fromHub('parakeet-tdt-0.6b-v3', { backend: 'webgpu-hybrid' });
