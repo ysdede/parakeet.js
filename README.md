@@ -45,8 +45,8 @@ async function decodeToMono16k(file) {
 
 const model = await fromHub('parakeet-tdt-0.6b-v3', {
   backend: 'webgpu',
-  encoderQuant: 'fp32',
-  decoderQuant: 'int8',
+  encoderQuant: 'fp16',
+  decoderQuant: 'fp16',
 });
 
 // `file` should be a File (for example from <input type="file">)
@@ -86,8 +86,39 @@ const model = await fromUrls({
   - advanced: `webgpu-hybrid`, `webgpu-strict`
 - In WebGPU modes, the decoder session runs on WASM (hybrid execution).
 - In `getParakeetModel`/`fromHub`, if backend starts with `webgpu` and `encoderQuant` is `int8`, encoder quantization is forced to `fp32`.
-- Decoder quantization can be `int8` or `fp32`.
+- Encoder/decoder quantization supports `int8`, `fp32`, and `fp16`.
+- FP16 requires FP16 ONNX artifacts (for example `encoder-model.fp16.onnx`).
+- ONNX Runtime Web does **not** convert FP32 model files into FP16 at load time.
+- If `fp16` is requested but missing in a repo, loading falls back to `fp32` for that component.
 - `preprocessorBackend` is `js` (default) or `onnx`.
+
+## FP16 Examples
+
+Load known FP16 model key:
+
+```js
+import { fromHub } from 'parakeet.js';
+
+const model = await fromHub('parakeet-tdt-0.6b-v3-fp16', {
+  backend: 'webgpu-hybrid',
+  encoderQuant: 'fp16',
+  decoderQuant: 'fp16',
+});
+```
+
+Use explicit FP16 URLs:
+
+```js
+import { fromUrls } from 'parakeet.js';
+
+const model = await fromUrls({
+  encoderUrl: 'https://huggingface.co/grikdotnet/parakeet-tdt-0.6b-fp16/resolve/main/encoder-model.fp16.onnx',
+  decoderUrl: 'https://huggingface.co/grikdotnet/parakeet-tdt-0.6b-fp16/resolve/main/decoder_joint-model.fp16.onnx',
+  tokenizerUrl: 'https://huggingface.co/grikdotnet/parakeet-tdt-0.6b-fp16/resolve/main/vocab.txt',
+  preprocessorBackend: 'js',
+  backend: 'webgpu-hybrid',
+});
+```
 
 ## Transcribing a file (single-shot)
 
