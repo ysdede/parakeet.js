@@ -13,6 +13,8 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
 
 const DEFAULT_MODEL_REVISIONS = ['main'];
 const MODEL_REVISIONS_CACHE = new Map();
+const MODEL_FILES_CACHE = new Map();
+const QUANTIZATION_ORDER = ['fp16', 'int8', 'fp32'];
 
 function formatRepoPath(repoId) {
   return repoId
@@ -42,6 +44,46 @@ async function fetchModelRevisions(repoId) {
     console.warn(`[App] Failed to fetch revisions for ${repoId}; using defaults`, error);
     return DEFAULT_MODEL_REVISIONS;
   }
+}
+
+async function fetchModelFiles(repoId, revision) {
+  if (!repoId) return [];
+  const cacheKey = `${repoId}@${revision}`;
+  if (MODEL_FILES_CACHE.has(cacheKey)) {
+    return MODEL_FILES_CACHE.get(cacheKey);
+  }
+
+  try {
+    const repoPath = formatRepoPath(repoId);
+    const response = await fetch(`https://huggingface.co/api/models/${repoPath}/tree/${encodeURIComponent(revision)}?recursive=1`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    const files = Array.isArray(payload)
+      ? payload.filter((entry) => entry?.type === 'file' && typeof entry?.path === 'string').map((entry) => entry.path)
+      : [];
+    MODEL_FILES_CACHE.set(cacheKey, files);
+    return files;
+  } catch (error) {
+    console.warn(`[App] Failed to fetch files for ${repoId}@${revision}`, error);
+    return [];
+  }
+}
+
+function getAvailableQuantModes(files, baseName) {
+  const existing = new Set(files);
+  const options = QUANTIZATION_ORDER.filter((quant) => {
+    if (quant === 'fp32') return existing.has(`${baseName}.onnx`);
+    if (quant === 'fp16') return existing.has(`${baseName}.fp16.onnx`);
+    return existing.has(`${baseName}.int8.onnx`);
+  });
+  return options.length > 0 ? options : ['fp32'];
+}
+
+function pickPreferredQuant(available, currentBackend) {
+  const preferred = currentBackend.startsWith('webgpu')
+    ? ['fp16', 'fp32', 'int8']
+    : ['int8', 'fp32', 'fp16'];
+  return preferred.find((quant) => available.includes(quant)) || available[0] || 'fp32';
 }
 
 // Cache audio file from GitHub raw URL to IndexedDB
@@ -148,6 +190,8 @@ export default function App() {
   const [threadingStatus, setThreadingStatus] = useState({ sab: false, threads: 1 });
   const [encoderQuant, setEncoderQuant] = useState('int8');
   const [decoderQuant, setDecoderQuant] = useState('int8');
+  const [encoderQuantOptions, setEncoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
+  const [decoderQuantOptions, setDecoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
   const [preprocessor, setPreprocessor] = useState('nemo128');
   const [preprocessorBackend, setPreprocessorBackend] = useState('onnx');
   const [status, setStatus] = useState('Idle');
@@ -183,16 +227,15 @@ export default function App() {
     displayName: config.displayName,
   }));
 
-  // Auto-adjust quant presets when backend changes
+  // Auto-adjust quant presets when backend changes (within available options).
   useEffect(() => {
-    if (backend.startsWith('webgpu')) {
-      setEncoderQuant('fp16');
-      setDecoderQuant('fp16');
-    } else {
-      setEncoderQuant('int8');
-      setDecoderQuant('int8');
-    }
-  }, [backend]);
+    setEncoderQuant((current) =>
+      encoderQuantOptions.includes(current) ? current : pickPreferredQuant(encoderQuantOptions, backend)
+    );
+    setDecoderQuant((current) =>
+      decoderQuantOptions.includes(current) ? current : pickPreferredQuant(decoderQuantOptions, backend)
+    );
+  }, [backend, encoderQuantOptions, decoderQuantOptions]);
 
   // List available branches for the selected model repo from HF refs API.
   useEffect(() => {
@@ -210,6 +253,29 @@ export default function App() {
       cancelled = true;
     };
   }, [selectedModel]);
+
+  // Inspect selected repo+branch files and filter quantization options accordingly.
+  useEffect(() => {
+    let cancelled = false;
+    const repoId = MODELS[selectedModel]?.repoId;
+    const revision = modelRevision || 'main';
+
+    (async () => {
+      const files = await fetchModelFiles(repoId, revision);
+      if (cancelled) return;
+
+      const encOptions = getAvailableQuantModes(files, 'encoder-model');
+      const decOptions = getAvailableQuantModes(files, 'decoder_joint-model');
+      setEncoderQuantOptions(encOptions);
+      setDecoderQuantOptions(decOptions);
+      setEncoderQuant((current) => (encOptions.includes(current) ? current : pickPreferredQuant(encOptions, backend)));
+      setDecoderQuant((current) => (decOptions.includes(current) ? current : pickPreferredQuant(decOptions, backend)));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModel, modelRevision, backend]);
 
   // Detect SharedArrayBuffer and threading capabilities
   useEffect(() => {
@@ -631,9 +697,9 @@ export default function App() {
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
-                      <option value="fp16">fp16</option>
-                      <option value="fp32">fp32</option>
-                      <option value="int8">int8</option>
+                      {encoderQuantOptions.map((quant) => (
+                        <option key={quant} value={quant}>{quant}</option>
+                      ))}
                     </select>
                     <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
                       expand_more
@@ -653,9 +719,9 @@ export default function App() {
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
-                      <option value="fp16">fp16</option>
-                      <option value="int8">int8</option>
-                      <option value="fp32">fp32</option>
+                      {decoderQuantOptions.map((quant) => (
+                        <option key={quant} value={quant}>{quant}</option>
+                      ))}
                     </select>
                     <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
                       expand_more
