@@ -11,11 +11,38 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
   languages: config.languages,
 }));
 
-const MODEL_REVISIONS = [
-  'main',
-  'feat/fp16-canonical-v2',
-  'feat/fp16-canonical-v3',
-];
+const DEFAULT_MODEL_REVISIONS = ['main'];
+const MODEL_REVISIONS_CACHE = new Map();
+
+function formatRepoPath(repoId) {
+  return repoId
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
+async function fetchModelRevisions(repoId) {
+  if (!repoId) return DEFAULT_MODEL_REVISIONS;
+  if (MODEL_REVISIONS_CACHE.has(repoId)) {
+    return MODEL_REVISIONS_CACHE.get(repoId);
+  }
+
+  try {
+    const repoPath = formatRepoPath(repoId);
+    const response = await fetch(`https://huggingface.co/api/models/${repoPath}/refs`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    const branches = Array.isArray(payload?.branches)
+      ? payload.branches.map((branch) => branch?.name).filter(Boolean)
+      : [];
+    const revisions = branches.length > 0 ? branches : DEFAULT_MODEL_REVISIONS;
+    MODEL_REVISIONS_CACHE.set(repoId, revisions);
+    return revisions;
+  } catch (error) {
+    console.warn(`[App] Failed to fetch revisions for ${repoId}; using defaults`, error);
+    return DEFAULT_MODEL_REVISIONS;
+  }
+}
 
 // Cache audio file from GitHub raw URL to IndexedDB
 async function getCachedAudioFile(url, cacheKey) {
@@ -113,6 +140,7 @@ function pcmToWavBlob(pcm, sampleRate = 16000) {
 export default function App() {
   const [selectedModel, setSelectedModel] = useState('parakeet-tdt-0.6b-v2');
   const [modelRevision, setModelRevision] = useState('main');
+  const [modelRevisions, setModelRevisions] = useState(DEFAULT_MODEL_REVISIONS);
   const modelConfig = MODELS[selectedModel];
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   // Use hybrid mode by default (WebGPU encoder + WASM decoder)
@@ -165,6 +193,23 @@ export default function App() {
       setDecoderQuant('int8');
     }
   }, [backend]);
+
+  // List available branches for the selected model repo from HF refs API.
+  useEffect(() => {
+    let cancelled = false;
+    const repoId = MODELS[selectedModel]?.repoId;
+
+    (async () => {
+      const revisions = await fetchModelRevisions(repoId);
+      if (cancelled) return;
+      setModelRevisions(revisions);
+      setModelRevision((current) => (revisions.includes(current) ? current : revisions[0] || 'main'));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModel]);
 
   // Detect SharedArrayBuffer and threading capabilities
   useEffect(() => {
@@ -493,7 +538,7 @@ export default function App() {
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
-                      {MODEL_REVISIONS.map(rev => (
+                      {modelRevisions.map(rev => (
                         <option key={rev} value={rev}>
                           {rev}
                         </option>
