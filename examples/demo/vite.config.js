@@ -49,8 +49,8 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
     fs: {
-      // Allow importing shared helpers from examples/shared.
-      allow: [path.resolve(__dirname, '../shared')],
+      // Allow serving this app root and shared helpers.
+      allow: [path.resolve(__dirname), path.resolve(__dirname, '../shared')],
     },
   },
   resolve: {
