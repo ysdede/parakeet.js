@@ -243,7 +243,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedModel, modelRevision, backend]);
+  }, [selectedModel, modelRevision]);
 
   // Detect SharedArrayBuffer and threading capabilities
   useEffect(() => {
@@ -480,6 +480,8 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setText('');
+    setReferenceText('');
     setIsTranscribing(true);
     setStatus(`Transcribing "${file.name}"…`);
 

@@ -73,6 +73,9 @@ export async function fromHub(repoIdOrModelKey, options = {}) {
     const hint = buildFp16CompileHint(options);
     const baseMessage = error?.message || String(error);
     console.warn(`[fromHub] FP16 compile/session load failed. ${hint}`, error);
-    throw new Error(`[fromHub] FP16 compile/session load failed. ${hint} Original error: ${baseMessage}`);
+    throw new Error(
+      `[fromHub] FP16 compile/session load failed. ${hint} Original error: ${baseMessage}`,
+      { cause: error }
+    );
   }
 }

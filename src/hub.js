@@ -30,6 +30,18 @@ function getQuantizedModelName(baseName, quant) {
 }
 
 /**
+ * Encode an HF repo path (org/name) by segments.
+ * @param {string} repoId
+ * @returns {string}
+ */
+function encodeRepoPath(repoId) {
+  return String(repoId || '')
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
+/**
  * Normalize HF tree/metadata path entry.
  * @param {string} path
  * @returns {string}
@@ -87,9 +99,10 @@ async function listRepoFiles(repoId, revision = 'main') {
   const cacheKey = `${repoId}@${revision}`;
   if (repoFileCache.has(cacheKey)) return repoFileCache.get(cacheKey);
 
+  const encodedRepoId = encodeRepoPath(repoId);
   const encodedRevision = encodeURIComponent(revision);
-  const treeUrl = `https://huggingface.co/api/models/${repoId}/tree/${encodedRevision}?recursive=1`;
-  const modelUrl = `https://huggingface.co/api/models/${repoId}?revision=${encodedRevision}`;
+  const treeUrl = `https://huggingface.co/api/models/${encodedRepoId}/tree/${encodedRevision}?recursive=1`;
+  const modelUrl = `https://huggingface.co/api/models/${encodedRepoId}?revision=${encodedRevision}`;
 
   try {
     const resp = await fetch(treeUrl);
@@ -195,7 +208,7 @@ export async function getModelFile(repoId, filename, options = {}) {
     .join('/');
 
   const baseUrl = 'https://huggingface.co';
-  const pathParts = [repoId, 'resolve', encodedRevision];
+  const pathParts = [encodeRepoPath(repoId), 'resolve', encodedRevision];
   if (encodedSubfolder) pathParts.push(encodedSubfolder);
   pathParts.push(encodedFilename);
   const url = `${baseUrl}/${pathParts.join('/')}`;
@@ -328,7 +341,7 @@ function validateRequestedFp16Component(component, repoId, repoFiles) {
  * @param {'nemo80'|'nemo128'} preprocessor
  * @returns {Array<{key: string, name: string, componentName?: 'encoder'|'decoder', optional?: boolean}>}
  */
-function buildRequiredDownloads(components, preprocessorBackend, preprocessor) {
+function buildRequiredDownloads(components, preprocessorBackend, preprocessor, verbose = false) {
   const files = [
     {
       key: components.encoder.key,
@@ -347,9 +360,9 @@ function buildRequiredDownloads(components, preprocessorBackend, preprocessor) {
 
   if (preprocessorBackend !== 'js') {
     files.push({ key: 'preprocessorUrl', name: `${preprocessor}.onnx`, optional: false });
-    console.log(`[Hub] Preprocessor: ONNX — will download ${preprocessor}.onnx`);
+    if (verbose) console.log(`[Hub] Preprocessor: ONNX — will download ${preprocessor}.onnx`);
   } else {
-    console.log(`[Hub] Preprocessor: JS (mel.js) — skipping ${preprocessor}.onnx download`);
+    if (verbose) console.log(`[Hub] Preprocessor: JS (mel.js) — skipping ${preprocessor}.onnx download`);
   }
 
   return files;
@@ -399,6 +412,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
     preprocessorBackend = 'js',
     backend = 'webgpu',
     progress,
+    verbose = false,
   } = options;
 
   let encoderQ = encoderQuant;
@@ -417,7 +431,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   validateRequestedFp16Component(components.encoder, repoId, repoFiles);
   validateRequestedFp16Component(components.decoder, repoId, repoFiles);
 
-  const requiredFiles = buildRequiredDownloads(components, preprocessorBackend, preprocessor);
+  const requiredFiles = buildRequiredDownloads(components, preprocessorBackend, preprocessor, verbose);
 
   const results = {
     urls: {},

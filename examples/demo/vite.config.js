@@ -50,7 +50,7 @@ export default defineConfig({
     },
     fs: {
       // Allow importing shared helpers from examples/shared.
-      allow: [path.resolve(__dirname, '..')],
+      allow: [path.resolve(__dirname, '../shared')],
     },
   },
   resolve: {
