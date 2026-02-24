@@ -223,6 +223,7 @@ export default function App() {
     let cancelled = false;
     const repoId = MODELS[selectedModel]?.repoId;
     const revision = modelRevision || 'main';
+    if (!modelRevisions.includes(revision)) return;
 
     (async () => {
       const files = await fetchModelFiles(repoId, revision);
@@ -243,7 +244,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedModel, modelRevision]);
+  }, [selectedModel, modelRevision, modelRevisions]);
 
   // Detect SharedArrayBuffer and threading capabilities
   useEffect(() => {
@@ -330,6 +331,13 @@ export default function App() {
     setText('');
     setReferenceText('');
     setSelectedLanguage(nextLanguage);
+  }
+
+  function handleModelChange(nextModel) {
+    if (nextModel === selectedModel) return;
+    setSelectedModel(nextModel);
+    setModelRevisions(DEFAULT_MODEL_REVISIONS);
+    setModelRevision('main');
   }
 
   // Fetch random audio sample from HuggingFace speech dataset
@@ -624,7 +632,7 @@ export default function App() {
                   <div className="relative">
                     <select
                       value={selectedModel}
-                      onChange={e => setSelectedModel(e.target.value)}
+                      onChange={e => handleModelChange(e.target.value)}
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
