@@ -44,9 +44,9 @@ async function decodeToMono16k(file) {
 }
 
 const model = await fromHub('parakeet-tdt-0.6b-v3', {
-  backend: 'webgpu',
-  encoderQuant: 'fp16',
-  decoderQuant: 'fp16',
+  backend: 'webgpu-hybrid',
+  encoderQuant: 'fp32',
+  decoderQuant: 'int8',
 });
 
 // `file` should be a File (for example from <input type="file">)
