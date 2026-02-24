@@ -71,7 +71,17 @@ export async function loadModelWithFallback({
     revokeBlobUrls(firstModelUrls.urls);
 
     const retryOptions = buildRetryOptions(options, firstModelUrls.quantisation);
-    const retryModelUrls = await getParakeetModelFn(repoIdOrModelKey, retryOptions);
+    let retryModelUrls;
+    try {
+      retryModelUrls = await getParakeetModelFn(repoIdOrModelKey, retryOptions);
+    } catch (retryDownloadError) {
+      const firstMessage = firstError?.message || String(firstError);
+      const retryDownloadMessage = retryDownloadError?.message || String(retryDownloadError);
+      throw new Error(
+        `[ModelLoader] Initial compile failed (${firstMessage}). FP32 retry download failed (${retryDownloadMessage}).`
+      );
+    }
+
     onBeforeCompile?.({ attempt: 2, modelUrls: retryModelUrls, options: retryOptions });
 
     try {
