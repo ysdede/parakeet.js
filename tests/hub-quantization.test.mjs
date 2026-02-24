@@ -276,6 +276,30 @@ describe('getParakeetModel quantization resolution (strict mode)', () => {
     expect(state.treeCalls).toBeGreaterThanOrEqual(2);
   });
 
+  it('skips optional .data downloads when listing is unavailable', async () => {
+    const repoId = 'test/repo-no-listing-no-data-probe';
+    const { calls } = installFetchMock({
+      repoId,
+      treeShouldFail: true,
+      metadataShouldFail: true,
+      siblings: [
+        'encoder-model.fp16.onnx',
+        'decoder_joint-model.fp16.onnx',
+        'vocab.txt',
+      ],
+    });
+
+    const res = await getParakeetModel(repoId, {
+      backend: 'webgpu-hybrid',
+      encoderQuant: 'fp16',
+      decoderQuant: 'fp16',
+      preprocessorBackend: 'js',
+    });
+
+    expect(res.quantisation.encoder).toBe('fp16');
+    expect(calls.some((x) => x.includes('.onnx.data'))).toBe(false);
+  });
+
   it('encodes slash branch names in API and resolve URLs', async () => {
     const repoId = 'test/repo-branch-slash';
     const revision = 'feat/fp16-canonical-v2';
