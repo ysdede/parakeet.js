@@ -9,7 +9,6 @@
     "build": "vite build",
     "build:local": "cross-env PARAKEET_LOCAL=true vite build",
     "preview": "vite preview",
-    "deploy-to-hf": "node scripts/deploy-to-hf.js",
     "deploy-to-gh": "node scripts/deploy-to-gh.js"
   },
   "dependencies": {
