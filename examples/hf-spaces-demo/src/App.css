@@ -16,6 +16,18 @@
   background-color: #10b981;
 }
 
+/* Remove native select arrow so custom expand_more icon is the only one */
+select,
+select.appearance-none {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-image: none;
+}
+select::-ms-expand {
+  display: none;
+}
+
 /* Smooth transitions */
 input,
 select,
