@@ -13,6 +13,43 @@ import './App.css';
 
 const SETTINGS_STORAGE_KEY = 'parakeet.hf-spaces-demo.settings.v1';
 
+function parseThemeValue(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'dark') return true;
+  if (normalized === 'light') return false;
+  return null;
+}
+
+function getHfThemeFromQuery() {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  return parseThemeValue(params.get('__theme') || params.get('theme') || params.get('color'));
+}
+
+function getInitialDarkMode(settings) {
+  const hfTheme = getHfThemeFromQuery();
+  if (hfTheme !== null) return hfTheme;
+  if (typeof settings.darkMode === 'boolean') return settings.darkMode;
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return false;
+}
+
+function getThemeFromMessage(data) {
+  if (!data) return null;
+  if (typeof data === 'string') return parseThemeValue(data);
+  if (typeof data !== 'object') return null;
+
+  return (
+    parseThemeValue(data.theme) ??
+    parseThemeValue(data.colorMode) ??
+    parseThemeValue(data.mode) ??
+    parseThemeValue(data?.payload?.theme)
+  );
+}
+
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -169,7 +206,7 @@ export default function App() {
   );
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [darkMode, setDarkMode] = useState(Boolean(initialSettings.darkMode));
+  const [darkMode, setDarkMode] = useState(getInitialDarkMode(initialSettings));
   const [modelLoaded, setModelLoaded] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const maxCores = navigator.hardwareConcurrency || 8;
@@ -302,6 +339,50 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  // Follow HF/parent theme when provided; otherwise fallback to system changes
+  // if user has no saved explicit theme preference.
+  useEffect(() => {
+    const hfTheme = getHfThemeFromQuery();
+    if (hfTheme !== null) {
+      setDarkMode(hfTheme);
+    }
+
+    const onMessage = (event) => {
+      const messageTheme = getThemeFromMessage(event?.data);
+      if (messageTheme !== null) {
+        setDarkMode(messageTheme);
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+
+    if (typeof window.matchMedia !== 'function') {
+      return () => window.removeEventListener('message', onMessage);
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const onMediaChange = (event) => {
+      if (getHfThemeFromQuery() !== null) return;
+      if (typeof initialSettings.darkMode === 'boolean') return;
+      setDarkMode(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', onMediaChange);
+    } else {
+      mediaQuery.addListener(onMediaChange);
+    }
+
+    return () => {
+      window.removeEventListener('message', onMessage);
+      if (typeof mediaQuery.removeEventListener === 'function') {
+        mediaQuery.removeEventListener('change', onMediaChange);
+      } else {
+        mediaQuery.removeListener(onMediaChange);
+      }
+    };
+  }, [initialSettings.darkMode]);
 
   function playAudio() {
     if (audioRef.current) {
