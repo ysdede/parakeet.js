@@ -26,7 +26,13 @@ const QUANT_SUFFIX = {
  * @returns {string} Filename with quant suffix (e.g. 'encoder-model.fp16.onnx').
  */
 function getQuantizedModelName(baseName, quant) {
-  return `${baseName}${QUANT_SUFFIX[quant] || QUANT_SUFFIX.fp32}`;
+  const suffix = QUANT_SUFFIX[quant];
+  if (!suffix) {
+    throw new Error(
+      `[Hub] Unknown quantization '${quant}'; expected one of: ${Object.keys(QUANT_SUFFIX).join(', ')}`
+    );
+  }
+  return `${baseName}${suffix}`;
 }
 
 /**
