@@ -66,18 +66,6 @@ export const MODELS = {
     predHidden: 640,
     predLayers: 2,
   },
-  'parakeet-tdt-0.6b-v3-fp16': {
-    repoId: 'ysdede/parakeet-tdt-0.6b-v3-onnx',
-    displayName: 'Parakeet TDT 0.6B v3 (Multilingual, FP16)',
-    languages: ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'pl', 'ru', 'uk', 'ja', 'ko', 'zh'],
-    defaultLanguage: 'en',
-    vocabSize: 4097,
-    featuresSize: 128,
-    preprocessor: 'nemo128',
-    subsampling: 8,
-    predHidden: 640,
-    predLayers: 2,
-  },
 };
 
 /**

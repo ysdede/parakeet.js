@@ -84,12 +84,14 @@ const model = await fromUrls({
   - `webgpu` (alias accepted)
   - `wasm`
   - advanced: `webgpu-hybrid`, `webgpu-strict`
-- In WebGPU modes, the decoder session runs on WASM (hybrid execution).
+- In WebGPU modes, the encoder prefers WebGPU but decoder session runs on WASM (hybrid execution).
 - In `getParakeetModel`/`fromHub`, if backend starts with `webgpu` and `encoderQuant` is `int8`, encoder quantization is forced to `fp32`.
 - Encoder/decoder quantization supports `int8`, `fp32`, and `fp16`.
 - FP16 requires FP16 ONNX artifacts (for example `encoder-model.fp16.onnx`).
 - ONNX Runtime Web does **not** convert FP32 model files into FP16 at load time.
-- If `fp16` is requested but missing in a repo, loading falls back to `fp32` for that component.
+- `getParakeetModel`/`fromHub` are strict about requested quantization: they do not auto-switch `fp16` to `fp32`.
+- If requested FP16 artifacts are missing or fail to load, API calls throw actionable errors so callers can choose a different quantization explicitly.
+- Decoder runs on WASM in WebGPU modes; if decoder FP16 is unsupported in your runtime, choose `decoderQuant: 'int8'` or `decoderQuant: 'fp32'` explicitly.
 - `preprocessorBackend` is `js` (default) or `onnx`.
 
 ## FP16 Examples
@@ -99,7 +101,7 @@ Load known FP16 model key:
 ```js
 import { fromHub } from 'parakeet.js';
 
-const model = await fromHub('parakeet-tdt-0.6b-v3-fp16', {
+const model = await fromHub('parakeet-tdt-0.6b-v3', {
   backend: 'webgpu-hybrid',
   encoderQuant: 'fp16',
   decoderQuant: 'fp16',
