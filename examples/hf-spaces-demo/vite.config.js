@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
@@ -33,6 +33,14 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+    fs: {
+      // Allow serving this app root and shared helpers.
+      allow: [
+        path.resolve(__dirname),
+        path.resolve(__dirname, '../shared'),
+        searchForWorkspaceRoot(process.cwd()),
+      ],
     },
   },
   resolve: {

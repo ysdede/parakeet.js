@@ -44,7 +44,7 @@ async function decodeToMono16k(file) {
 }
 
 const model = await fromHub('parakeet-tdt-0.6b-v3', {
-  backend: 'webgpu',
+  backend: 'webgpu-hybrid',
   encoderQuant: 'fp32',
   decoderQuant: 'int8',
 });
@@ -68,11 +68,11 @@ console.log(result.utterance_text);
 import { fromUrls } from 'parakeet.js';
 
 const model = await fromUrls({
-  encoderUrl: 'https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/encoder-model.onnx',
-  decoderUrl: 'https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.int8.onnx',
-  tokenizerUrl: 'https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt',
+  encoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/encoder-model.onnx',
+  decoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.int8.onnx',
+  tokenizerUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt',
   // Only needed if you choose preprocessorBackend: 'onnx'
-  preprocessorUrl: 'https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/nemo128.onnx',
+  preprocessorUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/nemo128.onnx',
   backend: 'webgpu-hybrid',
   preprocessorBackend: 'js',
 });
@@ -84,10 +84,45 @@ const model = await fromUrls({
   - `webgpu` (alias accepted)
   - `wasm`
   - advanced: `webgpu-hybrid`, `webgpu-strict`
-- In WebGPU modes, the decoder session runs on WASM (hybrid execution).
+- In WebGPU modes, the encoder prefers WebGPU but decoder session runs on WASM (hybrid execution).
 - In `getParakeetModel`/`fromHub`, if backend starts with `webgpu` and `encoderQuant` is `int8`, encoder quantization is forced to `fp32`.
-- Decoder quantization can be `int8` or `fp32`.
+- Encoder/decoder quantization supports `int8`, `fp32`, and `fp16`.
+- FP16 requires FP16 ONNX artifacts (for example `encoder-model.fp16.onnx`).
+- ONNX Runtime Web does **not** convert FP32 model files into FP16 at load time.
+- `getParakeetModel`/`fromHub` are strict about requested quantization: they do not auto-switch `fp16` to `fp32`.
+- If requested FP16 artifacts are missing or fail to load, API calls throw actionable errors so callers can choose a different quantization explicitly.
+- Decoder runs on WASM in WebGPU modes; if decoder FP16 is unsupported in your runtime, choose `decoderQuant: 'int8'` or `decoderQuant: 'fp32'` explicitly.
 - `preprocessorBackend` is `js` (default) or `onnx`.
+
+## FP16 Examples
+
+Before using FP16 examples: ensure FP16 artifacts exist in the target repo and your browser/runtime supports FP16 execution (WebGPU FP16 path).
+
+Load known FP16 model key:
+
+```js
+import { fromHub } from 'parakeet.js';
+
+const model = await fromHub('parakeet-tdt-0.6b-v3', {
+  backend: 'webgpu-hybrid',
+  encoderQuant: 'fp16',
+  decoderQuant: 'fp16',
+});
+```
+
+Use explicit FP16 URLs:
+
+```js
+import { fromUrls } from 'parakeet.js';
+
+const model = await fromUrls({
+  encoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/encoder-model.fp16.onnx',
+  decoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.fp16.onnx',
+  tokenizerUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt',
+  preprocessorBackend: 'js',
+  backend: 'webgpu-hybrid',
+});
+```
 
 ## Transcribing a file (single-shot)
 

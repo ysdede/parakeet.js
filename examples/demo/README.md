@@ -144,7 +144,7 @@ demo/
 ### Model loading fails with memory error
 - Check browser DevTools isn't pausing on potential OOM
 - Try closing other browser tabs to free memory
-- Use int8 quantization for smaller models
+- Prefer `fp16` on WebGPU; this demo retries with `fp32` if `fp16` fails, while the core API does not auto-switch. Use `int8` for smallest files.
 
 ### Changes not reflected after deployment
 - GitHub Pages: Wait 1-2 minutes for CDN cache

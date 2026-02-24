@@ -1,7 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ParakeetModel, getParakeetModel, MODELS, LANGUAGE_NAMES } from 'parakeet.js';
 import { fetchRandomSample, hasTestSamples, SPEECH_DATASETS } from './utils/speechDatasets';
+import {
+  DEFAULT_MODEL_REVISIONS,
+  fetchModelRevisions,
+  fetchModelFiles,
+  getAvailableQuantModes,
+  pickPreferredQuant,
+} from '../../shared/modelSelection.js';
+import { formatResolvedQuantization, loadModelWithFallback } from '../../shared/modelLoader.js';
 import './App.css';
+
+const SETTINGS_STORAGE_KEY = 'parakeet.demo.settings.v1';
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Ignore storage failures (private mode/quota).
+  }
+}
 
 // Available models for selection
 const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
@@ -105,16 +134,24 @@ function pcmToWavBlob(pcm, sampleRate = 16000) {
 }
 
 export default function App() {
-  const [selectedModel, setSelectedModel] = useState('parakeet-tdt-0.6b-v2');
+  const initialSettings = loadSettings();
+  const initialSelectedModel = initialSettings.selectedModel;
+  const [selectedModel, setSelectedModel] = useState(
+    MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2'
+  );
+  const [modelRevision, setModelRevision] = useState(initialSettings.modelRevision || 'main');
+  const [modelRevisions, setModelRevisions] = useState(DEFAULT_MODEL_REVISIONS);
   const modelConfig = MODELS[selectedModel];
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [selectedLanguage, setSelectedLanguage] = useState(initialSettings.selectedLanguage || 'en');
   // Use hybrid mode by default (WebGPU encoder + WASM decoder)
-  const [backend, setBackend] = useState('webgpu-hybrid');
+  const [backend, setBackend] = useState(initialSettings.backend || 'webgpu-hybrid');
   const [threadingStatus, setThreadingStatus] = useState({ sab: false, threads: 1 });
-  const [encoderQuant, setEncoderQuant] = useState('int8');
-  const [decoderQuant, setDecoderQuant] = useState('int8');
-  const [preprocessor, setPreprocessor] = useState('nemo128');
-  const [preprocessorBackend, setPreprocessorBackend] = useState('onnx');
+  const [encoderQuant, setEncoderQuant] = useState(initialSettings.encoderQuant || 'fp32');
+  const [decoderQuant, setDecoderQuant] = useState(initialSettings.decoderQuant || 'int8');
+  const [encoderQuantOptions, setEncoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
+  const [decoderQuantOptions, setDecoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
+  const [preprocessor, setPreprocessor] = useState(initialSettings.preprocessor || 'nemo128');
+  const [preprocessorBackend, setPreprocessorBackend] = useState(initialSettings.preprocessorBackend || 'onnx');
   const [status, setStatus] = useState('Idle');
   const [progressText, setProgressText] = useState('');
   const [progressPct, setProgressPct] = useState(null);
@@ -124,17 +161,23 @@ export default function App() {
   const [transcriptions, setTranscriptions] = useState([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isLoadingSample, setIsLoadingSample] = useState(false);
-  const [verboseLog, setVerboseLog] = useState(false);
-  const [frameStride, setFrameStride] = useState(1);
-  const [dumpDetail, setDumpDetail] = useState(false);
-  const [enableProfiling, setEnableProfiling] = useState(true);
+  const [verboseLog, setVerboseLog] = useState(Boolean(initialSettings.verboseLog));
+  const [frameStride, setFrameStride] = useState(Number.isInteger(initialSettings.frameStride) ? initialSettings.frameStride : 1);
+  const [dumpDetail, setDumpDetail] = useState(Boolean(initialSettings.dumpDetail));
+  const [enableProfiling, setEnableProfiling] = useState(
+    initialSettings.enableProfiling === undefined ? true : Boolean(initialSettings.enableProfiling)
+  );
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(Boolean(initialSettings.darkMode));
   const [modelLoaded, setModelLoaded] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const maxCores = navigator.hardwareConcurrency || 8;
-  const [cpuThreads, setCpuThreads] = useState(Math.max(1, maxCores - 2));
+  const [cpuThreads, setCpuThreads] = useState(
+    Number.isInteger(initialSettings.cpuThreads)
+      ? Math.min(maxCores, Math.max(1, initialSettings.cpuThreads))
+      : Math.max(1, maxCores - 2)
+  );
   const modelRef = useRef(null);
   const fileInputRef = useRef(null);
   const audioRef = useRef(null);
@@ -148,16 +191,60 @@ export default function App() {
     displayName: config.displayName,
   }));
 
-  // Auto-adjust quant presets when backend changes
+  // Auto-adjust quant presets when backend changes (within available options).
   useEffect(() => {
-    if (backend.startsWith('webgpu')) {
-      setEncoderQuant('fp32');
-      setDecoderQuant('int8');
-    } else {
-      setEncoderQuant('int8');
-      setDecoderQuant('int8');
-    }
-  }, [backend]);
+    setEncoderQuant((current) =>
+      encoderQuantOptions.includes(current) ? current : pickPreferredQuant(encoderQuantOptions, backend, 'encoder')
+    );
+    setDecoderQuant((current) =>
+      decoderQuantOptions.includes(current) ? current : pickPreferredQuant(decoderQuantOptions, backend, 'decoder')
+    );
+  }, [backend, encoderQuantOptions, decoderQuantOptions]);
+
+  // List available branches for the selected model repo from HF refs API.
+  useEffect(() => {
+    let cancelled = false;
+    const repoId = MODELS[selectedModel]?.repoId;
+
+    (async () => {
+      const revisions = await fetchModelRevisions(repoId);
+      if (cancelled) return;
+      setModelRevisions(revisions);
+      setModelRevision((current) => (revisions.includes(current) ? current : revisions[0] || 'main'));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModel]);
+
+  // Inspect selected repo+branch files and filter quantization options accordingly.
+  useEffect(() => {
+    let cancelled = false;
+    const repoId = MODELS[selectedModel]?.repoId;
+    const revision = modelRevision || 'main';
+    if (!modelRevisions.includes(revision)) return;
+
+    (async () => {
+      const files = await fetchModelFiles(repoId, revision);
+      if (cancelled) return;
+
+      const encOptions = getAvailableQuantModes(files, 'encoder-model');
+      const decOptions = getAvailableQuantModes(files, 'decoder_joint-model');
+      setEncoderQuantOptions(encOptions);
+      setDecoderQuantOptions(decOptions);
+      setEncoderQuant((current) =>
+        encOptions.includes(current) ? current : pickPreferredQuant(encOptions, backend, 'encoder')
+      );
+      setDecoderQuant((current) =>
+        decOptions.includes(current) ? current : pickPreferredQuant(decOptions, backend, 'decoder')
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModel, modelRevision, modelRevisions]);
 
   // Detect SharedArrayBuffer and threading capabilities
   useEffect(() => {
@@ -165,6 +252,40 @@ export default function App() {
     const threads = sabAvailable ? (navigator.hardwareConcurrency || 1) : 1;
     setThreadingStatus({ sab: sabAvailable, threads });
   }, []);
+
+  useEffect(() => {
+    saveSettings({
+      selectedModel,
+      modelRevision,
+      selectedLanguage,
+      backend,
+      encoderQuant,
+      decoderQuant,
+      preprocessor,
+      preprocessorBackend,
+      verboseLog,
+      frameStride,
+      dumpDetail,
+      enableProfiling,
+      darkMode,
+      cpuThreads,
+    });
+  }, [
+    selectedModel,
+    modelRevision,
+    selectedLanguage,
+    backend,
+    encoderQuant,
+    decoderQuant,
+    preprocessor,
+    preprocessorBackend,
+    verboseLog,
+    frameStride,
+    dumpDetail,
+    enableProfiling,
+    darkMode,
+    cpuThreads,
+  ]);
 
   // Cleanup audio URL on unmount
   useEffect(() => {
@@ -196,6 +317,29 @@ export default function App() {
     }
   }
 
+  function handleLanguageChange(nextLanguage) {
+    if (nextLanguage === selectedLanguage) return;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+    setText('');
+    setReferenceText('');
+    setSelectedLanguage(nextLanguage);
+  }
+
+  function handleModelChange(nextModel) {
+    if (nextModel === selectedModel) return;
+    setSelectedModel(nextModel);
+    setModelRevisions(DEFAULT_MODEL_REVISIONS);
+    setModelRevision('main');
+  }
+
   // Fetch random audio sample from HuggingFace speech dataset
   async function loadRandomSample() {
     if (!modelRef.current) return;
@@ -208,6 +352,10 @@ export default function App() {
     setIsLoadingSample(true);
     setReferenceText('');
     setText('');
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
       setAudioUrl(null);
@@ -285,27 +433,37 @@ export default function App() {
         setProgressPct(pct);
       };
 
-      const modelUrls = await getParakeetModel(selectedModel, {
-        encoderQuant,
-        decoderQuant,
-        preprocessor,
-        preprocessorBackend,
-        backend,
-        progress: progressCallback
+      const modelLoadResult = await loadModelWithFallback({
+        repoIdOrModelKey: selectedModel,
+        options: {
+          revision: modelRevision,
+          encoderQuant,
+          decoderQuant,
+          preprocessor,
+          preprocessorBackend,
+          backend,
+          progress: progressCallback,
+          verbose: verboseLog,
+          cpuThreads,
+        },
+        getParakeetModelFn: getParakeetModel,
+        fromUrlsFn: ParakeetModel.fromUrls,
+        onBeforeCompile: ({ attempt, modelUrls }) => {
+          const resolvedQuant = formatResolvedQuantization(modelUrls.quantisation);
+          console.log(`[App] ${resolvedQuant}`);
+
+          if (attempt === 2) {
+            setStatus('Retrying compile with FP32…');
+            setProgressText(`${resolvedQuant} · retrying after FP16 compile failure`);
+          } else {
+            setStatus('Compiling model…');
+            setProgressText(`${resolvedQuant} · compiling may take ~10s on first load`);
+          }
+          setProgressPct(null);
+        },
       });
 
-      setStatus('Compiling model…');
-      setProgressText('This may take ~10s on first load');
-      setProgressPct(null);
-
-      modelRef.current = await ParakeetModel.fromUrls({
-        ...modelUrls.urls,
-        filenames: modelUrls.filenames,
-        preprocessorBackend,
-        backend,
-        verbose: verboseLog,
-        cpuThreads,
-      });
+      modelRef.current = modelLoadResult.model;
 
       setStatus('Verifying…');
       setProgressText('Running test transcription');
@@ -350,6 +508,8 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setText('');
+    setReferenceText('');
     setIsTranscribing(true);
     setStatus(`Transcribing "${file.name}"…`);
 
@@ -432,7 +592,7 @@ export default function App() {
             </div>
           </div>
           <button
-            className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             onClick={() => setDarkMode(!darkMode)}
           >
             <span className="material-icons-outlined text-gray-600 dark:text-gray-300">
@@ -457,13 +617,35 @@ export default function App() {
                   <div className="relative">
                     <select
                       value={selectedModel}
-                      onChange={e => setSelectedModel(e.target.value)}
+                      onChange={e => handleModelChange(e.target.value)}
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
                       {MODEL_OPTIONS.map(opt => (
                         <option key={opt.key} value={opt.key}>
                           {opt.displayName}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                      expand_more
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                    Model Branch
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={modelRevision}
+                      onChange={e => setModelRevision(e.target.value)}
+                      disabled={isLoading || isModelReady}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                    >
+                      {modelRevisions.map(rev => (
+                        <option key={rev} value={rev}>
+                          {rev}
                         </option>
                       ))}
                     </select>
@@ -535,8 +717,9 @@ export default function App() {
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
-                      <option value="fp32">fp32</option>
-                      <option value="int8">int8</option>
+                      {encoderQuantOptions.map((quant) => (
+                        <option key={quant} value={quant}>{quant}</option>
+                      ))}
                     </select>
                     <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
                       expand_more
@@ -556,8 +739,9 @@ export default function App() {
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
-                      <option value="int8">int8</option>
-                      <option value="fp32">fp32</option>
+                      {decoderQuantOptions.map((quant) => (
+                        <option key={quant} value={quant}>{quant}</option>
+                      ))}
                     </select>
                     <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
                       expand_more
@@ -715,7 +899,7 @@ export default function App() {
                   <div className="relative">
                     <select
                       value={selectedLanguage}
-                      onChange={e => setSelectedLanguage(e.target.value)}
+                      onChange={e => handleLanguageChange(e.target.value)}
                       disabled={!isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >

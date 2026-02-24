@@ -55,7 +55,7 @@ export const MODELS = {
     predLayers: 2,
   },
   'parakeet-tdt-0.6b-v3': {
-    repoId: 'istupakov/parakeet-tdt-0.6b-v3-onnx',
+    repoId: 'ysdede/parakeet-tdt-0.6b-v3-onnx',
     displayName: 'Parakeet TDT 0.6B v3 (Multilingual)',
     languages: ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'pl', 'ru', 'uk', 'ja', 'ko', 'zh'],
     defaultLanguage: 'en',
