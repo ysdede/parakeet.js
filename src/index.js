@@ -22,7 +22,7 @@ export async function fromUrls(cfg) {
 /**
  * Convenience factory to load from HuggingFace Hub.
  * @param {string} repoIdOrModelKey - Hugging Face repo ID or known model key.
- * @param {Object} [options={}] - Download/runtime options forwarded to hub/model loaders.
+ * @param {Object} [options={}] - Download/runtime options forwarded to hub/model loaders (e.g. encoderQuant, decoderQuant: 'int8'|'fp32'|'fp16', backend, progress).
  * @returns {Promise<ParakeetModel>} Loaded Parakeet model instance.
  * @example
  * import { fromHub } from 'parakeet.js';

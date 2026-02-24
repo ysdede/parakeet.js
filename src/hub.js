@@ -18,6 +18,11 @@ const QUANT_SUFFIX = {
   fp32: '.onnx',
 };
 
+/**
+ * @param {string} baseName - Base filename (e.g. 'encoder-model').
+ * @param {('int8'|'fp32'|'fp16')} quant - Quantization key.
+ * @returns {string} Filename with quant suffix (e.g. 'encoder-model.fp16.onnx').
+ */
 function getQuantizedModelName(baseName, quant) {
   return `${baseName}${QUANT_SUFFIX[quant] || QUANT_SUFFIX.fp32}`;
 }
