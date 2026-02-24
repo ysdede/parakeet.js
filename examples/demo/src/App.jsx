@@ -293,20 +293,6 @@ export default function App() {
     };
   }, [audioUrl]);
 
-  // On language change: stop playback and flush loaded sample
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    setIsPlaying(false);
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null);
-    }
-    setText('');
-    setReferenceText('');
-  }, [selectedLanguage]);
-
   // Toggle dark mode
   useEffect(() => {
     if (darkMode) {
@@ -328,6 +314,22 @@ export default function App() {
       audioRef.current.pause();
       setIsPlaying(false);
     }
+  }
+
+  function handleLanguageChange(nextLanguage) {
+    if (nextLanguage === selectedLanguage) return;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+    setText('');
+    setReferenceText('');
+    setSelectedLanguage(nextLanguage);
   }
 
   // Fetch random audio sample from HuggingFace speech dataset
@@ -885,7 +887,7 @@ export default function App() {
                   <div className="relative">
                     <select
                       value={selectedLanguage}
-                      onChange={e => setSelectedLanguage(e.target.value)}
+                      onChange={e => handleLanguageChange(e.target.value)}
                       disabled={!isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
