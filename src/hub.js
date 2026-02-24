@@ -379,7 +379,8 @@ function buildOptionalExternalDataDownloads(components, repoFiles) {
     { key: 'decoderDataUrl', name: `${components.decoder.filename}.data`, optional: true },
   ];
 
-  if (repoFiles === null) return candidates;
+  // When listing is unavailable, skip optimistic .data fetches to avoid extra 404 round-trips.
+  if (repoFiles === null) return [];
   return candidates.filter((entry) => repoHasFile(repoFiles, entry.name));
 }
 

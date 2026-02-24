@@ -96,6 +96,8 @@ const model = await fromUrls({
 
 ## FP16 Examples
 
+Before using FP16 examples: ensure FP16 artifacts exist in the target repo and your browser/runtime supports FP16 execution (WebGPU FP16 path).
+
 Load known FP16 model key:
 
 ```js
