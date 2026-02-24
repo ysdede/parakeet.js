@@ -3,11 +3,19 @@ export function formatResolvedQuantization(quantisation) {
 }
 
 function toFromUrlsConfig(modelUrls, options) {
+  const {
+    backend,
+    verbose,
+    cpuThreads,
+  } = options || {};
+
   return {
     ...modelUrls.urls,
     filenames: modelUrls.filenames,
     preprocessorBackend: modelUrls.preprocessorBackend,
-    ...options,
+    backend,
+    verbose,
+    cpuThreads,
   };
 }
 
@@ -20,6 +28,14 @@ function buildRetryOptions(options, quantisation) {
   if (quantisation?.encoder === 'fp16') retryOptions.encoderQuant = 'fp32';
   if (quantisation?.decoder === 'fp16') retryOptions.decoderQuant = 'fp32';
   return retryOptions;
+}
+
+function revokeBlobUrls(urls) {
+  for (const value of Object.values(urls || {})) {
+    if (typeof value === 'string' && value.startsWith('blob:')) {
+      URL.revokeObjectURL(value);
+    }
+  }
 }
 
 /**
@@ -50,6 +66,9 @@ export async function loadModelWithFallback({
     if (!shouldRetryWithFp32(firstModelUrls.quantisation)) {
       throw firstError;
     }
+
+    // Free first-attempt blobs before downloading retry artifacts.
+    revokeBlobUrls(firstModelUrls.urls);
 
     const retryOptions = buildRetryOptions(options, firstModelUrls.quantisation);
     const retryModelUrls = await getParakeetModelFn(repoIdOrModelKey, retryOptions);
