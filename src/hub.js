@@ -347,11 +347,7 @@ function validateRequestedFp16Component(component, repoId, repoFiles) {
  * @param {'nemo80'|'nemo128'} preprocessor
  * @returns {Array<{key: string, name: string, componentName?: 'encoder'|'decoder', optional?: boolean}>}
  */
- * @param {{encoder: ResolvedComponent, decoder: ResolvedComponent}} components
- * @param {'js'|'onnx'} preprocessorBackend
- * @param {'nemo80'|'nemo128'} preprocessor
- * @param {boolean} [verbose=false] Whether to log preprocessor selection.
- * @returns {Array<{key: string, name: string, componentName?: 'encoder'|'decoder', optional?: boolean}>}
+function buildRequiredDownloads(components, preprocessorBackend, preprocessor, verbose = false) {
   const files = [
     {
       key: components.encoder.key,
