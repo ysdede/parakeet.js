@@ -13,8 +13,7 @@
     "deploy-to-gh": "node scripts/deploy-to-gh.js"
   },
   "dependencies": {
-    "parakeet.js": "^1.2.1",
-    "onnxruntime-web": "1.24.1",
+    "parakeet.js": "^1.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
