@@ -352,6 +352,10 @@ export default function App() {
     setIsLoadingSample(true);
     setReferenceText('');
     setText('');
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
       setAudioUrl(null);
