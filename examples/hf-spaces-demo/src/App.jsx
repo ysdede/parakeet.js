@@ -293,6 +293,20 @@ export default function App() {
     };
   }, [audioUrl]);
 
+  // On language change: stop playback and flush loaded sample
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+    setText('');
+    setReferenceText('');
+  }, [selectedLanguage]);
+
   // Toggle dark mode
   useEffect(() => {
     if (darkMode) {
