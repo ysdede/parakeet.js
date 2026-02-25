@@ -500,7 +500,7 @@ export class ParakeetModel {
    * @param {Object} opts - Transcription options
    * @param {boolean} opts.returnTimestamps - Include word/token timestamps
    * @param {boolean} opts.returnConfidences - Include confidence scores
-   * @param {number} opts.temperature - Decoding temperature (default 1.0 for greedy)
+   * @param {number} opts.temperature - Decoding temperature (default 1.0 for greedy). Non-positive values are clamped to a small positive epsilon.
    * @param {Object} opts.previousDecoderState - Decoder state from previous chunk (for streaming)
    * @param {boolean} opts.returnDecoderState - Return decoder state for next chunk
    * @param {number} opts.timeOffset - Add this offset to all timestamps (seconds)
@@ -539,6 +539,7 @@ export class ParakeetModel {
       // Pre-computed mel features (bypass preprocessor entirely)
       precomputedFeatures = null,    // { features: Float32Array, T: number, melBins: number }
     } = opts;
+    const safeTemperature = Number.isFinite(temperature) ? Math.max(temperature, 1e-6) : 1.0;
 
     const perfEnabled = debug || enableProfiling; // collect timings & populate result.metrics (default: true for backward compat)
     let t0, tPreproc = 0, tEncode = 0, tDecode = 0, tToken = 0;
@@ -720,7 +721,7 @@ export class ParakeetModel {
 
       // Compute softmax denominator when confidences OR logProbs are requested
       if (returnConfidences || returnLogProbs) {
-        const invTemp = 1.0 / temperature;
+        const invTemp = 1.0 / safeTemperature;
         let sumExp = 0;
         for (let i = 0; i < tokenLogits.length; i++) {
           // Optimization: (logit/T) - (maxLogit/T) = (logit - maxLogit) / T
