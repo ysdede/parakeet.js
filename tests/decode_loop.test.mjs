@@ -164,4 +164,39 @@ describe('ParakeetModel decode loop', () => {
     expect(result.frameIndices.every((i) => i <= 2)).toBe(true);
     expect(joinerRun).toHaveBeenCalledTimes(2);
   });
+
+  it('computes confidence and logProb correctly with non-default temperature', async () => {
+    const queue = [
+      makeJoinerOutput([0.0, 1.0, 0.5], [5.0, 1.0, 0.1]), // token=1, step=0
+      makeJoinerOutput([2.0, 0.0, 0.0], [5.0, 1.0, 0.1]), // blank, step=0
+    ];
+
+    let idx = 0;
+    const joinerRun = vi.fn().mockImplementation(async () => {
+      const out = queue[Math.min(idx, queue.length - 1)];
+      idx += 1;
+      return out;
+    });
+
+    const model = createModelForDecodeLoop({ tEnc: 1, joinerRun });
+    const result = await model.transcribe(new Float32Array(16000), 16000, {
+      returnTokenIds: true,
+      returnConfidences: true,
+      returnLogProbs: true,
+      temperature: 0.5,
+      enableProfiling: false,
+    });
+
+    const expectedSumExp =
+      Math.exp((0.0 - 1.0) / 0.5) +
+      Math.exp((1.0 - 1.0) / 0.5) +
+      Math.exp((0.5 - 1.0) / 0.5);
+    const expectedConf = 1 / expectedSumExp;
+    const expectedLogProb = -Math.log(expectedSumExp);
+
+    expect(result.tokenIds).toEqual([1]);
+    expect(result.confidence_scores.token).toEqual([+expectedConf.toFixed(4)]);
+    expect(result.logProbs).toEqual([+expectedLogProb.toFixed(6)]);
+    expect(joinerRun).toHaveBeenCalledTimes(2);
+  });
 });
