@@ -94,6 +94,20 @@ const model = await fromUrls({
 - Decoder runs on WASM in WebGPU modes; if decoder FP16 is unsupported in your runtime, choose `decoderQuant: 'int8'` or `decoderQuant: 'fp32'` explicitly.
 - `preprocessorBackend` is `js` (default) or `onnx`.
 
+## JS Mel FFT Update (v1.4.0)
+
+`parakeet.js` now uses the `pr74` real-FFT path in the default JS preprocessor (`preprocessorBackend: 'js'`).
+This keeps feature compatibility with the previous implementation while reducing mel extraction cost.
+
+| Item | Previous JS path | New JS path (default) |
+| --- | --- | --- |
+| FFT strategy | Full `N=512` complex FFT per frame | Real-FFT via one `N/2=256` complex FFT + spectrum reconstruction (`pr74`) |
+| Expected speed | Baseline | Faster mel stage (commonly around `~1.5x` in local mel benchmarks) |
+| Output behavior | NeMo-compatible normalized log-mel | Same behavior and ONNX-reference accuracy thresholds preserved |
+| API changes | N/A | None (`JsPreprocessor` / `IncrementalMelProcessor` unchanged) |
+
+If you need exact ONNX preprocessor execution instead of JS mel, set `preprocessorBackend: 'onnx'`.
+
 ## FP16 Examples
 
 Before using FP16 examples: ensure FP16 artifacts exist in the target repo and your browser/runtime supports FP16 execution (WebGPU FP16 path).
