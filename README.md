@@ -23,24 +23,9 @@ yarn add parakeet.js
 import { fromHub } from 'parakeet.js';
 
 async function decodeToMono16k(file) {
-  const arrayBuffer = await file.arrayBuffer();
-  const ctx = new AudioContext({ sampleRate: 16000 });
-  const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
-
-  let pcm;
-  if (audioBuffer.numberOfChannels === 1) {
-    pcm = audioBuffer.getChannelData(0);
-  } else {
-    const mono = new Float32Array(audioBuffer.length);
-    for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
-      const channel = audioBuffer.getChannelData(ch);
-      for (let i = 0; i < mono.length; i++) mono[i] += channel[i] / audioBuffer.numberOfChannels;
-    }
-    pcm = mono;
-  }
-
-  await ctx.close();
-  return pcm;
+  // Placeholder: implement with your own audio loader/decoder.
+  // Must return mono Float32Array at 16 kHz.
+  throw new Error('Implement decodeToMono16k(file) for your app');
 }
 
 const model = await fromHub('parakeet-tdt-0.6b-v3', {
@@ -58,6 +43,8 @@ const result = await model.transcribe(pcm, 16000, {
 
 console.log(result.utterance_text);
 ```
+
+Use your existing app audio pipeline for `decodeToMono16k(file)` (Web Audio API, ffmpeg, server-side decode, etc.).
 
 ## Loading models
 
