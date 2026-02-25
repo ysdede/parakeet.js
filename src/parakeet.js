@@ -500,7 +500,7 @@ export class ParakeetModel {
    * @param {Object} opts - Transcription options
    * @param {boolean} opts.returnTimestamps - Include word/token timestamps
    * @param {boolean} opts.returnConfidences - Include confidence scores
-   * @param {number} opts.temperature - Decoding temperature (default 1.0 for greedy). Non-positive values are clamped to a small positive epsilon.
+   * @param {number} opts.temperature - Decoding temperature (default 1.0 for greedy)
    * @param {Object} opts.previousDecoderState - Decoder state from previous chunk (for streaming)
    * @param {boolean} opts.returnDecoderState - Return decoder state for next chunk
    * @param {number} opts.timeOffset - Add this offset to all timestamps (seconds)
@@ -539,7 +539,6 @@ export class ParakeetModel {
       // Pre-computed mel features (bypass preprocessor entirely)
       precomputedFeatures = null,    // { features: Float32Array, T: number, melBins: number }
     } = opts;
-    const safeTemperature = Number.isFinite(temperature) ? Math.max(temperature, 1e-6) : 1.0;
 
     const perfEnabled = debug || enableProfiling; // collect timings & populate result.metrics (default: true for backward compat)
     let t0, tPreproc = 0, tEncode = 0, tDecode = 0, tToken = 0;
@@ -708,12 +707,18 @@ export class ParakeetModel {
       // NOTE: State update moved below - only update on non-blank token (matching Python reference)
 
       // Temperature scaling & argmax
-      // Optimization: avoid division in the hot loop (valid for T > 0).
-      // argmax(logit/T) == argmax(logit) for positive temperature.
+      // Optimization: avoid division in the hot loop.
+      // max(logit/T) occurs at same index as max(logit).
       let maxLogit = -Infinity, maxId = 0;
       for (let i = 0; i < tokenLogits.length; i++) {
         const v = tokenLogits[i];
         if (v > maxLogit) { maxLogit = v; maxId = i; }
+      }
+
+      // Compute maxVal (scaled) only if needed for softmax stability or logProbs
+      let maxVal = maxLogit;
+      if (temperature !== 1.0) {
+        maxVal = maxLogit / temperature;
       }
 
       let confVal = 1.0; // Default confidence when not computing softmax
@@ -721,16 +726,16 @@ export class ParakeetModel {
 
       // Compute softmax denominator when confidences OR logProbs are requested
       if (returnConfidences || returnLogProbs) {
-        const invTemp = 1.0 / safeTemperature;
+        const invTemp = 1.0 / temperature;
         let sumExp = 0;
         for (let i = 0; i < tokenLogits.length; i++) {
-          // Optimization: (logit/T) - (maxLogit/T) = (logit - maxLogit) / T
+          // Optimization: (logit/T) - maxVal = (logit - maxLogit) / T
           // This avoids one division per item by using multiplication.
           sumExp += Math.exp((tokenLogits[i] - maxLogit) * invTemp);
         }
         confVal = 1 / sumExp;
-        // For the selected max logit, log(softmax) simplifies to -log(sumExp).
-        logProbVal = -Math.log(sumExp);
+        // Log probability: log(softmax(logit)) = logit - log(sum(exp(logits)))
+        logProbVal = (maxLogit * invTemp) - maxVal - Math.log(sumExp);
 
         if (returnConfidences) {
           frameConfs.push(confVal);
