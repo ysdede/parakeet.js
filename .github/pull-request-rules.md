@@ -1,15 +1,16 @@
-# Agent Posting Rules
+# Pull Request Rules
 
 ## GitHub Text Formatting
 
-Use these rules for all GitHub write actions:
-- `gh pr comment`
+Apply these rules for all GitHub write actions:
+- `gh pr create`
 - `gh pr edit --body`
+- `gh pr comment`
 - `gh issue comment`
 - review replies/comments
 
 1. Never post literal escaped newline sequences (`\n`) in final text.
-2. Prefer `--body-file <path>` with a Markdown file containing real line breaks.
+2. Prefer `--body-file <path>` with Markdown that contains real line breaks.
 3. If using `--body`, ensure it contains actual newlines, not escaped `\n`.
 4. Verify content before posting:
    - no `\n` artifacts,
