@@ -8,7 +8,8 @@
  *                          (implicit in JS — we process exact-length audio, no batch padding)
  *   3. Zero-pad:           N_FFT/2 = 256 samples on each side
  *   4. STFT:               Cast to Float64, symmetric Hann window (400→512 zero-padded),
- *                          512-point FFT, hop_length=160
+ *                          real FFT via N/2 complex FFT + spectrum reconstruction
+ *                          (writes power bins 0..N_FFT/2), hop_length=160
  *   5. Power spectrum:     |real|² + |imag|²  → cast back to Float32
  *   6. Mel filterbank:     MatMul with slaney-normalized triangular filterbank
  *   7. Log:                log(mel + 2^-24)
@@ -284,11 +285,14 @@ export class JsPreprocessor {
     // Share immutable precomputed constants across instances.
     this.melFilterbank = getCachedMelFilterbank(this.nMels);
     this.hannWindow = getCachedPaddedHannWindow();
+    // Keep full-size twiddles for compatibility with tests and diagnostics.
     this.twiddles = precomputeTwiddles(N_FFT);
+    // PR74 path: use one N/2 complex FFT for real-valued input reconstruction.
+    this.twiddlesHalf = precomputeTwiddles(N_FFT >> 1);
 
     // Pre-allocate reusable buffers
-    this._fftRe = new Float64Array(N_FFT);
-    this._fftIm = new Float64Array(N_FFT);
+    this._fftRe = new Float64Array(N_FFT >> 1);
+    this._fftIm = new Float64Array(N_FFT >> 1);
     this._powerBuf = new Float32Array(N_FREQ_BINS);
     this._paddedBuffer = null;
 
@@ -409,19 +413,57 @@ export class JsPreprocessor {
     const window = this.hannWindow;
     const fb = this.melFilterbank;
     const nMels = this.nMels;
-    const tw = this.twiddles;
+    const twFull = this.twiddles;
+    const twHalf = this.twiddlesHalf;
     const fbBounds = this.fbBounds;
+    const halfN = N_FFT >> 1;
+    const quarterN = halfN >> 1;
 
     for (let t = startFrame; t < nFrames; t++) {
       const offset = t * HOP_LENGTH;
-      for (let k = 0; k < N_FFT; k++) {
-        fftRe[k] = padded[offset + k] * window[k];
-        fftIm[k] = 0;
+      // PR74: real FFT via one N/2 complex FFT, then reconstruct full real spectrum power.
+      for (let k = 0; k < halfN; k++) {
+        const idx = k << 1;
+        fftRe[k] = padded[offset + idx] * window[idx];
+        fftIm[k] = padded[offset + idx + 1] * window[idx + 1];
       }
-      fft(fftRe, fftIm, N_FFT, tw);
-      for (let k = 0; k < N_FREQ_BINS; k++) {
-        powerBuf[k] = fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k];
+
+      fft(fftRe, fftIm, halfN, twHalf);
+
+      const z0r = fftRe[0];
+      const z0i = fftIm[0];
+      powerBuf[0] = (z0r + z0i) * (z0r + z0i);
+      powerBuf[halfN] = (z0r - z0i) * (z0r - z0i);
+
+      for (let k = 1; k < quarterN; k++) {
+        const rk = fftRe[k];
+        const ik = fftIm[k];
+        const rnk = fftRe[halfN - k];
+        const ink = fftIm[halfN - k];
+
+        const xeR = 0.5 * (rk + rnk);
+        const xeI = 0.5 * (ik - ink);
+        const xoR = 0.5 * (ik + ink);
+        const xoI = -0.5 * (rk - rnk);
+
+        const wc = twFull.cos[k];
+        const ws = twFull.sin[k];
+        const tr = xoR * wc - xoI * ws;
+        const ti = xoR * ws + xoI * wc;
+
+        const xkR = xeR + tr;
+        const xkI = xeI + ti;
+        powerBuf[k] = xkR * xkR + xkI * xkI;
+
+        const xnkR = xeR - tr;
+        const xnkI = xeI - ti;
+        powerBuf[halfN - k] = xnkR * xnkR + xnkI * xnkI;
       }
+
+      const rQuarter = fftRe[quarterN];
+      const iQuarter = fftIm[quarterN];
+      powerBuf[quarterN] = rQuarter * rQuarter + iQuarter * iQuarter;
+
       for (let m = 0; m < nMels; m++) {
         let melVal = 0;
         const fbOff = m * N_FREQ_BINS;

@@ -22,27 +22,6 @@ yarn add parakeet.js
 ```js
 import { fromHub } from 'parakeet.js';
 
-async function decodeToMono16k(file) {
-  const arrayBuffer = await file.arrayBuffer();
-  const ctx = new AudioContext({ sampleRate: 16000 });
-  const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
-
-  let pcm;
-  if (audioBuffer.numberOfChannels === 1) {
-    pcm = audioBuffer.getChannelData(0);
-  } else {
-    const mono = new Float32Array(audioBuffer.length);
-    for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
-      const channel = audioBuffer.getChannelData(ch);
-      for (let i = 0; i < mono.length; i++) mono[i] += channel[i] / audioBuffer.numberOfChannels;
-    }
-    pcm = mono;
-  }
-
-  await ctx.close();
-  return pcm;
-}
-
 const model = await fromHub('parakeet-tdt-0.6b-v3', {
   backend: 'webgpu-hybrid',
   encoderQuant: 'fp32',
@@ -50,7 +29,7 @@ const model = await fromHub('parakeet-tdt-0.6b-v3', {
 });
 
 // `file` should be a File (for example from <input type="file">)
-const pcm = await decodeToMono16k(file);
+const pcm = await getMono16kPcm(file); // returns mono Float32Array at 16 kHz
 const result = await model.transcribe(pcm, 16000, {
   returnTimestamps: true,
   returnConfidences: true,
@@ -58,6 +37,8 @@ const result = await model.transcribe(pcm, 16000, {
 
 console.log(result.utterance_text);
 ```
+
+Use your existing app audio pipeline for `getMono16kPcm(file)` (Web Audio API, ffmpeg, server-side decode, etc.). A complete browser example is available in `examples/demo/src/App.jsx` (`transcribeFile` flow).
 
 ## Loading models
 
@@ -93,6 +74,20 @@ const model = await fromUrls({
 - If requested FP16 artifacts are missing or fail to load, API calls throw actionable errors so callers can choose a different quantization explicitly.
 - Decoder runs on WASM in WebGPU modes; if decoder FP16 is unsupported in your runtime, choose `decoderQuant: 'int8'` or `decoderQuant: 'fp32'` explicitly.
 - `preprocessorBackend` is `js` (default) or `onnx`.
+
+## JS Mel FFT Update (v1.4.0)
+
+`parakeet.js` now uses the `pr74` real-FFT path in the default JS preprocessor (`preprocessorBackend: 'js'`).
+This keeps feature compatibility with the previous implementation while reducing mel extraction cost.
+
+| Item | Previous JS path | New JS path (default) |
+| --- | --- | --- |
+| FFT strategy | Full `N=512` complex FFT per frame | Real-FFT via one `N/2=256` complex FFT + spectrum reconstruction (`pr74`) |
+| Expected speed | Baseline | Faster mel stage (commonly around `~1.5x` in local mel benchmarks) |
+| Output behavior | NeMo-compatible normalized log-mel | Same behavior and ONNX-reference accuracy thresholds preserved |
+| API changes | N/A | None (`JsPreprocessor` / `IncrementalMelProcessor` unchanged) |
+
+If you need exact ONNX preprocessor execution instead of JS mel, set `preprocessorBackend: 'onnx'`.
 
 ## FP16 Examples
 
