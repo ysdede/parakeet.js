@@ -199,4 +199,34 @@ describe('ParakeetModel decode loop', () => {
     expect(result.logProbs).toEqual([+expectedLogProb.toFixed(6)]);
     expect(joinerRun).toHaveBeenCalledTimes(2);
   });
+
+  it('clamps non-positive temperature to a small positive value', async () => {
+    for (const temp of [0, -1]) {
+      const queue = [
+        makeJoinerOutput([0.0, 1.0, 0.5], [5.0, 1.0, 0.1]), // token=1, step=0
+        makeJoinerOutput([2.0, 0.0, 0.0], [5.0, 1.0, 0.1]), // blank, step=0
+      ];
+
+      let idx = 0;
+      const joinerRun = vi.fn().mockImplementation(async () => {
+        const out = queue[Math.min(idx, queue.length - 1)];
+        idx += 1;
+        return out;
+      });
+
+      const model = createModelForDecodeLoop({ tEnc: 1, joinerRun });
+      const result = await model.transcribe(new Float32Array(16000), 16000, {
+        returnTokenIds: true,
+        returnConfidences: true,
+        returnLogProbs: true,
+        temperature: temp,
+        enableProfiling: false,
+      });
+
+      expect(result.tokenIds).toEqual([1]);
+      expect(Number.isFinite(result.logProbs[0])).toBe(true);
+      expect(result.confidence_scores.token[0]).toBeGreaterThanOrEqual(0.9999);
+      expect(joinerRun).toHaveBeenCalledTimes(2);
+    }
+  });
 });
