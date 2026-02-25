@@ -284,11 +284,13 @@ export class JsPreprocessor {
     // Share immutable precomputed constants across instances.
     this.melFilterbank = getCachedMelFilterbank(this.nMels);
     this.hannWindow = getCachedPaddedHannWindow();
-    this.twiddles = precomputeTwiddles(N_FFT);
+    // Optimization: Use Real-FFT via N/2 Complex FFT
+    this.twiddlesFFT = precomputeTwiddles(N_FFT >> 1);
+    this.twiddlesReconstruct = precomputeTwiddles(N_FFT);
 
-    // Pre-allocate reusable buffers
-    this._fftRe = new Float64Array(N_FFT);
-    this._fftIm = new Float64Array(N_FFT);
+    // Pre-allocate reusable buffers (half size for complex FFT of packed real data)
+    this._fftRe = new Float64Array(N_FFT >> 1);
+    this._fftIm = new Float64Array(N_FFT >> 1);
     this._powerBuf = new Float32Array(N_FREQ_BINS);
     this._paddedBuffer = null;
 
@@ -409,19 +411,69 @@ export class JsPreprocessor {
     const window = this.hannWindow;
     const fb = this.melFilterbank;
     const nMels = this.nMels;
-    const tw = this.twiddles;
+    const twFFT = this.twiddlesFFT;
+    const twRec = this.twiddlesReconstruct;
     const fbBounds = this.fbBounds;
+    const N2 = N_FFT >> 1; // 256
 
     for (let t = startFrame; t < nFrames; t++) {
       const offset = t * HOP_LENGTH;
-      for (let k = 0; k < N_FFT; k++) {
-        fftRe[k] = padded[offset + k] * window[k];
-        fftIm[k] = 0;
+
+      // 1. Pack N real inputs into N/2 complex inputs
+      //    Z[k] = x[2k] + j*x[2k+1]
+      for (let k = 0; k < N2; k++) {
+        const idx = offset + 2 * k;
+        fftRe[k] = padded[idx] * window[2 * k];
+        fftIm[k] = padded[idx + 1] * window[2 * k + 1];
       }
-      fft(fftRe, fftIm, N_FFT, tw);
-      for (let k = 0; k < N_FREQ_BINS; k++) {
-        powerBuf[k] = fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k];
+
+      // 2. Perform N/2-point Complex FFT
+      fft(fftRe, fftIm, N2, twFFT);
+
+      // 3. Reconstruct Power Spectrum for N-point Real FFT
+      // X[0] and X[N/2] special cases
+      const z0_re = fftRe[0];
+      const z0_im = fftIm[0];
+      powerBuf[0] = (z0_re + z0_im) * (z0_re + z0_im);
+      powerBuf[N2] = (z0_re - z0_im) * (z0_re - z0_im);
+
+      // Reconstruct k=1 to N/2-1
+      const N4 = N2 >> 1; // 128
+      for (let k = 1; k <= N4; k++) {
+        const kRev = N2 - k;
+        const re_k = fftRe[k];
+        const im_k = fftIm[k];
+        const re_rev = k === N4 ? re_k : fftRe[kRev];
+        const im_rev = k === N4 ? im_k : fftIm[kRev];
+
+        // A = 0.5 * (Z[k] + Z*[N/2-k])
+        const reA = 0.5 * (re_k + re_rev);
+        const imA = 0.5 * (im_k - im_rev);
+
+        // C = -j * B = -j * 0.5 * (Z[k] - Z*[N/2-k])
+        const reC = 0.5 * (im_k + im_rev);
+        const imC = -0.5 * (re_k - re_rev);
+
+        // W_N^k = cos - j*sin
+        const c = twRec.cos[k];
+        const s = twRec.sin[k];
+
+        // X[k] = A + C*W -> CW = (reC + j imC)(c + j s)
+        const reCW = reC * c - imC * s;
+        const imCW = reC * s + imC * c;
+
+        const x_re = reA + reCW;
+        const x_im = imA + imCW;
+        powerBuf[k] = x_re * x_re + x_im * x_im;
+
+        if (k < N4) {
+          // |X[N/2-k]| = |A - CW|
+          const x2_re = reA - reCW;
+          const x2_im = imA - imCW;
+          powerBuf[kRev] = x2_re * x2_re + x2_im * x2_im;
+        }
       }
+
       for (let m = 0; m < nMels; m++) {
         let melVal = 0;
         const fbOff = m * N_FREQ_BINS;
