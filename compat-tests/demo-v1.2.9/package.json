@@ -1,0 +1,28 @@
+{
+  "name": "parakeet-js-hf-spaces-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:local": "cross-env PARAKEET_LOCAL=true vite",
+    "build": "vite build",
+    "build:local": "cross-env PARAKEET_LOCAL=true vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "parakeet.js": "1.3.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.0",
+    "@tailwindcss/typography": "^0.5.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "autoprefixer": "^10.4.0",
+    "cross-env": "^7.0.3",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "vite": "^4.5.0"
+  }
+}
