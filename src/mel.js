@@ -8,7 +8,8 @@
  *                          (implicit in JS — we process exact-length audio, no batch padding)
  *   3. Zero-pad:           N_FFT/2 = 256 samples on each side
  *   4. STFT:               Cast to Float64, symmetric Hann window (400→512 zero-padded),
- *                          512-point FFT, hop_length=160
+ *                          real FFT via N/2 complex FFT + spectrum reconstruction
+ *                          (writes power bins 0..N_FFT/2), hop_length=160
  *   5. Power spectrum:     |real|² + |imag|²  → cast back to Float32
  *   6. Mel filterbank:     MatMul with slaney-normalized triangular filterbank
  *   7. Log:                log(mel + 2^-24)
