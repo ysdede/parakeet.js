@@ -303,9 +303,15 @@ describe('JsPreprocessor', () => {
     expect(p1.hannWindow).toBe(p2.hannWindow);
     expect(p1.hannWindow).toBe(p3.hannWindow);
 
-    expect(p1.twiddles).toBe(p2.twiddles);
-    expect(p1.twiddles).toBe(p3.twiddles);
-    expect(p1.twiddles.bitrev.length).toBe(MEL_CONSTANTS.N_FFT);
+    // N/2 complex FFT
+    expect(p1.twiddlesFFT).toBe(p2.twiddlesFFT);
+    expect(p1.twiddlesFFT).toBe(p3.twiddlesFFT);
+    expect(p1.twiddlesFFT.bitrev.length).toBe(MEL_CONSTANTS.N_FFT >> 1); // 256
+
+    // Reconstruction
+    expect(p1.twiddlesReconstruct).toBe(p2.twiddlesReconstruct);
+    expect(p1.twiddlesReconstruct).toBe(p3.twiddlesReconstruct);
+    expect(p1.twiddlesReconstruct.bitrev.length).toBe(MEL_CONSTANTS.N_FFT); // 512
 
     expect(p1.melFilterbank).toBe(p2.melFilterbank);
     expect(p3.melFilterbank).not.toBe(p1.melFilterbank);
