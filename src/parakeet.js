@@ -707,10 +707,18 @@ export class ParakeetModel {
       // NOTE: State update moved below - only update on non-blank token (matching Python reference)
 
       // Temperature scaling & argmax
-      let maxVal = -Infinity, maxId = 0;
+      // Optimization: avoid division in the hot loop.
+      // max(logit/T) occurs at same index as max(logit).
+      let maxLogit = -Infinity, maxId = 0;
       for (let i = 0; i < tokenLogits.length; i++) {
-        const v = tokenLogits[i] / temperature;
-        if (v > maxVal) { maxVal = v; maxId = i; }
+        const v = tokenLogits[i];
+        if (v > maxLogit) { maxLogit = v; maxId = i; }
+      }
+
+      // Compute maxVal (scaled) only if needed for softmax stability or logProbs
+      let maxVal = maxLogit;
+      if (temperature !== 1.0) {
+        maxVal = maxLogit / temperature;
       }
 
       let confVal = 1.0; // Default confidence when not computing softmax
@@ -718,13 +726,16 @@ export class ParakeetModel {
 
       // Compute softmax denominator when confidences OR logProbs are requested
       if (returnConfidences || returnLogProbs) {
+        const invTemp = 1.0 / temperature;
         let sumExp = 0;
         for (let i = 0; i < tokenLogits.length; i++) {
-          sumExp += Math.exp((tokenLogits[i] / temperature) - maxVal);
+          // Optimization: (logit/T) - maxVal = (logit - maxLogit) / T
+          // This avoids one division per item by using multiplication.
+          sumExp += Math.exp((tokenLogits[i] - maxLogit) * invTemp);
         }
         confVal = 1 / sumExp;
         // Log probability: log(softmax(logit)) = logit - log(sum(exp(logits)))
-        logProbVal = (tokenLogits[maxId] / temperature) - maxVal - Math.log(sumExp);
+        logProbVal = (maxLogit * invTemp) - maxVal - Math.log(sumExp);
 
         if (returnConfidences) {
           frameConfs.push(confVal);
