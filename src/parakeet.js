@@ -42,6 +42,7 @@ export class ParakeetModel {
 
     // Read blank ID from tokenizer (dynamic instead of hardcoded)
     this.blankId = tokenizer.blankId;
+    this._vocabSize = tokenizer.id2token?.length ?? tokenizer.sanitizedTokens?.length ?? 0;
 
     // Combined model specific constants
     this.predHidden = 640;
@@ -263,9 +264,10 @@ export class ParakeetModel {
    * @param {Object} encTensor - Encoder frame tensor shaped [1, D, 1].
    * @param {number} token - Previous token ID (uses blank when not numeric).
    * @param {{state1: Object, state2: Object}|null} [currentState=null] - Decoder LSTM state tensors.
+   * @param {Object|null} [reusableFeeds=null] - Optional per-call feed object to avoid per-step allocations.
    * @returns {Promise<{tokenLogits: Float32Array, step: number, newState: {state1: Object, state2: Object}, _logitsTensor: Object}>}
    */
-  async _runCombinedStep(encTensor, token, currentState = null) {
+  async _runCombinedStep(encTensor, token, currentState = null, reusableFeeds = null) {
     const singleToken = typeof token === 'number' ? token : this.blankId;
 
     // Reuse pre-allocated tensors
@@ -275,13 +277,16 @@ export class ParakeetModel {
     const state1 = currentState?.state1 || this._combState1;
     const state2 = currentState?.state2 || this._combState2;
 
-    const feeds = {
-      encoder_outputs: encTensor,
+    const feeds = reusableFeeds || {
+      encoder_outputs: null,
       targets: this._targetTensor,
       target_length: this._targetLenTensor,
-      input_states_1: state1,
-      input_states_2: state2,
+      input_states_1: null,
+      input_states_2: null,
     };
+    feeds.encoder_outputs = encTensor;
+    feeds.input_states_1 = state1;
+    feeds.input_states_2 = state2;
 
     const out = await this.joinerSession.run(feeds);
     const logits = out['outputs'];
@@ -290,14 +295,11 @@ export class ParakeetModel {
     // each call. ORT-WASM does not copy the data on Tensor creation, so these tensors
     // have no separate WASM allocation to leak — disposing them would be wrong.
 
-    const vocab = this.tokenizer.id2token.length;
+    const vocab = this._vocabSize;
     const totalDim = logits.dims[3];
-    const data = logits.data;
-
-    // subarray(): zero-copy view into joiner output buffer.
-    // Do NOT mutate tokenLogits/durLogits without copying first (.slice()).
-    const tokenLogits = data.subarray(0, vocab);
-    const durLogits = data.subarray(vocab, totalDim);
+    const logitsData = logits.data;
+    const tokenLogits = logitsData.subarray(0, vocab);
+    const durLogits = logitsData.subarray(vocab, totalDim);
 
     let step = 0;
     if (durLogits.length) {
@@ -688,9 +690,20 @@ export class ParakeetModel {
       }
     }
     let emittedTokens = 0;
+    const blankId = this.blankId;
+    const maxTokensPerStep = this.maxTokensPerStep;
+    const needLogitNorm = returnConfidences || returnLogProbs;
+    const invTemp = temperature !== 1.0 ? (1.0 / temperature) : 1.0;
 
 
     const decStartTime = perfEnabled ? performance.now() : 0;
+    const stepFeeds = {
+      encoder_outputs: null,
+      targets: this._targetTensor,
+      target_length: this._targetLenTensor,
+      input_states_1: null,
+      input_states_2: null,
+    };
 
     // When not using cache, we will capture decoder state at prefixFrames once
     let prefixStateCaptured = startFrame > 0 || prefixFrames === 0;
@@ -701,8 +714,8 @@ export class ParakeetModel {
       this._encoderFrameBuffer.set(transposed.subarray(frameStart, frameStart + D));
       // const encTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
 
-      const prevTok = ids.length ? ids[ids.length - 1] : this.blankId;
-      const { tokenLogits, step, newState, _logitsTensor } = await this._runCombinedStep(this._encoderFrameTensor, prevTok, decoderState);
+      const prevTok = ids.length ? ids[ids.length - 1] : blankId;
+      const { tokenLogits, step, newState, _logitsTensor } = await this._runCombinedStep(this._encoderFrameTensor, prevTok, decoderState, stepFeeds);
       // NOTE: State update moved below - only update on non-blank token (matching Python reference)
 
       // Temperature scaling & argmax
@@ -724,8 +737,7 @@ export class ParakeetModel {
       let logProbVal = 0; // Raw log probability for this token
 
       // Compute softmax denominator when confidences OR logProbs are requested
-      if (returnConfidences || returnLogProbs) {
-        const invTemp = 1.0 / temperature;
+      if (needLogitNorm) {
         let sumExp = 0;
         for (let i = 0; i < tokenLogits.length; i++) {
           // Optimization: (logit/T) - maxVal = (logit - maxLogit) / T
@@ -745,7 +757,7 @@ export class ParakeetModel {
       // Dispose the joiner logits tensor (tokenLogits subarray has been fully consumed)
       _logitsTensor?.dispose?.();
 
-      if (maxId !== this.blankId) {
+      if (maxId !== blankId) {
         // CRITICAL FIX: Only update decoder state on non-blank token emission
         // This matches the Python reference in onnx-asr/src/onnx_asr/asr.py line 212
         this._disposeDecoderState(decoderState, newState); // free old state tensors
@@ -783,7 +795,7 @@ export class ParakeetModel {
       if (step > 0) {
         t += step;
         emittedTokens = 0;  // Reset on TDT step advance
-      } else if (maxId === this.blankId || emittedTokens >= this.maxTokensPerStep) {
+      } else if (maxId === blankId || emittedTokens >= maxTokensPerStep) {
         t += frameStride;
         emittedTokens = 0;  // Reset on blank or max tokens
       }
