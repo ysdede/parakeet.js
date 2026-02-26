@@ -1,3 +1,3 @@
-## 2024-05-22 - Argmax Optimization in Decoding Loop
-Learning: Pure JS implementation of `argmax` on `Float32Array` can be significantly optimized by avoiding division inside the loop (~4x speedup in micro-benchmark).
-Action: Prefer loop-invariant code motion for mathematical operations in hot loops, especially when iterating over large arrays (vocab size).
+## 2024-05-22 - JS Loops vs TypedArray.set
+Learning: Manual loops over TypedArrays in V8 are significantly slower (~10x) than `set` + `subarray` for bulk copies, even for moderate sizes (D=640).
+Action: Prefer `set` + `subarray` for contiguous memory copies in hot loops.
