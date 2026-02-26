@@ -697,9 +697,7 @@ export class ParakeetModel {
     for (let t = startFrame; t < Tenc;) {
       // Copy frame data to reusable buffer
       const frameStart = t * D;
-      for (let i = 0; i < D; i++) {
-        this._encoderFrameBuffer[i] = transposed[frameStart + i];
-      }
+      this._encoderFrameBuffer.set(transposed.subarray(frameStart, frameStart + D));
       // const encTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
 
       const prevTok = ids.length ? ids[ids.length - 1] : this.blankId;
