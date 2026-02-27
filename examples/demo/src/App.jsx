@@ -12,6 +12,67 @@ import { formatResolvedQuantization, loadModelWithFallback } from '../../shared/
 import './App.css';
 
 const SETTINGS_STORAGE_KEY = 'parakeet.demo.settings.v1';
+const MODEL_SOURCE_OPTIONS = {
+  HUGGINGFACE: 'huggingface',
+  LOCAL: 'local',
+};
+const QUANT_TO_FILENAME = {
+  fp32: '.onnx',
+  fp16: '.fp16.onnx',
+  int8: '.int8.onnx',
+};
+
+function getBasename(path) {
+  return String(path || '').split('/').pop() || '';
+}
+
+function normalizeRelPath(path) {
+  return String(path || '').replace(/\\/g, '/').replace(/^\.\//, '');
+}
+
+function detectLocalQuantModes(entries, baseName) {
+  const names = new Set(entries.map((entry) => entry.basename.toLowerCase()));
+  const out = [];
+  if (names.has(`${baseName}.onnx`)) out.push('fp32');
+  if (names.has(`${baseName}.fp16.onnx`)) out.push('fp16');
+  if (names.has(`${baseName}.int8.onnx`)) out.push('int8');
+  return out;
+}
+
+function findLocalEntry(entries, expectedName) {
+  const lower = expectedName.toLowerCase();
+  return (
+    entries.find((entry) => entry.path.toLowerCase() === lower) ||
+    entries.find((entry) => entry.basename.toLowerCase() === lower) ||
+    entries.find((entry) => entry.path.toLowerCase().endsWith(`/${lower}`)) ||
+    null
+  );
+}
+
+function quantizedModelName(baseName, quant) {
+  return `${baseName}${QUANT_TO_FILENAME[quant] || '.onnx'}`;
+}
+
+async function collectDirectoryFilesRecursive(dirHandle, prefix = '') {
+  const entries = [];
+  for await (const [name, handle] of dirHandle.entries()) {
+    const relPath = prefix ? `${prefix}/${name}` : name;
+    if (handle.kind === 'file') {
+      const file = await handle.getFile();
+      entries.push({
+        path: normalizeRelPath(relPath),
+        basename: getBasename(relPath),
+        file,
+      });
+      continue;
+    }
+    if (handle.kind === 'directory') {
+      const nested = await collectDirectoryFilesRecursive(handle, relPath);
+      entries.push(...nested);
+    }
+  }
+  return entries;
+}
 
 function loadSettings() {
   try {
@@ -136,6 +197,12 @@ function pcmToWavBlob(pcm, sampleRate = 16000) {
 export default function App() {
   const initialSettings = loadSettings();
   const initialSelectedModel = initialSettings.selectedModel;
+  const initialModelSource = initialSettings.modelSource;
+  const [modelSource, setModelSource] = useState(
+    initialModelSource === MODEL_SOURCE_OPTIONS.LOCAL
+      ? MODEL_SOURCE_OPTIONS.LOCAL
+      : MODEL_SOURCE_OPTIONS.HUGGINGFACE
+  );
   const [selectedModel, setSelectedModel] = useState(
     MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2'
   );
@@ -150,6 +217,11 @@ export default function App() {
   const [decoderQuant, setDecoderQuant] = useState(initialSettings.decoderQuant || 'int8');
   const [encoderQuantOptions, setEncoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
   const [decoderQuantOptions, setDecoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
+  const [localEntries, setLocalEntries] = useState([]);
+  const [localFolderName, setLocalFolderName] = useState('');
+  const [localTokenizerOptions, setLocalTokenizerOptions] = useState(['vocab.txt']);
+  const [localTokenizerName, setLocalTokenizerName] = useState('vocab.txt');
+  const [localPreprocessorOptions, setLocalPreprocessorOptions] = useState(['nemo128']);
   const [preprocessor, setPreprocessor] = useState(initialSettings.preprocessor || 'nemo128');
   const [preprocessorBackend, setPreprocessorBackend] = useState(initialSettings.preprocessorBackend || 'onnx');
   const [status, setStatus] = useState('Idle');
@@ -180,7 +252,9 @@ export default function App() {
   );
   const modelRef = useRef(null);
   const fileInputRef = useRef(null);
+  const modelFolderInputRef = useRef(null);
   const audioRef = useRef(null);
+  const localModelBlobUrlsRef = useRef([]);
 
   const isModelReady = modelLoaded;
   const isLoading = !modelLoaded && status !== 'Idle' && !status.toLowerCase().includes('fail');
@@ -203,9 +277,10 @@ export default function App() {
 
   // List available branches for the selected model repo from HF refs API.
   useEffect(() => {
+    if (modelSource !== MODEL_SOURCE_OPTIONS.HUGGINGFACE) return;
     let cancelled = false;
     const repoId = MODELS[selectedModel]?.repoId;
- 
+
     (async () => {
       const revisions = await fetchModelRevisions(repoId);
       if (cancelled) return;
@@ -220,6 +295,7 @@ export default function App() {
 
   // Inspect selected repo+branch files and filter quantization options accordingly.
   useEffect(() => {
+    if (modelSource !== MODEL_SOURCE_OPTIONS.HUGGINGFACE) return;
     let cancelled = false;
     const repoId = MODELS[selectedModel]?.repoId;
     const revision = modelRevision || 'main';
@@ -244,7 +320,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedModel, modelRevision, modelRevisions]);
+  }, [selectedModel, modelRevision, modelRevisions, modelSource]);
 
   // Detect SharedArrayBuffer and threading capabilities
   useEffect(() => {
@@ -255,6 +331,7 @@ export default function App() {
 
   useEffect(() => {
     saveSettings({
+      modelSource,
       selectedModel,
       modelRevision,
       selectedLanguage,
@@ -271,6 +348,7 @@ export default function App() {
       cpuThreads,
     });
   }, [
+    modelSource,
     selectedModel,
     modelRevision,
     selectedLanguage,
@@ -291,6 +369,10 @@ export default function App() {
   useEffect(() => {
     return () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
+      for (const url of localModelBlobUrlsRef.current) {
+        URL.revokeObjectURL(url);
+      }
+      localModelBlobUrlsRef.current = [];
     };
   }, [audioUrl]);
 
@@ -338,6 +420,92 @@ export default function App() {
     setSelectedModel(nextModel);
     setModelRevisions(DEFAULT_MODEL_REVISIONS);
     setModelRevision('main');
+  }
+
+  function applyLocalEntries(entries, folderName = '') {
+    setLocalEntries(entries);
+    setLocalFolderName(folderName);
+
+    const encOptions = detectLocalQuantModes(entries, 'encoder-model');
+    const decOptions = detectLocalQuantModes(entries, 'decoder_joint-model');
+    const nextEncOptions = encOptions.length ? encOptions : ['fp32'];
+    const nextDecOptions = decOptions.length ? decOptions : ['fp32'];
+
+    setEncoderQuantOptions(nextEncOptions);
+    setDecoderQuantOptions(nextDecOptions);
+    setEncoderQuant((current) =>
+      nextEncOptions.includes(current) ? current : pickPreferredQuant(nextEncOptions, backend, 'encoder')
+    );
+    setDecoderQuant((current) =>
+      nextDecOptions.includes(current) ? current : pickPreferredQuant(nextDecOptions, backend, 'decoder')
+    );
+
+    const tokenizerCandidates = [];
+    if (findLocalEntry(entries, 'vocab.txt')) tokenizerCandidates.push('vocab.txt');
+    if (findLocalEntry(entries, 'tokens.txt')) tokenizerCandidates.push('tokens.txt');
+    if (!tokenizerCandidates.length) {
+      for (const entry of entries) {
+        if (entry.basename.toLowerCase().endsWith('.txt')) {
+          tokenizerCandidates.push(entry.basename);
+        }
+      }
+    }
+    const dedupedTokenizer = [...new Set(tokenizerCandidates)];
+    if (dedupedTokenizer.length) {
+      setLocalTokenizerOptions(dedupedTokenizer);
+      setLocalTokenizerName((current) => (dedupedTokenizer.includes(current) ? current : dedupedTokenizer[0]));
+    }
+
+    const preprocessorCandidates = [];
+    if (findLocalEntry(entries, 'nemo128.onnx')) preprocessorCandidates.push('nemo128');
+    if (findLocalEntry(entries, 'nemo80.onnx')) preprocessorCandidates.push('nemo80');
+    const dedupedPreprocessor = [...new Set(preprocessorCandidates)];
+    if (dedupedPreprocessor.length) {
+      setLocalPreprocessorOptions(dedupedPreprocessor);
+      setPreprocessor((current) => (dedupedPreprocessor.includes(current) ? current : dedupedPreprocessor[0]));
+    } else {
+      setLocalPreprocessorOptions([]);
+    }
+
+    setStatus(`Local folder selected (${entries.length} files)`);
+  }
+
+  async function pickLocalModelFolder() {
+    try {
+      if (typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function') {
+        const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+        const entries = await collectDirectoryFilesRecursive(dirHandle);
+        applyLocalEntries(entries, dirHandle.name || '');
+        return;
+      }
+
+      if (modelFolderInputRef.current) {
+        modelFolderInputRef.current.click();
+        return;
+      }
+
+      alert('Directory picker is not available in this browser. Use Chromium-based browser or provide local files via folder input.');
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error('[LocalFolder] Failed to read directory', error);
+      setStatus(`Failed to read folder: ${error.message}`);
+    }
+  }
+
+  function handleLocalFolderInput(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const entries = files.map((file) => {
+      const relPath = normalizeRelPath(file.webkitRelativePath || file.name);
+      return {
+        path: relPath,
+        basename: getBasename(relPath),
+        file,
+      };
+    });
+    const folderName = entries[0]?.path?.split('/')?.[0] || '';
+    applyLocalEntries(entries, folderName);
+    event.target.value = '';
   }
 
   // Fetch random audio sample from HuggingFace speech dataset
@@ -421,12 +589,79 @@ export default function App() {
   }
 
   async function loadModel() {
-    setStatus('Downloading model…');
+    const isLocalSource = modelSource === MODEL_SOURCE_OPTIONS.LOCAL;
+    setStatus(isLocalSource ? 'Preparing local model…' : 'Downloading model…');
     setProgressText('');
-    setProgressPct(0);
+    setProgressPct(isLocalSource ? null : 0);
     console.time('LoadModel');
 
     try {
+      for (const url of localModelBlobUrlsRef.current) {
+        URL.revokeObjectURL(url);
+      }
+      localModelBlobUrlsRef.current = [];
+
+      if (isLocalSource) {
+        if (!localEntries.length) {
+          throw new Error('Pick a local model folder first.');
+        }
+
+        const createdBlobUrls = [];
+        const toBlobUrl = (file) => {
+          const url = URL.createObjectURL(file);
+          createdBlobUrls.push(url);
+          return url;
+        };
+
+        const encoderName = quantizedModelName('encoder-model', encoderQuant);
+        const decoderName = quantizedModelName('decoder_joint-model', decoderQuant);
+        const encoderEntry = findLocalEntry(localEntries, encoderName);
+        const decoderEntry = findLocalEntry(localEntries, decoderName);
+        const tokenizerEntry = findLocalEntry(localEntries, localTokenizerName);
+
+        if (!encoderEntry) throw new Error(`Missing encoder file: ${encoderName}`);
+        if (!decoderEntry) throw new Error(`Missing decoder file: ${decoderName}`);
+        if (!tokenizerEntry) throw new Error(`Missing tokenizer file: ${localTokenizerName}`);
+
+        const cfg = {
+          encoderUrl: toBlobUrl(encoderEntry.file),
+          decoderUrl: toBlobUrl(decoderEntry.file),
+          tokenizerUrl: toBlobUrl(tokenizerEntry.file),
+          filenames: {
+            encoder: encoderEntry.basename,
+            decoder: decoderEntry.basename,
+          },
+          preprocessorBackend,
+          backend,
+          verbose: verboseLog,
+          cpuThreads,
+        };
+
+        if (preprocessorBackend === 'onnx') {
+          const preprocessorName = `${preprocessor}.onnx`;
+          const preprocessorEntry = findLocalEntry(localEntries, preprocessorName);
+          if (!preprocessorEntry) {
+            throw new Error(`Missing preprocessor file: ${preprocessorName} (switch to JS preprocessor or add file to folder).`);
+          }
+          cfg.preprocessorUrl = toBlobUrl(preprocessorEntry.file);
+        }
+
+        const encoderDataEntry = findLocalEntry(localEntries, `${encoderEntry.basename}.data`);
+        if (encoderDataEntry) {
+          cfg.encoderDataUrl = toBlobUrl(encoderDataEntry.file);
+        }
+        const decoderDataEntry = findLocalEntry(localEntries, `${decoderEntry.basename}.data`);
+        if (decoderDataEntry) {
+          cfg.decoderDataUrl = toBlobUrl(decoderDataEntry.file);
+        }
+
+        setStatus('Compiling model…');
+        setProgressText('Compiling local model artifacts');
+        setProgressPct(null);
+
+        modelRef.current = await ParakeetModel.fromUrls(cfg);
+        localModelBlobUrlsRef.current = createdBlobUrls;
+      } else {
       const progressCallback = ({ loaded, total, file }) => {
         const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
         setProgressText(`${file}: ${pct}%`);
@@ -464,6 +699,7 @@ export default function App() {
       });
 
       modelRef.current = modelLoadResult.model;
+      }
 
       setStatus('Verifying…');
       setProgressText('Running test transcription');
@@ -612,6 +848,28 @@ export default function App() {
                 {/* Model Selection */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                    Model Source
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={modelSource}
+                      onChange={(e) => setModelSource(e.target.value)}
+                      disabled={isLoading || isModelReady}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                    >
+                      <option value={MODEL_SOURCE_OPTIONS.HUGGINGFACE}>HuggingFace</option>
+                      <option value={MODEL_SOURCE_OPTIONS.LOCAL}>Local folder</option>
+                    </select>
+                    <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                      expand_more
+                    </span>
+                  </div>
+                </div>
+
+                {modelSource === MODEL_SOURCE_OPTIONS.HUGGINGFACE && (
+                  <>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                     Model
                   </label>
                   <div className="relative">
@@ -632,28 +890,58 @@ export default function App() {
                     </span>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Model Branch
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={modelRevision}
-                      onChange={e => setModelRevision(e.target.value)}
+                  </>
+                )}
+
+                {modelSource === MODEL_SOURCE_OPTIONS.LOCAL && (
+                  <div className="space-y-2">
+                    <input
+                      ref={modelFolderInputRef}
+                      type="file"
+                      webkitdirectory=""
+                      directory=""
+                      multiple
+                      onChange={handleLocalFolderInput}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={pickLocalModelFolder}
                       disabled={isLoading || isModelReady}
-                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                      className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-medium py-2.5 px-4 rounded-lg transition-all border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {modelRevisions.map(rev => (
-                        <option key={rev} value={rev}>
-                          {rev}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
-                      expand_more
-                    </span>
+                      Choose Local Model Folder
+                    </button>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {localEntries.length
+                        ? `Selected ${localEntries.length} files${localFolderName ? ` from "${localFolderName}"` : ''}.`
+                        : 'Pick a folder containing encoder/decoder ONNX files and tokenizer text.'}
+                    </p>
                   </div>
-                </div>
+                )}
+                {modelSource === MODEL_SOURCE_OPTIONS.HUGGINGFACE && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                      Model Branch
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={modelRevision}
+                        onChange={e => setModelRevision(e.target.value)}
+                        disabled={isLoading || isModelReady}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                      >
+                        {modelRevisions.map(rev => (
+                          <option key={rev} value={rev}>
+                            {rev}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                        expand_more
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Backend and Precision */}
                 <div className="grid grid-cols-2 gap-3">
@@ -768,12 +1056,52 @@ export default function App() {
                       expand_more
                     </span>
                   </div>
+                  {modelSource === MODEL_SOURCE_OPTIONS.LOCAL && preprocessorBackend === 'onnx' && localPreprocessorOptions.length > 0 && (
+                    <div className="relative mt-2">
+                      <select
+                        value={preprocessor}
+                        onChange={(e) => setPreprocessor(e.target.value)}
+                        disabled={isLoading || isModelReady}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                      >
+                        {localPreprocessorOptions.map((name) => (
+                          <option key={name} value={name}>{name}.onnx</option>
+                        ))}
+                      </select>
+                      <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                        expand_more
+                      </span>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     {preprocessorBackend === 'js'
                       ? 'Pure JS: no ONNX download, supports streaming caching'
                       : 'ONNX WASM+SIMD: slightly faster per-call, requires nemo128.onnx download'}
                   </p>
                 </div>
+
+                {modelSource === MODEL_SOURCE_OPTIONS.LOCAL && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                      Tokenizer
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={localTokenizerName}
+                        onChange={(e) => setLocalTokenizerName(e.target.value)}
+                        disabled={isLoading || isModelReady}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                      >
+                        {localTokenizerOptions.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                      <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                        expand_more
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Toggles */}
                 <div className="flex flex-col gap-3 pt-2">
