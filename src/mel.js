@@ -221,6 +221,7 @@ function fft(re, im, N, tw) {
       }
     }
   } else {
+    // Fallback if no precomputed bitrev (shouldn't happen with correct usage)
     let j = 0;
     for (let i = 0; i < N - 1; i++) {
       if (i < j) {
@@ -240,10 +241,97 @@ function fft(re, im, N, tw) {
     }
   }
 
-  // Butterfly stages
-  for (let len = 2; len <= N; len <<= 1) {
+  // Unrolled Stage 1 (len=2): wCos=1, wSin=0
+  for (let i = 0; i < N; i += 2) {
+    const p = i,
+      q = i + 1;
+    const tRe = re[q],
+      tIm = im[q];
+    re[q] = re[p] - tRe;
+    im[q] = im[p] - tIm;
+    re[p] += tRe;
+    im[p] += tIm;
+  }
+
+  // Unrolled Stage 2 (len=4): k=0 (1,0), k=1 (0,-1)
+  for (let i = 0; i < N; i += 4) {
+    // k=0
+    const p0 = i,
+      q0 = i + 2;
+    const tRe0 = re[q0],
+      tIm0 = im[q0];
+    re[q0] = re[p0] - tRe0;
+    im[q0] = im[p0] - tIm0;
+    re[p0] += tRe0;
+    im[p0] += tIm0;
+
+    // k=1: wCos=0, wSin=-1 -> tRe = im[q], tIm = -re[q]
+    const p1 = i + 1,
+      q1 = i + 3;
+    const tRe1 = im[q1],
+      tIm1 = -re[q1];
+    re[q1] = re[p1] - tRe1;
+    im[q1] = im[p1] - tIm1;
+    re[p1] += tRe1;
+    im[p1] += tIm1;
+  }
+
+  // Unrolled Stage 3 (len=8): k=0,1,2,3
+  for (let i = 0; i < N; i += 8) {
+    // k=0 (1,0)
+    {
+      const p = i,
+        q = i + 4;
+      const tRe = re[q],
+        tIm = im[q];
+      re[q] = re[p] - tRe;
+      im[q] = im[p] - tIm;
+      re[p] += tRe;
+      im[p] += tIm;
+    }
+    // k=1 (wCos=0.707, wSin=-0.707)
+    {
+      const wCos = 0.7071067811865476,
+        wSin = -0.7071067811865476;
+      const p = i + 1,
+        q = p + 4;
+      const tRe = re[q] * wCos - im[q] * wSin;
+      const tIm = re[q] * wSin + im[q] * wCos;
+      re[q] = re[p] - tRe;
+      im[q] = im[p] - tIm;
+      re[p] += tRe;
+      im[p] += tIm;
+    }
+    // k=2 (0, -1)
+    {
+      const p = i + 2,
+        q = p + 4;
+      const tRe = im[q],
+        tIm = -re[q];
+      re[q] = re[p] - tRe;
+      im[q] = im[p] - tIm;
+      re[p] += tRe;
+      im[p] += tIm;
+    }
+    // k=3 (wCos=-0.707, wSin=-0.707)
+    {
+      const wCos = -0.7071067811865476,
+        wSin = -0.7071067811865476;
+      const p = i + 3,
+        q = p + 4;
+      const tRe = re[q] * wCos - im[q] * wSin;
+      const tIm = re[q] * wSin + im[q] * wCos;
+      re[q] = re[p] - tRe;
+      im[q] = im[p] - tIm;
+      re[p] += tRe;
+      im[p] += tIm;
+    }
+  }
+
+  // Remaining stages (len=16..N)
+  for (let len = 16; len <= N; len <<= 1) {
     const halfLen = len >> 1;
-    const step = N / len; // twiddle index stride
+    const step = N / len;
     for (let i = 0; i < N; i += len) {
       for (let k = 0; k < halfLen; k++) {
         const twIdx = k * step;
