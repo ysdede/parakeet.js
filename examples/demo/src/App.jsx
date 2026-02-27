@@ -205,7 +205,7 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     const repoId = MODELS[selectedModel]?.repoId;
-
+ 
     (async () => {
       const revisions = await fetchModelRevisions(repoId);
       if (cancelled) return;
