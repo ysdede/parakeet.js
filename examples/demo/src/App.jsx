@@ -12,6 +12,9 @@ import { formatResolvedQuantization, loadModelWithFallback } from '../../shared/
 import './App.css';
 
 const SETTINGS_STORAGE_KEY = 'parakeet.demo.settings.v1';
+const LOCAL_MODEL_DB_NAME = 'parakeet-demo-local-model';
+const LOCAL_MODEL_STORE_NAME = 'handles';
+const LOCAL_MODEL_DIR_KEY = 'directory-handle';
 const MODEL_SOURCE_OPTIONS = {
   HUGGINGFACE: 'huggingface',
   LOCAL: 'local',
@@ -56,13 +59,15 @@ function quantizedModelName(baseName, quant) {
 async function collectDirectoryFilesRecursive(dirHandle, prefix = '') {
   const entries = [];
   for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind === 'directory' && name === '.git') {
+      continue;
+    }
     const relPath = prefix ? `${prefix}/${name}` : name;
     if (handle.kind === 'file') {
-      const file = await handle.getFile();
       entries.push({
         path: normalizeRelPath(relPath),
         basename: getBasename(relPath),
-        file,
+        handle,
       });
       continue;
     }
@@ -72,6 +77,63 @@ async function collectDirectoryFilesRecursive(dirHandle, prefix = '') {
     }
   }
   return entries;
+}
+
+async function getEntryFile(entry) {
+  if (entry.file) return entry.file;
+  if (entry.handle?.kind === 'file') return entry.handle.getFile();
+  throw new Error(`Could not access local file entry: ${entry?.path || entry?.basename || 'unknown'}`);
+}
+
+function supportsDirectoryHandlePersistence() {
+  return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function' && typeof indexedDB !== 'undefined';
+}
+
+function openLocalModelDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(LOCAL_MODEL_DB_NAME, 1);
+    request.onerror = () => reject(new Error('Failed to open local model IndexedDB'));
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(LOCAL_MODEL_STORE_NAME)) {
+        db.createObjectStore(LOCAL_MODEL_STORE_NAME);
+      }
+    };
+  });
+}
+
+async function readPersistedDirectoryHandle() {
+  const db = await openLocalModelDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readonly');
+    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
+    const req = store.get(LOCAL_MODEL_DIR_KEY);
+    req.onerror = () => reject(new Error('Failed to read persisted folder handle'));
+    req.onsuccess = () => resolve(req.result || null);
+  });
+}
+
+async function persistDirectoryHandle(dirHandle) {
+  const db = await openLocalModelDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readwrite');
+    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
+    const req = store.put(dirHandle, LOCAL_MODEL_DIR_KEY);
+    req.onerror = () => reject(new Error('Failed to persist folder handle'));
+    req.onsuccess = () => resolve();
+  });
+}
+
+async function clearPersistedDirectoryHandle() {
+  const db = await openLocalModelDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readwrite');
+    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
+    const req = store.delete(LOCAL_MODEL_DIR_KEY);
+    req.onerror = () => reject(new Error('Failed to clear persisted folder handle'));
+    req.onsuccess = () => resolve();
+  });
 }
 
 function loadSettings() {
@@ -219,9 +281,18 @@ export default function App() {
   const [decoderQuantOptions, setDecoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
   const [localEntries, setLocalEntries] = useState([]);
   const [localFolderName, setLocalFolderName] = useState('');
+  const [hasPersistedLocalHandle, setHasPersistedLocalHandle] = useState(false);
+  const [needsLocalHandleReconnect, setNeedsLocalHandleReconnect] = useState(false);
+  const [localHandlePersistenceSupported] = useState(supportsDirectoryHandlePersistence());
   const [localTokenizerOptions, setLocalTokenizerOptions] = useState(['vocab.txt']);
   const [localTokenizerName, setLocalTokenizerName] = useState('vocab.txt');
   const [localPreprocessorOptions, setLocalPreprocessorOptions] = useState(['nemo128']);
+  const [localDetectedArtifacts, setLocalDetectedArtifacts] = useState({
+    encoder: [],
+    decoder: [],
+    tokenizers: [],
+    preprocessors: [],
+  });
   const [preprocessor, setPreprocessor] = useState(initialSettings.preprocessor || 'nemo128');
   const [preprocessorBackend, setPreprocessorBackend] = useState(initialSettings.preprocessorBackend || 'onnx');
   const [status, setStatus] = useState('Idle');
@@ -243,6 +314,7 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [darkMode, setDarkMode] = useState(Boolean(initialSettings.darkMode));
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [isModelLoading, setIsModelLoading] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const maxCores = navigator.hardwareConcurrency || 8;
   const [cpuThreads, setCpuThreads] = useState(
@@ -257,7 +329,7 @@ export default function App() {
   const localModelBlobUrlsRef = useRef([]);
 
   const isModelReady = modelLoaded;
-  const isLoading = !modelLoaded && status !== 'Idle' && !status.toLowerCase().includes('fail');
+  const isLoading = isModelLoading;
 
   // Get available languages for test samples
   const testLanguageOptions = Object.entries(SPEECH_DATASETS).map(([code, config]) => ({
@@ -385,6 +457,24 @@ export default function App() {
     }
   }, [darkMode]);
 
+  // Restore persisted local folder handle when local source is active.
+  useEffect(() => {
+    let cancelled = false;
+    if (modelSource !== MODEL_SOURCE_OPTIONS.LOCAL) return () => {};
+    if (!localHandlePersistenceSupported) return () => {};
+    if (localEntries.length > 0) return () => {};
+
+    (async () => {
+      const restored = await restorePersistedLocalFolder({ requestPermission: false });
+      if (cancelled || !restored) return;
+      console.log('[LocalFolder] Local folder restored automatically from persisted handle');
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modelSource, localHandlePersistenceSupported, localEntries.length]);
+
   function playAudio() {
     if (audioRef.current) {
       audioRef.current.play();
@@ -423,6 +513,7 @@ export default function App() {
   }
 
   function applyLocalEntries(entries, folderName = '') {
+    console.log('[LocalFolder] Parsing selected local folder entries…', { count: entries.length, folderName });
     setLocalEntries(entries);
     setLocalFolderName(folderName);
 
@@ -467,20 +558,89 @@ export default function App() {
       setLocalPreprocessorOptions([]);
     }
 
+    setLocalDetectedArtifacts({
+      encoder: nextEncOptions,
+      decoder: nextDecOptions,
+      tokenizers: dedupedTokenizer,
+      preprocessors: dedupedPreprocessor,
+    });
+
+    console.log('[LocalFolder] Detected artifacts', {
+      encoder: nextEncOptions,
+      decoder: nextDecOptions,
+      tokenizers: dedupedTokenizer,
+      preprocessors: dedupedPreprocessor,
+    });
     setStatus(`Local folder selected (${entries.length} files)`);
+  }
+
+  async function restorePersistedLocalFolder({ requestPermission = false } = {}) {
+    if (!localHandlePersistenceSupported) return false;
+    try {
+      const dirHandle = await readPersistedDirectoryHandle();
+      if (!dirHandle) {
+        setHasPersistedLocalHandle(false);
+        setNeedsLocalHandleReconnect(false);
+        return false;
+      }
+
+      setHasPersistedLocalHandle(true);
+      const queryState = typeof dirHandle.queryPermission === 'function'
+        ? await dirHandle.queryPermission({ mode: 'read' })
+        : 'granted';
+
+      let permissionState = queryState;
+      if (permissionState !== 'granted' && requestPermission && typeof dirHandle.requestPermission === 'function') {
+        permissionState = await dirHandle.requestPermission({ mode: 'read' });
+      }
+
+      if (permissionState !== 'granted') {
+        setNeedsLocalHandleReconnect(true);
+        console.log('[LocalFolder] Persisted folder found but permission is not granted yet');
+        return false;
+      }
+
+      console.log('[LocalFolder] Restoring persisted directory handle', { name: dirHandle.name });
+      const entries = await collectDirectoryFilesRecursive(dirHandle);
+      applyLocalEntries(entries, dirHandle.name || '');
+      setNeedsLocalHandleReconnect(false);
+      setStatus(`Restored local folder "${dirHandle.name || ''}"`);
+      return true;
+    } catch (error) {
+      console.warn('[LocalFolder] Failed to restore persisted handle, clearing it', error);
+      try {
+        await clearPersistedDirectoryHandle();
+      } catch {}
+      setHasPersistedLocalHandle(false);
+      setNeedsLocalHandleReconnect(false);
+      return false;
+    }
   }
 
   async function pickLocalModelFolder() {
     try {
+      console.log('[LocalFolder] Folder selection requested');
       if (typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function') {
         const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+        console.log('[LocalFolder] Directory handle acquired', { name: dirHandle.name });
         const entries = await collectDirectoryFilesRecursive(dirHandle);
         applyLocalEntries(entries, dirHandle.name || '');
+        if (localHandlePersistenceSupported) {
+          try {
+            await persistDirectoryHandle(dirHandle);
+            setHasPersistedLocalHandle(true);
+            setNeedsLocalHandleReconnect(false);
+            console.log('[LocalFolder] Persisted directory handle for future visits');
+          } catch (persistError) {
+            console.warn('[LocalFolder] Could not persist directory handle', persistError);
+          }
+        }
         return;
       }
 
       if (modelFolderInputRef.current) {
         modelFolderInputRef.current.click();
+        setStatus('Directory-handle persistence is unavailable in this browser. Folder will need to be reselected next visit.');
         return;
       }
 
@@ -495,6 +655,7 @@ export default function App() {
   function handleLocalFolderInput(event) {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
+    console.log('[LocalFolder] Folder input fallback selected files', { count: files.length });
     const entries = files.map((file) => {
       const relPath = normalizeRelPath(file.webkitRelativePath || file.name);
       return {
@@ -505,7 +666,17 @@ export default function App() {
     });
     const folderName = entries[0]?.path?.split('/')?.[0] || '';
     applyLocalEntries(entries, folderName);
+    if (!localHandlePersistenceSupported) {
+      setStatus(`Local folder selected (${entries.length} files). This browser cannot persist folder access; reselect next visit.`);
+    }
     event.target.value = '';
+  }
+
+  async function reconnectPersistedFolder() {
+    const restored = await restorePersistedLocalFolder({ requestPermission: true });
+    if (!restored) {
+      setStatus('Could not restore saved folder access. Please choose folder again.');
+    }
   }
 
   // Fetch random audio sample from HuggingFace speech dataset
@@ -590,6 +761,7 @@ export default function App() {
 
   async function loadModel() {
     const isLocalSource = modelSource === MODEL_SOURCE_OPTIONS.LOCAL;
+    setIsModelLoading(true);
     setStatus(isLocalSource ? 'Preparing local model…' : 'Downloading model…');
     setProgressText('');
     setProgressPct(isLocalSource ? null : 0);
@@ -602,6 +774,7 @@ export default function App() {
       localModelBlobUrlsRef.current = [];
 
       if (isLocalSource) {
+        console.log('[LocalFolder] Starting model load from local artifacts');
         if (!localEntries.length) {
           throw new Error('Pick a local model folder first.');
         }
@@ -618,15 +791,22 @@ export default function App() {
         const encoderEntry = findLocalEntry(localEntries, encoderName);
         const decoderEntry = findLocalEntry(localEntries, decoderName);
         const tokenizerEntry = findLocalEntry(localEntries, localTokenizerName);
+        console.log('[LocalFolder] Selected artifacts', {
+          encoder: encoderName,
+          decoder: decoderName,
+          tokenizer: localTokenizerName,
+          preprocessorBackend,
+          preprocessor: preprocessorBackend === 'onnx' ? `${preprocessor}.onnx` : null,
+        });
 
         if (!encoderEntry) throw new Error(`Missing encoder file: ${encoderName}`);
         if (!decoderEntry) throw new Error(`Missing decoder file: ${decoderName}`);
         if (!tokenizerEntry) throw new Error(`Missing tokenizer file: ${localTokenizerName}`);
 
         const cfg = {
-          encoderUrl: toBlobUrl(encoderEntry.file),
-          decoderUrl: toBlobUrl(decoderEntry.file),
-          tokenizerUrl: toBlobUrl(tokenizerEntry.file),
+          encoderUrl: toBlobUrl(await getEntryFile(encoderEntry)),
+          decoderUrl: toBlobUrl(await getEntryFile(decoderEntry)),
+          tokenizerUrl: toBlobUrl(await getEntryFile(tokenizerEntry)),
           filenames: {
             encoder: encoderEntry.basename,
             decoder: decoderEntry.basename,
@@ -643,25 +823,28 @@ export default function App() {
           if (!preprocessorEntry) {
             throw new Error(`Missing preprocessor file: ${preprocessorName} (switch to JS preprocessor or add file to folder).`);
           }
-          cfg.preprocessorUrl = toBlobUrl(preprocessorEntry.file);
+          cfg.preprocessorUrl = toBlobUrl(await getEntryFile(preprocessorEntry));
         }
 
         const encoderDataEntry = findLocalEntry(localEntries, `${encoderEntry.basename}.data`);
         if (encoderDataEntry) {
-          cfg.encoderDataUrl = toBlobUrl(encoderDataEntry.file);
+          cfg.encoderDataUrl = toBlobUrl(await getEntryFile(encoderDataEntry));
         }
         const decoderDataEntry = findLocalEntry(localEntries, `${decoderEntry.basename}.data`);
         if (decoderDataEntry) {
-          cfg.decoderDataUrl = toBlobUrl(decoderDataEntry.file);
+          cfg.decoderDataUrl = toBlobUrl(await getEntryFile(decoderDataEntry));
         }
 
         setStatus('Compiling model…');
         setProgressText('Compiling local model artifacts');
         setProgressPct(null);
 
+        console.log('[LocalFolder] Calling ParakeetModel.fromUrls with local blob URLs');
         modelRef.current = await ParakeetModel.fromUrls(cfg);
         localModelBlobUrlsRef.current = createdBlobUrls;
+        console.log('[LocalFolder] Model sessions created from local artifacts');
       } else {
+      console.log('[Hub] Starting model load from HuggingFace');
       const progressCallback = ({ loaded, total, file }) => {
         const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
         setProgressText(`${file}: ${pct}%`);
@@ -699,10 +882,12 @@ export default function App() {
       });
 
       modelRef.current = modelLoadResult.model;
+      console.log('[Hub] Model sessions created from HuggingFace artifacts');
       }
 
       setStatus('Verifying…');
       setProgressText('Running test transcription');
+      console.log('[LoadModel] Running warm-up verification transcription');
       const expectedText = 'it is not life as we know or understand it';
 
       try {
@@ -736,6 +921,8 @@ export default function App() {
     } catch (e) {
       console.error(e);
       setStatus(`Failed: ${e.message}`);
+    } finally {
+      setIsModelLoading(false);
     }
   }
 
@@ -904,18 +1091,49 @@ export default function App() {
                       onChange={handleLocalFolderInput}
                       className="hidden"
                     />
-                    <button
-                      onClick={pickLocalModelFolder}
-                      disabled={isLoading || isModelReady}
-                      className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-medium py-2.5 px-4 rounded-lg transition-all border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Choose Local Model Folder
-                    </button>
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                      Local Model Folder
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200 truncate">
+                        {localFolderName || 'No folder selected'}
+                      </div>
+                      <button
+                        onClick={pickLocalModelFolder}
+                        disabled={isLoading || isModelReady}
+                        title="Browse local model folder"
+                        className="h-[38px] w-[38px] flex items-center justify-center rounded-lg bg-yellow-400 hover:bg-yellow-500 text-gray-900 border border-yellow-500 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-icons-outlined text-lg">folder_open</span>
+                      </button>
+                    </div>
+                    {localHandlePersistenceSupported && hasPersistedLocalHandle && needsLocalHandleReconnect && (
+                      <button
+                        onClick={reconnectPersistedFolder}
+                        disabled={isLoading || isModelReady}
+                        className="w-full bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-100 font-medium py-2 px-4 rounded-lg transition-all border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Restore Saved Folder
+                      </button>
+                    )}
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {localEntries.length
                         ? `Selected ${localEntries.length} files${localFolderName ? ` from "${localFolderName}"` : ''}.`
                         : 'Pick a folder containing encoder/decoder ONNX files and tokenizer text.'}
                     </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {localHandlePersistenceSupported
+                        ? 'Folder access can be persisted in this browser (you may be asked permission on revisit).'
+                        : 'This browser cannot persist folder access for local models. User must reselect folder on next visit.'}
+                    </p>
+                    {localEntries.length > 0 && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                        <p>Encoder dtypes: {localDetectedArtifacts.encoder.length ? localDetectedArtifacts.encoder.join(', ') : 'none'}</p>
+                        <p>Decoder dtypes: {localDetectedArtifacts.decoder.length ? localDetectedArtifacts.decoder.join(', ') : 'none'}</p>
+                        <p>Tokenizers: {localDetectedArtifacts.tokenizers.length ? localDetectedArtifacts.tokenizers.join(', ') : 'none'}</p>
+                        <p>Preprocessors: {localDetectedArtifacts.preprocessors.length ? localDetectedArtifacts.preprocessors.join(', ') : 'none'}</p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {modelSource === MODEL_SOURCE_OPTIONS.HUGGINGFACE && (
