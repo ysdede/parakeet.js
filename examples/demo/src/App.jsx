@@ -610,7 +610,9 @@ export default function App() {
       console.warn('[LocalFolder] Failed to restore persisted handle, clearing it', error);
       try {
         await clearPersistedDirectoryHandle();
-      } catch {}
+      } catch (clearError) {
+        console.warn('[LocalFolder] Failed to clear persisted handle', clearError);
+      }
       setHasPersistedLocalHandle(false);
       setNeedsLocalHandleReconnect(false);
       return false;
@@ -786,103 +788,110 @@ export default function App() {
           return url;
         };
 
-        const encoderName = quantizedModelName('encoder-model', encoderQuant);
-        const decoderName = quantizedModelName('decoder_joint-model', decoderQuant);
-        const encoderEntry = findLocalEntry(localEntries, encoderName);
-        const decoderEntry = findLocalEntry(localEntries, decoderName);
-        const tokenizerEntry = findLocalEntry(localEntries, localTokenizerName);
-        console.log('[LocalFolder] Selected artifacts', {
-          encoder: encoderName,
-          decoder: decoderName,
-          tokenizer: localTokenizerName,
-          preprocessorBackend,
-          preprocessor: preprocessorBackend === 'onnx' ? `${preprocessor}.onnx` : null,
-        });
+        try {
+          const encoderName = quantizedModelName('encoder-model', encoderQuant);
+          const decoderName = quantizedModelName('decoder_joint-model', decoderQuant);
+          const encoderEntry = findLocalEntry(localEntries, encoderName);
+          const decoderEntry = findLocalEntry(localEntries, decoderName);
+          const tokenizerEntry = findLocalEntry(localEntries, localTokenizerName);
+          console.log('[LocalFolder] Selected artifacts', {
+            encoder: encoderName,
+            decoder: decoderName,
+            tokenizer: localTokenizerName,
+            preprocessorBackend,
+            preprocessor: preprocessorBackend === 'onnx' ? `${preprocessor}.onnx` : null,
+          });
 
-        if (!encoderEntry) throw new Error(`Missing encoder file: ${encoderName}`);
-        if (!decoderEntry) throw new Error(`Missing decoder file: ${decoderName}`);
-        if (!tokenizerEntry) throw new Error(`Missing tokenizer file: ${localTokenizerName}`);
+          if (!encoderEntry) throw new Error(`Missing encoder file: ${encoderName}`);
+          if (!decoderEntry) throw new Error(`Missing decoder file: ${decoderName}`);
+          if (!tokenizerEntry) throw new Error(`Missing tokenizer file: ${localTokenizerName}`);
 
-        const cfg = {
-          encoderUrl: toBlobUrl(await getEntryFile(encoderEntry)),
-          decoderUrl: toBlobUrl(await getEntryFile(decoderEntry)),
-          tokenizerUrl: toBlobUrl(await getEntryFile(tokenizerEntry)),
-          filenames: {
-            encoder: encoderEntry.basename,
-            decoder: decoderEntry.basename,
-          },
-          preprocessorBackend,
-          backend,
-          verbose: verboseLog,
-          cpuThreads,
+          const cfg = {
+            encoderUrl: toBlobUrl(await getEntryFile(encoderEntry)),
+            decoderUrl: toBlobUrl(await getEntryFile(decoderEntry)),
+            tokenizerUrl: toBlobUrl(await getEntryFile(tokenizerEntry)),
+            filenames: {
+              encoder: encoderEntry.basename,
+              decoder: decoderEntry.basename,
+            },
+            preprocessorBackend,
+            backend,
+            verbose: verboseLog,
+            cpuThreads,
+          };
+
+          if (preprocessorBackend === 'onnx') {
+            const preprocessorName = `${preprocessor}.onnx`;
+            const preprocessorEntry = findLocalEntry(localEntries, preprocessorName);
+            if (!preprocessorEntry) {
+              throw new Error(`Missing preprocessor file: ${preprocessorName} (switch to JS preprocessor or add file to folder).`);
+            }
+            cfg.preprocessorUrl = toBlobUrl(await getEntryFile(preprocessorEntry));
+          }
+
+          const encoderDataEntry = findLocalEntry(localEntries, `${encoderEntry.basename}.data`);
+          if (encoderDataEntry) {
+            cfg.encoderDataUrl = toBlobUrl(await getEntryFile(encoderDataEntry));
+          }
+          const decoderDataEntry = findLocalEntry(localEntries, `${decoderEntry.basename}.data`);
+          if (decoderDataEntry) {
+            cfg.decoderDataUrl = toBlobUrl(await getEntryFile(decoderDataEntry));
+          }
+
+          setStatus('Compiling model…');
+          setProgressText('Compiling local model artifacts');
+          setProgressPct(null);
+
+          console.log('[LocalFolder] Calling ParakeetModel.fromUrls with local blob URLs');
+          modelRef.current = await ParakeetModel.fromUrls(cfg);
+          localModelBlobUrlsRef.current = createdBlobUrls;
+          console.log('[LocalFolder] Model sessions created from local artifacts');
+        } catch (localLoadError) {
+          for (const url of createdBlobUrls) {
+            URL.revokeObjectURL(url);
+          }
+          throw localLoadError;
+        }
+      } else {
+        console.log('[Hub] Starting model load from HuggingFace');
+        const progressCallback = ({ loaded, total, file }) => {
+          const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+          setProgressText(`${file}: ${pct}%`);
+          setProgressPct(pct);
         };
 
-        if (preprocessorBackend === 'onnx') {
-          const preprocessorName = `${preprocessor}.onnx`;
-          const preprocessorEntry = findLocalEntry(localEntries, preprocessorName);
-          if (!preprocessorEntry) {
-            throw new Error(`Missing preprocessor file: ${preprocessorName} (switch to JS preprocessor or add file to folder).`);
-          }
-          cfg.preprocessorUrl = toBlobUrl(await getEntryFile(preprocessorEntry));
-        }
+        const modelLoadResult = await loadModelWithFallback({
+          repoIdOrModelKey: selectedModel,
+          options: {
+            revision: modelRevision,
+            encoderQuant,
+            decoderQuant,
+            preprocessor,
+            preprocessorBackend,
+            backend,
+            progress: progressCallback,
+            verbose: verboseLog,
+            cpuThreads,
+          },
+          getParakeetModelFn: getParakeetModel,
+          fromUrlsFn: ParakeetModel.fromUrls,
+          onBeforeCompile: ({ attempt, modelUrls }) => {
+            const resolvedQuant = formatResolvedQuantization(modelUrls.quantisation);
+            console.log(`[App] ${resolvedQuant}`);
 
-        const encoderDataEntry = findLocalEntry(localEntries, `${encoderEntry.basename}.data`);
-        if (encoderDataEntry) {
-          cfg.encoderDataUrl = toBlobUrl(await getEntryFile(encoderDataEntry));
-        }
-        const decoderDataEntry = findLocalEntry(localEntries, `${decoderEntry.basename}.data`);
-        if (decoderDataEntry) {
-          cfg.decoderDataUrl = toBlobUrl(await getEntryFile(decoderDataEntry));
-        }
+            if (attempt === 2) {
+              setStatus('Retrying compile with FP32…');
+              setProgressText(`${resolvedQuant} · retrying after FP16 compile failure`);
+            } else {
+              setStatus('Compiling model…');
+              setProgressText(`${resolvedQuant} · compiling may take ~10s on first load`);
+            }
+            setProgressPct(null);
+          },
+        });
 
-        setStatus('Compiling model…');
-        setProgressText('Compiling local model artifacts');
-        setProgressPct(null);
-
-        console.log('[LocalFolder] Calling ParakeetModel.fromUrls with local blob URLs');
-        modelRef.current = await ParakeetModel.fromUrls(cfg);
-        localModelBlobUrlsRef.current = createdBlobUrls;
-        console.log('[LocalFolder] Model sessions created from local artifacts');
-      } else {
-      console.log('[Hub] Starting model load from HuggingFace');
-      const progressCallback = ({ loaded, total, file }) => {
-        const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
-        setProgressText(`${file}: ${pct}%`);
-        setProgressPct(pct);
-      };
-
-      const modelLoadResult = await loadModelWithFallback({
-        repoIdOrModelKey: selectedModel,
-        options: {
-          revision: modelRevision,
-          encoderQuant,
-          decoderQuant,
-          preprocessor,
-          preprocessorBackend,
-          backend,
-          progress: progressCallback,
-          verbose: verboseLog,
-          cpuThreads,
-        },
-        getParakeetModelFn: getParakeetModel,
-        fromUrlsFn: ParakeetModel.fromUrls,
-        onBeforeCompile: ({ attempt, modelUrls }) => {
-          const resolvedQuant = formatResolvedQuantization(modelUrls.quantisation);
-          console.log(`[App] ${resolvedQuant}`);
-
-          if (attempt === 2) {
-            setStatus('Retrying compile with FP32…');
-            setProgressText(`${resolvedQuant} · retrying after FP16 compile failure`);
-          } else {
-            setStatus('Compiling model…');
-            setProgressText(`${resolvedQuant} · compiling may take ~10s on first load`);
-          }
-          setProgressPct(null);
-        },
-      });
-
-      modelRef.current = modelLoadResult.model;
-      console.log('[Hub] Model sessions created from HuggingFace artifacts');
+        modelRef.current = modelLoadResult.model;
+        console.log('[Hub] Model sessions created from HuggingFace artifacts');
       }
 
       setStatus('Verifying…');
