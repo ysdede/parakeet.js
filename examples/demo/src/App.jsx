@@ -565,6 +565,10 @@ export default function App() {
       setPreprocessor((current) => (dedupedPreprocessor.includes(current) ? current : dedupedPreprocessor[0]));
     } else {
       setLocalPreprocessorOptions([]);
+      if (preprocessorBackend === 'onnx') {
+        setPreprocessorBackend('js');
+        console.log('[LocalFolder] No local nemo*.onnx detected; falling back preprocessorBackend to js');
+      }
     }
 
     setLocalDetectedArtifacts({
