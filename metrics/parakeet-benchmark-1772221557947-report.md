@@ -10,7 +10,7 @@
 
 - **Decode (WASM)** is the **largest share of total time** (~46%), followed by Encode (WebGPU) (~42%) and Preprocess (~11%).
 - **Times are not linear in audio duration:** decode time scales with output length (number of decoder steps/tokens) as well as encoder length. Same-duration clips show large decode variance (e.g. 24–26 s bucket: 95–200 ms decode).
-- **RTF** (real-time factor) is high on average (~73×) but **drops for longer clips** (slope +1.6 with duration; longer clips have lower RTF in practice because decode dominates and scales with token count).
+- **RTF** (real-time factor) is high on average (~73×) and in this run **increases with clip duration** (slope +1.6), while still showing high variance.
 
 ---
 
