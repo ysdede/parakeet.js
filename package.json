@@ -45,6 +45,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify:frame-copy": "node tests/verify_copy.mjs",
+    "bench:frame-copy": "node tests/bench_ops.mjs",
     "docs:clean": "node -e \"require('fs').rmSync('.typedoc-site', { recursive: true, force: true })\"",
     "docs:api": "typedoc --options typedoc.json",
     "docs:build": "npm run docs:clean && npm run docs:api"

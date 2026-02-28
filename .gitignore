@@ -21,3 +21,4 @@ scripts/
 *OPTIMIZATION*.md
 audio/
 *.pyc
+traces/

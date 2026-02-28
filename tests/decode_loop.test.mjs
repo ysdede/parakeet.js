@@ -24,13 +24,14 @@ function createMockTokenizer() {
   };
 }
 
-function createModelForDecodeLoop({ tEnc, joinerRun }) {
+function createModelForDecodeLoop({ tEnc, joinerRun, encoderData = null }) {
   const D = 4;
+  const encoded = encoderData || new Float32Array(D * tEnc).fill(0.1);
   const encoderSession = {
     run: vi.fn().mockResolvedValue({
       outputs: {
         dims: [1, D, tEnc],
-        data: new Float32Array(D * tEnc).fill(0.1),
+        data: encoded,
         dispose: vi.fn(),
       },
     }),
@@ -163,5 +164,43 @@ describe('ParakeetModel decode loop', () => {
     expect(result.utterance_text).toBe('AA');
     expect(result.frameIndices.every((i) => i <= 2)).toBe(true);
     expect(joinerRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('copies the correct transposed frame slice into reusable encoder buffer each step', async () => {
+    const tEnc = 3;
+    const encoderData = new Float32Array([
+      10, 11, 12, // d=0 across time
+      20, 21, 22, // d=1 across time
+      30, 31, 32, // d=2 across time
+      40, 41, 42, // d=3 across time
+    ]);
+
+    const model = createModelForDecodeLoop({
+      tEnc,
+      joinerRun: vi.fn(),
+      encoderData,
+    });
+
+    const seenFrames = [];
+    model._runCombinedStep = vi.fn(async (encTensor) => {
+      seenFrames.push(Array.from(encTensor.data));
+      return {
+        tokenLogits: new Float32Array([9.0, 0.1, 0.1]), // blank
+        step: 1, // advance one frame per iteration
+        newState: null,
+        _logitsTensor: { dispose: vi.fn() },
+      };
+    });
+
+    await model.transcribe(new Float32Array(16000), 16000, {
+      enableProfiling: false,
+    });
+
+    expect(seenFrames).toEqual([
+      [10, 20, 30, 40],
+      [11, 21, 31, 41],
+      [12, 22, 32, 42],
+    ]);
+    expect(model._runCombinedStep).toHaveBeenCalledTimes(tEnc);
   });
 });
