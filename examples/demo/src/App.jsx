@@ -363,7 +363,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedModel]);
+  }, [selectedModel, modelSource]);
 
   // Inspect selected repo+branch files and filter quantization options accordingly.
   useEffect(() => {
@@ -437,16 +437,22 @@ export default function App() {
     cpuThreads,
   ]);
 
-  // Cleanup audio URL on unmount
+  // Cleanup audio URL when it changes and on unmount.
   useEffect(() => {
     return () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
+  // Cleanup model blob URLs only on unmount.
+  useEffect(() => {
+    return () => {
       for (const url of localModelBlobUrlsRef.current) {
         URL.revokeObjectURL(url);
       }
       localModelBlobUrlsRef.current = [];
     };
-  }, [audioUrl]);
+  }, []);
 
   // Toggle dark mode
   useEffect(() => {
@@ -545,6 +551,9 @@ export default function App() {
     if (dedupedTokenizer.length) {
       setLocalTokenizerOptions(dedupedTokenizer);
       setLocalTokenizerName((current) => (dedupedTokenizer.includes(current) ? current : dedupedTokenizer[0]));
+    } else {
+      setLocalTokenizerOptions([]);
+      setLocalTokenizerName('');
     }
 
     const preprocessorCandidates = [];
@@ -559,8 +568,8 @@ export default function App() {
     }
 
     setLocalDetectedArtifacts({
-      encoder: nextEncOptions,
-      decoder: nextDecOptions,
+      encoder: encOptions,
+      decoder: decOptions,
       tokenizers: dedupedTokenizer,
       preprocessors: dedupedPreprocessor,
     });
