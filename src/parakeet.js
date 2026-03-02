@@ -725,10 +725,21 @@ export class ParakeetModel {
       // Compute softmax denominator when confidences OR logProbs are requested
       if (returnConfidences || returnLogProbs) {
         const invTemp = 1.0 / temperature;
-        let sumExp = 0;
-        for (let i = 0; i < tokenLogits.length; i++) {
-          // Optimization: (logit/T) - maxVal = (logit - maxLogit) / T
-          // This avoids one division per item by using multiplication.
+        let s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+        let i = 0;
+        const len = tokenLogits.length;
+        // Optimization: (logit/T) - maxVal = (logit - maxLogit) / T
+        // This avoids one division per item by using multiplication.
+        // Optimization: unroll the accumulation loop 4x with independent accumulators
+        // This reduces loop overhead and improves instruction-level parallelism.
+        for (; i <= len - 4; i += 4) {
+          s0 += Math.exp((tokenLogits[i] - maxLogit) * invTemp);
+          s1 += Math.exp((tokenLogits[i+1] - maxLogit) * invTemp);
+          s2 += Math.exp((tokenLogits[i+2] - maxLogit) * invTemp);
+          s3 += Math.exp((tokenLogits[i+3] - maxLogit) * invTemp);
+        }
+        let sumExp = s0 + s1 + s2 + s3;
+        for (; i < len; i++) {
           sumExp += Math.exp((tokenLogits[i] - maxLogit) * invTemp);
         }
         confVal = 1 / sumExp;
