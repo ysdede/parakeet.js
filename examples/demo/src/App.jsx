@@ -106,33 +106,129 @@ function openLocalModelDb() {
 async function readPersistedDirectoryHandle() {
   const db = await openLocalModelDb();
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const closeDb = () => {
+      try {
+        db.close();
+      } catch {
+        // Ignore close errors.
+      }
+    };
+    const resolveOnce = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const rejectOnce = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
     const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readonly');
     const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
     const req = store.get(LOCAL_MODEL_DIR_KEY);
-    req.onerror = () => reject(new Error('Failed to read persisted folder handle'));
-    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to read persisted folder handle'));
+    };
+    req.onsuccess = () => {
+      closeDb();
+      resolveOnce(req.result || null);
+    };
+    tx.onabort = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to read persisted folder handle'));
+    };
+    tx.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to read persisted folder handle'));
+    };
   });
 }
 
 async function persistDirectoryHandle(dirHandle) {
   const db = await openLocalModelDb();
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const closeDb = () => {
+      try {
+        db.close();
+      } catch {
+        // Ignore close errors.
+      }
+    };
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const rejectOnce = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
     const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readwrite');
     const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
     const req = store.put(dirHandle, LOCAL_MODEL_DIR_KEY);
-    req.onerror = () => reject(new Error('Failed to persist folder handle'));
-    req.onsuccess = () => resolve();
+    req.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to persist folder handle'));
+    };
+    req.onsuccess = () => {
+      closeDb();
+      resolveOnce();
+    };
+    tx.onabort = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to persist folder handle'));
+    };
+    tx.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to persist folder handle'));
+    };
   });
 }
 
 async function clearPersistedDirectoryHandle() {
   const db = await openLocalModelDb();
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const closeDb = () => {
+      try {
+        db.close();
+      } catch {
+        // Ignore close errors.
+      }
+    };
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const rejectOnce = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
     const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readwrite');
     const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
     const req = store.delete(LOCAL_MODEL_DIR_KEY);
-    req.onerror = () => reject(new Error('Failed to clear persisted folder handle'));
-    req.onsuccess = () => resolve();
+    req.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to clear persisted folder handle'));
+    };
+    req.onsuccess = () => {
+      closeDb();
+      resolveOnce();
+    };
+    tx.onabort = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to clear persisted folder handle'));
+    };
+    tx.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to clear persisted folder handle'));
+    };
   });
 }
 
@@ -579,8 +675,8 @@ export default function App() {
     });
 
     console.log('[LocalFolder] Detected artifacts', {
-      encoder: nextEncOptions,
-      decoder: nextDecOptions,
+      encoder: encOptions,
+      decoder: decOptions,
       tokenizers: dedupedTokenizer,
       preprocessors: dedupedPreprocessor,
     });
@@ -776,6 +872,12 @@ export default function App() {
 
   async function loadModel() {
     const isLocalSource = modelSource === MODEL_SOURCE_OPTIONS.LOCAL;
+    const cleanupLocalBlobUrls = () => {
+      for (const url of localModelBlobUrlsRef.current) {
+        URL.revokeObjectURL(url);
+      }
+      localModelBlobUrlsRef.current = [];
+    };
     setIsModelLoading(true);
     setStatus(isLocalSource ? 'Preparing local model…' : 'Downloading model…');
     setProgressText('');
@@ -783,10 +885,7 @@ export default function App() {
     console.time('LoadModel');
 
     try {
-      for (const url of localModelBlobUrlsRef.current) {
-        URL.revokeObjectURL(url);
-      }
-      localModelBlobUrlsRef.current = [];
+      cleanupLocalBlobUrls();
 
       if (isLocalSource) {
         console.log('[LocalFolder] Starting model load from local artifacts');
@@ -931,10 +1030,16 @@ export default function App() {
         } else {
           console.error(`[App] Verification failed! Expected: "${expectedText}", Got: "${utterance_text}"`);
           setStatus('Verification failed');
+          setModelLoaded(false);
+          modelRef.current = null;
+          if (isLocalSource) cleanupLocalBlobUrls();
         }
       } catch (err) {
         console.error('[App] Warm-up failed', err);
         setStatus('Warm-up failed');
+        setModelLoaded(false);
+        modelRef.current = null;
+        if (isLocalSource) cleanupLocalBlobUrls();
       }
 
       console.timeEnd('LoadModel');
@@ -943,6 +1048,8 @@ export default function App() {
     } catch (e) {
       console.error(e);
       setStatus(`Failed: ${e.message}`);
+      setModelLoaded(false);
+      modelRef.current = null;
     } finally {
       setIsModelLoading(false);
     }

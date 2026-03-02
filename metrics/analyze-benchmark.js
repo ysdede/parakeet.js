@@ -42,7 +42,7 @@ function p50(a) {
 }
 function p95(a) {
   const s = [...a].sort((x, y) => x - y);
-  return s[Math.floor(s.length * 0.95)];
+  return s[Math.floor((s.length - 1) * 0.95)];
 }
 
 // Linear regression: y ≈ a*x + b, return { a, b, r2 }
