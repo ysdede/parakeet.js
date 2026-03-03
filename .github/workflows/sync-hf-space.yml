@@ -1,0 +1,165 @@
+name: Sync Demo to HF Space
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "examples/demo/**"
+      - ".github/workflows/sync-hf-space.yml"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create HF export
+        run: |
+          set -euo pipefail
+          rm -rf hf_export && mkdir -p hf_export
+
+          # Copy demo source (exclude dev artifacts)
+          rsync -a --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='public/assets' \
+            examples/demo/ hf_export/
+
+          # ── 1) Remove GH-only files ────────────────────────────────
+          rm -rf hf_export/scripts
+          rm -f hf_export/package-lock.json
+
+          # ── 2) Remove COI serviceworker (HF has real CORS headers) ──
+          sed -i '/<script src="coi-serviceworker.js"><\/script>/d' hf_export/index.html
+          rm -f hf_export/public/coi-serviceworker.js
+
+          echo "✅ HF export ready"
+          find hf_export -maxdepth 2 -not -path '*/node_modules/*'
+
+      - name: Write HF-specific files
+        run: |
+          # ── README.md with HF YAML frontmatter ─────────────────────
+          cat > hf_export/README.md << 'READMEEOF'
+          ---
+          title: Parakeet.js Demo
+          emoji: 🦜
+          colorFrom: indigo
+          colorTo: blue
+          sdk: static
+          pinned: true
+          header: mini
+          fullWidth: true
+          app_build_command: npm run build
+          app_file: dist/index.html
+          license: mit
+          short_description: NVIDIA Parakeet speech recognition for the browser
+          models:
+          - ysdede/parakeet-tdt-0.6b-v2-onnx
+          - ysdede/parakeet-tdt-0.6b-v3-onnx
+          datasets:
+          - mozilla-foundation/common_voice_13_0
+          tags:
+          - parakeet-js
+          - parakeet
+          - onnx
+          - webgpu
+          - wasm
+          - asr
+          - speech-recognition
+          - nvidia
+          custom_headers:
+            cross-origin-embedder-policy: require-corp
+            cross-origin-opener-policy: same-origin
+            cross-origin-resource-policy: cross-origin
+          preload_from_hub:
+          - ysdede/parakeet-tdt-0.6b-v2-onnx
+          - ysdede/parakeet-tdt-0.6b-v3-onnx
+          ---
+
+          # 🦜 Parakeet.js Demo
+
+          Browser-based speech recognition with NVIDIA Parakeet ASR models (WebGPU/WASM).
+
+          Synced from [`ysdede/parakeet.js/examples/demo`](https://github.com/ysdede/parakeet.js/tree/master/examples/demo).
+
+          - [GitHub Repository](https://github.com/ysdede/parakeet.js)
+          - [npm Package](https://www.npmjs.com/package/parakeet.js)
+          - [API Documentation](https://ysdede.github.io/parakeet.js/api/)
+          READMEEOF
+
+          # ── vite.config.js (NPM-only, no local-source aliasing) ────
+          cat > hf_export/vite.config.js << 'VITEEOF'
+          import { defineConfig } from 'vite';
+          import react from '@vitejs/plugin-react';
+          import fs from 'fs';
+          import path from 'path';
+
+          function readJson(filePath) {
+            try {
+              return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            } catch {
+              return null;
+            }
+          }
+
+          const npmPkg = readJson(path.resolve(__dirname, 'node_modules/parakeet.js/package.json'));
+          const parakeetVersion = npmPkg?.version || 'unknown';
+
+          export default defineConfig({
+            plugins: [react()],
+            server: {
+              port: 3000,
+              headers: {
+                'Cross-Origin-Opener-Policy': 'same-origin',
+                'Cross-Origin-Embedder-Policy': 'require-corp',
+              },
+            },
+            define: {
+              global: 'globalThis',
+              __PARAKEET_VERSION__: JSON.stringify(parakeetVersion),
+              __PARAKEET_SOURCE__: JSON.stringify('npm'),
+            },
+          });
+          VITEEOF
+
+          # ── package.json (no cross-env / dev:local scripts) ─────────
+          cat > hf_export/package.json << 'PKGEOF'
+          {
+            "name": "parakeet-js-demo",
+            "version": "1.1.0",
+            "private": true,
+            "type": "module",
+            "scripts": {
+              "dev": "vite",
+              "build": "vite build",
+              "preview": "vite preview"
+            },
+            "dependencies": {
+              "parakeet.js": "^1.4.0",
+              "react": "^18.2.0",
+              "react-dom": "^18.2.0"
+            },
+            "devDependencies": {
+              "@tailwindcss/forms": "^0.5.0",
+              "@tailwindcss/typography": "^0.5.0",
+              "@vitejs/plugin-react": "^4.0.0",
+              "autoprefixer": "^10.4.0",
+              "postcss": "^8.4.0",
+              "tailwindcss": "^3.4.0",
+              "vite": "^7.3.1"
+            }
+          }
+          PKGEOF
+
+      - name: Push to HF Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          cd hf_export
+          git init
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Sync from GitHub (${GITHUB_SHA::7})"
+          git branch -M main
+          git remote add space "https://ysdede:${HF_TOKEN}@huggingface.co/spaces/ysdede/parakeet.js-demo"
+          git push --force space main

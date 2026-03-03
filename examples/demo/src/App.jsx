@@ -5,8 +5,8 @@ import {
   fetchModelFiles,
   getAvailableQuantModes,
   pickPreferredQuant,
-} from '../../shared/modelSelection.js';
-import { formatResolvedQuantization, loadModelWithFallback } from '../../shared/modelLoader.js';
+} from './shared/modelSelection.js';
+import { formatResolvedQuantization, loadModelWithFallback } from './shared/modelLoader.js';
 import './App.css';
 
 const SETTINGS_STORAGE_KEY = 'parakeet.demo.settings.v1';
@@ -17,6 +17,11 @@ const MODEL_SOURCE_OPTIONS = {
   HUGGINGFACE: 'huggingface',
   LOCAL: 'local',
 };
+
+// showDirectoryPicker is blocked in cross-origin iframes (e.g. HF Spaces)
+const isInIframe = (() => {
+  try { return window.self !== window.top; } catch { return true; }
+})();
 const QUANT_TO_FILENAME = {
   fp32: '.onnx',
   fp16: '.fp16.onnx',
@@ -92,7 +97,10 @@ async function getEntryFile(entry) {
 }
 
 function supportsDirectoryHandlePersistence() {
-  return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function' && typeof indexedDB !== 'undefined';
+  if (typeof window === 'undefined' || typeof window.showDirectoryPicker !== 'function' || typeof indexedDB === 'undefined') return false;
+  // showDirectoryPicker is blocked in cross-origin iframes (e.g. HF Spaces)
+  try { if (window.self !== window.top) return false; } catch { return false; }
+  return true;
 }
 
 function openLocalModelDb() {
@@ -238,6 +246,43 @@ async function clearPersistedDirectoryHandle() {
   });
 }
 
+function parseThemeValue(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'dark') return true;
+  if (normalized === 'light') return false;
+  return null;
+}
+
+function getHfThemeFromQuery() {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  return parseThemeValue(params.get('__theme') || params.get('theme') || params.get('color'));
+}
+
+function getInitialDarkMode(settings) {
+  const hfTheme = getHfThemeFromQuery();
+  if (hfTheme !== null) return hfTheme;
+  if (typeof settings.darkMode === 'boolean') return settings.darkMode;
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return false;
+}
+
+function getThemeFromMessage(data) {
+  if (!data) return null;
+  if (typeof data === 'string') return parseThemeValue(data);
+  if (typeof data !== 'object') return null;
+
+  return (
+    parseThemeValue(data.theme) ??
+    parseThemeValue(data.colorMode) ??
+    parseThemeValue(data.mode) ??
+    parseThemeValue(data?.payload?.theme)
+  );
+}
+
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -364,7 +409,7 @@ export default function App() {
   const initialModelSource = initialSettings.modelSource;
   const resolvedInitialModel = MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2';
   const [modelSource, setModelSource] = useState(
-    initialModelSource === MODEL_SOURCE_OPTIONS.LOCAL
+    initialModelSource === MODEL_SOURCE_OPTIONS.LOCAL && !isInIframe
       ? MODEL_SOURCE_OPTIONS.LOCAL
       : MODEL_SOURCE_OPTIONS.HUGGINGFACE
   );
@@ -412,7 +457,7 @@ export default function App() {
   );
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [darkMode, setDarkMode] = useState(Boolean(initialSettings.darkMode));
+  const [darkMode, setDarkMode] = useState(getInitialDarkMode(initialSettings));
   const [modelLoaded, setModelLoaded] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
@@ -550,12 +595,56 @@ export default function App() {
     }
   }, [darkMode]);
 
+  // Follow HF/parent theme when provided; otherwise fallback to system changes
+  // if user has no saved explicit theme preference.
+  useEffect(() => {
+    const hfTheme = getHfThemeFromQuery();
+    if (hfTheme !== null) {
+      setDarkMode(hfTheme);
+    }
+
+    const onMessage = (event) => {
+      const messageTheme = getThemeFromMessage(event?.data);
+      if (messageTheme !== null) {
+        setDarkMode(messageTheme);
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+
+    if (typeof window.matchMedia !== 'function') {
+      return () => window.removeEventListener('message', onMessage);
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const onMediaChange = (event) => {
+      if (getHfThemeFromQuery() !== null) return;
+      if (typeof initialSettings.darkMode === 'boolean') return;
+      setDarkMode(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', onMediaChange);
+    } else {
+      mediaQuery.addListener(onMediaChange);
+    }
+
+    return () => {
+      window.removeEventListener('message', onMessage);
+      if (typeof mediaQuery.removeEventListener === 'function') {
+        mediaQuery.removeEventListener('change', onMediaChange);
+      } else {
+        mediaQuery.removeListener(onMediaChange);
+      }
+    };
+  }, [initialSettings.darkMode]);
+
   // Restore persisted local folder handle when local source is active.
   useEffect(() => {
     let cancelled = false;
-    if (modelSource !== MODEL_SOURCE_OPTIONS.LOCAL) return () => {};
-    if (!localHandlePersistenceSupported) return () => {};
-    if (localEntries.length > 0) return () => {};
+    if (modelSource !== MODEL_SOURCE_OPTIONS.LOCAL) return () => { };
+    if (!localHandlePersistenceSupported) return () => { };
+    if (localEntries.length > 0) return () => { };
 
     (async () => {
       const restored = await restorePersistedLocalFolder({ requestPermission: false });
@@ -1003,7 +1092,7 @@ export default function App() {
 
       try {
         // Use GitHub raw URL for the test audio file
-        const audioUrl = './assets/life_Jim.wav';
+        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/life_Jim.wav';
         const audioBlob = await getCachedAudioFile(audioUrl, 'life_Jim.wav');
         const buf = await audioBlob.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });
@@ -1133,14 +1222,29 @@ export default function App() {
               <div>parakeet.js {parakeetVersion} ({parakeetSource})</div>
             </div>
           </div>
-          <button
-            className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            onClick={() => setDarkMode(!darkMode)}
-          >
-            <span className="material-icons-outlined text-gray-600 dark:text-gray-300">
-              brightness_4
-            </span>
-          </button>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/ysdede/parakeet.js"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center hover:opacity-80 transition-opacity"
+              title="View on GitHub"
+            >
+              <img
+                src="https://img.shields.io/github/stars/ysdede/parakeet.js?style=social"
+                alt="GitHub stars"
+                className="h-6"
+              />
+            </a>
+            <button
+              className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              onClick={() => setDarkMode(!darkMode)}
+            >
+              <span className="material-icons-outlined text-gray-600 dark:text-gray-300">
+                brightness_4
+              </span>
+            </button>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -1164,7 +1268,7 @@ export default function App() {
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
                       <option value={MODEL_SOURCE_OPTIONS.HUGGINGFACE}>HuggingFace</option>
-                      <option value={MODEL_SOURCE_OPTIONS.LOCAL}>Local folder</option>
+                      {!isInIframe && <option value={MODEL_SOURCE_OPTIONS.LOCAL}>Local folder</option>}
                     </select>
                     <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
                       expand_more
@@ -1174,28 +1278,28 @@ export default function App() {
 
                 {modelSource === MODEL_SOURCE_OPTIONS.HUGGINGFACE && (
                   <>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Model
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={selectedModel}
-                      onChange={e => handleModelChange(e.target.value)}
-                      disabled={isLoading || isModelReady}
-                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
-                    >
-                      {MODEL_OPTIONS.map(opt => (
-                        <option key={opt.key} value={opt.key}>
-                          {opt.displayName}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
-                      expand_more
-                    </span>
-                  </div>
-                </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Model
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={selectedModel}
+                          onChange={e => handleModelChange(e.target.value)}
+                          disabled={isLoading || isModelReady}
+                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                        >
+                          {MODEL_OPTIONS.map(opt => (
+                            <option key={opt.key} value={opt.key}>
+                              {opt.displayName}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                          expand_more
+                        </span>
+                      </div>
+                    </div>
                   </>
                 )}
 
