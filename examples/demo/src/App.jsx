@@ -1214,14 +1214,29 @@ export default function App() {
               <div>parakeet.js {parakeetVersion} ({parakeetSource})</div>
             </div>
           </div>
-          <button
-            className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            onClick={() => setDarkMode(!darkMode)}
-          >
-            <span className="material-icons-outlined text-gray-600 dark:text-gray-300">
-              brightness_4
-            </span>
-          </button>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/ysdede/parakeet.js"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center hover:opacity-80 transition-opacity"
+              title="View on GitHub"
+            >
+              <img
+                src="https://img.shields.io/github/stars/ysdede/parakeet.js?style=social"
+                alt="GitHub stars"
+                className="h-6"
+              />
+            </a>
+            <button
+              className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              onClick={() => setDarkMode(!darkMode)}
+            >
+              <span className="material-icons-outlined text-gray-600 dark:text-gray-300">
+                brightness_4
+              </span>
+            </button>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
