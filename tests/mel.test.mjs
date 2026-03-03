@@ -204,6 +204,44 @@ describe('createPaddedHannWindow', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('fft', () => {
+  it('should handle N=1 without out-of-bounds access', () => {
+    const n = 1;
+    const tw = precomputeTwiddles(n);
+    const re = new Float64Array([3.5]);
+    const im = new Float64Array([0]);
+    fft(re, im, n, tw);
+    expect(re[0]).toBeCloseTo(3.5, 10);
+    expect(im[0]).toBeCloseTo(0, 10);
+  });
+
+  it('should handle N=2 correctly', () => {
+    const n = 2;
+    const tw = precomputeTwiddles(n);
+    const re = new Float64Array([1, -1]);
+    const im = new Float64Array(n);
+    fft(re, im, n, tw);
+    expect(re[0]).toBeCloseTo(0, 10);
+    expect(im[0]).toBeCloseTo(0, 10);
+    expect(re[1]).toBeCloseTo(2, 10);
+    expect(im[1]).toBeCloseTo(0, 10);
+  });
+
+  it('should handle N=4 correctly', () => {
+    const n = 4;
+    const tw = precomputeTwiddles(n);
+    const re = new Float64Array([1, 2, 3, 4]);
+    const im = new Float64Array(n);
+    fft(re, im, n, tw);
+    expect(re[0]).toBeCloseTo(10, 10);
+    expect(im[0]).toBeCloseTo(0, 10);
+    expect(re[1]).toBeCloseTo(-2, 10);
+    expect(im[1]).toBeCloseTo(2, 10);
+    expect(re[2]).toBeCloseTo(-2, 10);
+    expect(im[2]).toBeCloseTo(0, 10);
+    expect(re[3]).toBeCloseTo(-2, 10);
+    expect(im[3]).toBeCloseTo(-2, 10);
+  });
+
   it('should handle DC signal (all ones)', () => {
     const n = 8;
     const tw = precomputeTwiddles(n);
