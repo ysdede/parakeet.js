@@ -21,10 +21,8 @@ jobs:
       contents: write
       
     steps:
-      - name: Checkout master
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: master
           
       - name: Setup Node.js
         uses: actions/setup-node@v4
