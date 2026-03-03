@@ -92,7 +92,10 @@ async function getEntryFile(entry) {
 }
 
 function supportsDirectoryHandlePersistence() {
-  return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function' && typeof indexedDB !== 'undefined';
+  if (typeof window === 'undefined' || typeof window.showDirectoryPicker !== 'function' || typeof indexedDB === 'undefined') return false;
+  // showDirectoryPicker is blocked in cross-origin iframes (e.g. HF Spaces)
+  try { if (window.self !== window.top) return false; } catch { return false; }
+  return true;
 }
 
 function openLocalModelDb() {
