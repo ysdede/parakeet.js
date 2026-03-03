@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ParakeetModel, getParakeetModel, MODELS, LANGUAGE_NAMES } from 'parakeet.js';
 import { fetchRandomSample, hasTestSamples, SPEECH_DATASETS } from './utils/speechDatasets';
 import {
-  DEFAULT_MODEL_REVISIONS,
-  fetchModelRevisions,
   fetchModelFiles,
   getAvailableQuantModes,
   pickPreferredQuant,
@@ -23,6 +21,10 @@ const QUANT_TO_FILENAME = {
   fp32: '.onnx',
   fp16: '.fp16.onnx',
   int8: '.int8.onnx',
+};
+const MODEL_CANONICAL_REVISIONS = {
+  'parakeet-tdt-0.6b-v2': 'feat/fp16-canonical-v2',
+  'parakeet-tdt-0.6b-v3': 'feat/fp16-canonical-v3',
 };
 
 function getBasename(path) {
@@ -54,6 +56,10 @@ function findLocalEntry(entries, expectedName) {
 
 function quantizedModelName(baseName, quant) {
   return `${baseName}${QUANT_TO_FILENAME[quant] || '.onnx'}`;
+}
+
+function getCanonicalRevision(modelKey) {
+  return MODEL_CANONICAL_REVISIONS[modelKey] || 'main';
 }
 
 async function collectDirectoryFilesRecursive(dirHandle, prefix = '') {
@@ -356,16 +362,14 @@ export default function App() {
   const initialSettings = loadSettings();
   const initialSelectedModel = initialSettings.selectedModel;
   const initialModelSource = initialSettings.modelSource;
+  const resolvedInitialModel = MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2';
   const [modelSource, setModelSource] = useState(
     initialModelSource === MODEL_SOURCE_OPTIONS.LOCAL
       ? MODEL_SOURCE_OPTIONS.LOCAL
       : MODEL_SOURCE_OPTIONS.HUGGINGFACE
   );
-  const [selectedModel, setSelectedModel] = useState(
-    MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2'
-  );
-  const [modelRevision, setModelRevision] = useState(initialSettings.modelRevision || 'main');
-  const [modelRevisions, setModelRevisions] = useState(DEFAULT_MODEL_REVISIONS);
+  const [selectedModel, setSelectedModel] = useState(resolvedInitialModel);
+  const [modelRevision, setModelRevision] = useState(getCanonicalRevision(resolvedInitialModel));
   const modelConfig = MODELS[selectedModel];
   const [selectedLanguage, setSelectedLanguage] = useState(initialSettings.selectedLanguage || 'en');
   // Use hybrid mode by default (WebGPU encoder + WASM decoder)
@@ -443,22 +447,10 @@ export default function App() {
     );
   }, [backend, encoderQuantOptions, decoderQuantOptions]);
 
-  // List available branches for the selected model repo from HF refs API.
+  // Keep model revision pinned to canonical branch per model.
   useEffect(() => {
     if (modelSource !== MODEL_SOURCE_OPTIONS.HUGGINGFACE) return;
-    let cancelled = false;
-    const repoId = MODELS[selectedModel]?.repoId;
-
-    (async () => {
-      const revisions = await fetchModelRevisions(repoId);
-      if (cancelled) return;
-      setModelRevisions(revisions);
-      setModelRevision((current) => (revisions.includes(current) ? current : revisions[0] || 'main'));
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    setModelRevision(getCanonicalRevision(selectedModel));
   }, [selectedModel, modelSource]);
 
   // Inspect selected repo+branch files and filter quantization options accordingly.
@@ -466,8 +458,7 @@ export default function App() {
     if (modelSource !== MODEL_SOURCE_OPTIONS.HUGGINGFACE) return;
     let cancelled = false;
     const repoId = MODELS[selectedModel]?.repoId;
-    const revision = modelRevision || 'main';
-    if (!modelRevisions.includes(revision)) return;
+    const revision = modelRevision || getCanonicalRevision(selectedModel);
 
     (async () => {
       const files = await fetchModelFiles(repoId, revision);
@@ -488,7 +479,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedModel, modelRevision, modelRevisions, modelSource]);
+  }, [selectedModel, modelRevision, modelSource]);
 
   // Detect SharedArrayBuffer and threading capabilities
   useEffect(() => {
@@ -610,8 +601,7 @@ export default function App() {
   function handleModelChange(nextModel) {
     if (nextModel === selectedModel) return;
     setSelectedModel(nextModel);
-    setModelRevisions(DEFAULT_MODEL_REVISIONS);
-    setModelRevision('main');
+    setModelRevision(getCanonicalRevision(nextModel));
   }
 
   function applyLocalEntries(entries, folderName = '') {
@@ -1265,31 +1255,6 @@ export default function App() {
                     )}
                   </div>
                 )}
-                {modelSource === MODEL_SOURCE_OPTIONS.HUGGINGFACE && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                      Model Branch
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={modelRevision}
-                        onChange={e => setModelRevision(e.target.value)}
-                        disabled={isLoading || isModelReady}
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
-                      >
-                        {modelRevisions.map(rev => (
-                          <option key={rev} value={rev}>
-                            {rev}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
-                        expand_more
-                      </span>
-                    </div>
-                  </div>
-                )}
-
                 {/* Backend and Precision */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
