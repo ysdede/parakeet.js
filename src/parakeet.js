@@ -697,6 +697,7 @@ export class ParakeetModel {
     for (let t = startFrame; t < Tenc;) {
       // Copy frame data to reusable buffer
       const frameStart = t * D;
+      // Benchmark-driven hot path: keep this as set(subarray) (see tests/bench_ops.mjs, tests/verify_copy.mjs).
       this._encoderFrameBuffer.set(transposed.subarray(frameStart, frameStart + D));
       // const encTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
 
