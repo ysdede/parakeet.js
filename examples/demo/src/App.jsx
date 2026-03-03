@@ -2,16 +2,286 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ParakeetModel, getParakeetModel, MODELS, LANGUAGE_NAMES } from 'parakeet.js';
 import { fetchRandomSample, hasTestSamples, SPEECH_DATASETS } from './utils/speechDatasets';
 import {
-  DEFAULT_MODEL_REVISIONS,
-  fetchModelRevisions,
   fetchModelFiles,
   getAvailableQuantModes,
   pickPreferredQuant,
-} from '../../shared/modelSelection.js';
-import { formatResolvedQuantization, loadModelWithFallback } from '../../shared/modelLoader.js';
+} from './shared/modelSelection.js';
+import { formatResolvedQuantization, loadModelWithFallback } from './shared/modelLoader.js';
 import './App.css';
 
 const SETTINGS_STORAGE_KEY = 'parakeet.demo.settings.v1';
+const LOCAL_MODEL_DB_NAME = 'parakeet-demo-local-model';
+const LOCAL_MODEL_STORE_NAME = 'handles';
+const LOCAL_MODEL_DIR_KEY = 'directory-handle';
+const MODEL_SOURCE_OPTIONS = {
+  HUGGINGFACE: 'huggingface',
+  LOCAL: 'local',
+};
+
+// showDirectoryPicker is blocked in cross-origin iframes (e.g. HF Spaces)
+const isInIframe = (() => {
+  try { return window.self !== window.top; } catch { return true; }
+})();
+const QUANT_TO_FILENAME = {
+  fp32: '.onnx',
+  fp16: '.fp16.onnx',
+  int8: '.int8.onnx',
+};
+const MODEL_CANONICAL_REVISIONS = {
+  'parakeet-tdt-0.6b-v2': 'feat/fp16-canonical-v2',
+  'parakeet-tdt-0.6b-v3': 'feat/fp16-canonical-v3',
+};
+
+function getBasename(path) {
+  return String(path || '').split('/').pop() || '';
+}
+
+function normalizeRelPath(path) {
+  return String(path || '').replace(/\\/g, '/').replace(/^\.\//, '');
+}
+
+function detectLocalQuantModes(entries, baseName) {
+  const names = new Set(entries.map((entry) => entry.basename.toLowerCase()));
+  const out = [];
+  if (names.has(`${baseName}.onnx`)) out.push('fp32');
+  if (names.has(`${baseName}.fp16.onnx`)) out.push('fp16');
+  if (names.has(`${baseName}.int8.onnx`)) out.push('int8');
+  return out;
+}
+
+function findLocalEntry(entries, expectedName) {
+  const lower = expectedName.toLowerCase();
+  return (
+    entries.find((entry) => entry.path.toLowerCase() === lower) ||
+    entries.find((entry) => entry.basename.toLowerCase() === lower) ||
+    entries.find((entry) => entry.path.toLowerCase().endsWith(`/${lower}`)) ||
+    null
+  );
+}
+
+function quantizedModelName(baseName, quant) {
+  return `${baseName}${QUANT_TO_FILENAME[quant] || '.onnx'}`;
+}
+
+function getCanonicalRevision(modelKey) {
+  return MODEL_CANONICAL_REVISIONS[modelKey] || 'main';
+}
+
+async function collectDirectoryFilesRecursive(dirHandle, prefix = '') {
+  const entries = [];
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind === 'directory' && name === '.git') {
+      continue;
+    }
+    const relPath = prefix ? `${prefix}/${name}` : name;
+    if (handle.kind === 'file') {
+      entries.push({
+        path: normalizeRelPath(relPath),
+        basename: getBasename(relPath),
+        handle,
+      });
+      continue;
+    }
+    if (handle.kind === 'directory') {
+      const nested = await collectDirectoryFilesRecursive(handle, relPath);
+      entries.push(...nested);
+    }
+  }
+  return entries;
+}
+
+async function getEntryFile(entry) {
+  if (entry.file) return entry.file;
+  if (entry.handle?.kind === 'file') return entry.handle.getFile();
+  throw new Error(`Could not access local file entry: ${entry?.path || entry?.basename || 'unknown'}`);
+}
+
+function supportsDirectoryHandlePersistence() {
+  if (typeof window === 'undefined' || typeof window.showDirectoryPicker !== 'function' || typeof indexedDB === 'undefined') return false;
+  // showDirectoryPicker is blocked in cross-origin iframes (e.g. HF Spaces)
+  try { if (window.self !== window.top) return false; } catch { return false; }
+  return true;
+}
+
+function openLocalModelDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(LOCAL_MODEL_DB_NAME, 1);
+    request.onerror = () => reject(new Error('Failed to open local model IndexedDB'));
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(LOCAL_MODEL_STORE_NAME)) {
+        db.createObjectStore(LOCAL_MODEL_STORE_NAME);
+      }
+    };
+  });
+}
+
+async function readPersistedDirectoryHandle() {
+  const db = await openLocalModelDb();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const closeDb = () => {
+      try {
+        db.close();
+      } catch {
+        // Ignore close errors.
+      }
+    };
+    const resolveOnce = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const rejectOnce = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readonly');
+    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
+    const req = store.get(LOCAL_MODEL_DIR_KEY);
+    req.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to read persisted folder handle'));
+    };
+    req.onsuccess = () => {
+      closeDb();
+      resolveOnce(req.result || null);
+    };
+    tx.onabort = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to read persisted folder handle'));
+    };
+    tx.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to read persisted folder handle'));
+    };
+  });
+}
+
+async function persistDirectoryHandle(dirHandle) {
+  const db = await openLocalModelDb();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const closeDb = () => {
+      try {
+        db.close();
+      } catch {
+        // Ignore close errors.
+      }
+    };
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const rejectOnce = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readwrite');
+    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
+    const req = store.put(dirHandle, LOCAL_MODEL_DIR_KEY);
+    req.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to persist folder handle'));
+    };
+    req.onsuccess = () => {
+      closeDb();
+      resolveOnce();
+    };
+    tx.onabort = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to persist folder handle'));
+    };
+    tx.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to persist folder handle'));
+    };
+  });
+}
+
+async function clearPersistedDirectoryHandle() {
+  const db = await openLocalModelDb();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const closeDb = () => {
+      try {
+        db.close();
+      } catch {
+        // Ignore close errors.
+      }
+    };
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const rejectOnce = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readwrite');
+    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
+    const req = store.delete(LOCAL_MODEL_DIR_KEY);
+    req.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to clear persisted folder handle'));
+    };
+    req.onsuccess = () => {
+      closeDb();
+      resolveOnce();
+    };
+    tx.onabort = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to clear persisted folder handle'));
+    };
+    tx.onerror = () => {
+      closeDb();
+      rejectOnce(new Error('Failed to clear persisted folder handle'));
+    };
+  });
+}
+
+function parseThemeValue(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'dark') return true;
+  if (normalized === 'light') return false;
+  return null;
+}
+
+function getHfThemeFromQuery() {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  return parseThemeValue(params.get('__theme') || params.get('theme') || params.get('color'));
+}
+
+function getInitialDarkMode(settings) {
+  const hfTheme = getHfThemeFromQuery();
+  if (hfTheme !== null) return hfTheme;
+  if (typeof settings.darkMode === 'boolean') return settings.darkMode;
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return false;
+}
+
+function getThemeFromMessage(data) {
+  if (!data) return null;
+  if (typeof data === 'string') return parseThemeValue(data);
+  if (typeof data !== 'object') return null;
+
+  return (
+    parseThemeValue(data.theme) ??
+    parseThemeValue(data.colorMode) ??
+    parseThemeValue(data.mode) ??
+    parseThemeValue(data?.payload?.theme)
+  );
+}
 
 function loadSettings() {
   try {
@@ -136,11 +406,15 @@ function pcmToWavBlob(pcm, sampleRate = 16000) {
 export default function App() {
   const initialSettings = loadSettings();
   const initialSelectedModel = initialSettings.selectedModel;
-  const [selectedModel, setSelectedModel] = useState(
-    MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2'
+  const initialModelSource = initialSettings.modelSource;
+  const resolvedInitialModel = MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2';
+  const [modelSource, setModelSource] = useState(
+    initialModelSource === MODEL_SOURCE_OPTIONS.LOCAL && !isInIframe
+      ? MODEL_SOURCE_OPTIONS.LOCAL
+      : MODEL_SOURCE_OPTIONS.HUGGINGFACE
   );
-  const [modelRevision, setModelRevision] = useState(initialSettings.modelRevision || 'main');
-  const [modelRevisions, setModelRevisions] = useState(DEFAULT_MODEL_REVISIONS);
+  const [selectedModel, setSelectedModel] = useState(resolvedInitialModel);
+  const [modelRevision, setModelRevision] = useState(getCanonicalRevision(resolvedInitialModel));
   const modelConfig = MODELS[selectedModel];
   const [selectedLanguage, setSelectedLanguage] = useState(initialSettings.selectedLanguage || 'en');
   // Use hybrid mode by default (WebGPU encoder + WASM decoder)
@@ -150,6 +424,20 @@ export default function App() {
   const [decoderQuant, setDecoderQuant] = useState(initialSettings.decoderQuant || 'int8');
   const [encoderQuantOptions, setEncoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
   const [decoderQuantOptions, setDecoderQuantOptions] = useState(['fp16', 'int8', 'fp32']);
+  const [localEntries, setLocalEntries] = useState([]);
+  const [localFolderName, setLocalFolderName] = useState('');
+  const [hasPersistedLocalHandle, setHasPersistedLocalHandle] = useState(false);
+  const [needsLocalHandleReconnect, setNeedsLocalHandleReconnect] = useState(false);
+  const [localHandlePersistenceSupported] = useState(supportsDirectoryHandlePersistence());
+  const [localTokenizerOptions, setLocalTokenizerOptions] = useState(['vocab.txt']);
+  const [localTokenizerName, setLocalTokenizerName] = useState('vocab.txt');
+  const [localPreprocessorOptions, setLocalPreprocessorOptions] = useState(['nemo128']);
+  const [localDetectedArtifacts, setLocalDetectedArtifacts] = useState({
+    encoder: [],
+    decoder: [],
+    tokenizers: [],
+    preprocessors: [],
+  });
   const [preprocessor, setPreprocessor] = useState(initialSettings.preprocessor || 'nemo128');
   const [preprocessorBackend, setPreprocessorBackend] = useState(initialSettings.preprocessorBackend || 'onnx');
   const [status, setStatus] = useState('Idle');
@@ -169,8 +457,9 @@ export default function App() {
   );
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [darkMode, setDarkMode] = useState(Boolean(initialSettings.darkMode));
+  const [darkMode, setDarkMode] = useState(getInitialDarkMode(initialSettings));
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [isModelLoading, setIsModelLoading] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const maxCores = navigator.hardwareConcurrency || 8;
   const [cpuThreads, setCpuThreads] = useState(
@@ -180,10 +469,12 @@ export default function App() {
   );
   const modelRef = useRef(null);
   const fileInputRef = useRef(null);
+  const modelFolderInputRef = useRef(null);
   const audioRef = useRef(null);
+  const localModelBlobUrlsRef = useRef([]);
 
   const isModelReady = modelLoaded;
-  const isLoading = !modelLoaded && status !== 'Idle' && !status.toLowerCase().includes('fail');
+  const isLoading = isModelLoading;
 
   // Get available languages for test samples
   const testLanguageOptions = Object.entries(SPEECH_DATASETS).map(([code, config]) => ({
@@ -201,29 +492,18 @@ export default function App() {
     );
   }, [backend, encoderQuantOptions, decoderQuantOptions]);
 
-  // List available branches for the selected model repo from HF refs API.
+  // Keep model revision pinned to canonical branch per model.
   useEffect(() => {
-    let cancelled = false;
-    const repoId = MODELS[selectedModel]?.repoId;
-
-    (async () => {
-      const revisions = await fetchModelRevisions(repoId);
-      if (cancelled) return;
-      setModelRevisions(revisions);
-      setModelRevision((current) => (revisions.includes(current) ? current : revisions[0] || 'main'));
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedModel]);
+    if (modelSource !== MODEL_SOURCE_OPTIONS.HUGGINGFACE) return;
+    setModelRevision(getCanonicalRevision(selectedModel));
+  }, [selectedModel, modelSource]);
 
   // Inspect selected repo+branch files and filter quantization options accordingly.
   useEffect(() => {
+    if (modelSource !== MODEL_SOURCE_OPTIONS.HUGGINGFACE) return;
     let cancelled = false;
     const repoId = MODELS[selectedModel]?.repoId;
-    const revision = modelRevision || 'main';
-    if (!modelRevisions.includes(revision)) return;
+    const revision = modelRevision || getCanonicalRevision(selectedModel);
 
     (async () => {
       const files = await fetchModelFiles(repoId, revision);
@@ -244,7 +524,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedModel, modelRevision, modelRevisions]);
+  }, [selectedModel, modelRevision, modelSource]);
 
   // Detect SharedArrayBuffer and threading capabilities
   useEffect(() => {
@@ -255,6 +535,7 @@ export default function App() {
 
   useEffect(() => {
     saveSettings({
+      modelSource,
       selectedModel,
       modelRevision,
       selectedLanguage,
@@ -271,6 +552,7 @@ export default function App() {
       cpuThreads,
     });
   }, [
+    modelSource,
     selectedModel,
     modelRevision,
     selectedLanguage,
@@ -287,12 +569,22 @@ export default function App() {
     cpuThreads,
   ]);
 
-  // Cleanup audio URL on unmount
+  // Cleanup audio URL when it changes and on unmount.
   useEffect(() => {
     return () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
+
+  // Cleanup model blob URLs only on unmount.
+  useEffect(() => {
+    return () => {
+      for (const url of localModelBlobUrlsRef.current) {
+        URL.revokeObjectURL(url);
+      }
+      localModelBlobUrlsRef.current = [];
+    };
+  }, []);
 
   // Toggle dark mode
   useEffect(() => {
@@ -302,6 +594,68 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  // Follow HF/parent theme when provided; otherwise fallback to system changes
+  // if user has no saved explicit theme preference.
+  useEffect(() => {
+    const hfTheme = getHfThemeFromQuery();
+    if (hfTheme !== null) {
+      setDarkMode(hfTheme);
+    }
+
+    const onMessage = (event) => {
+      const messageTheme = getThemeFromMessage(event?.data);
+      if (messageTheme !== null) {
+        setDarkMode(messageTheme);
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+
+    if (typeof window.matchMedia !== 'function') {
+      return () => window.removeEventListener('message', onMessage);
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const onMediaChange = (event) => {
+      if (getHfThemeFromQuery() !== null) return;
+      if (typeof initialSettings.darkMode === 'boolean') return;
+      setDarkMode(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', onMediaChange);
+    } else {
+      mediaQuery.addListener(onMediaChange);
+    }
+
+    return () => {
+      window.removeEventListener('message', onMessage);
+      if (typeof mediaQuery.removeEventListener === 'function') {
+        mediaQuery.removeEventListener('change', onMediaChange);
+      } else {
+        mediaQuery.removeListener(onMediaChange);
+      }
+    };
+  }, [initialSettings.darkMode]);
+
+  // Restore persisted local folder handle when local source is active.
+  useEffect(() => {
+    let cancelled = false;
+    if (modelSource !== MODEL_SOURCE_OPTIONS.LOCAL) return () => { };
+    if (!localHandlePersistenceSupported) return () => { };
+    if (localEntries.length > 0) return () => { };
+
+    (async () => {
+      const restored = await restorePersistedLocalFolder({ requestPermission: false });
+      if (cancelled || !restored) return;
+      console.log('[LocalFolder] Local folder restored automatically from persisted handle');
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modelSource, localHandlePersistenceSupported, localEntries.length]);
 
   function playAudio() {
     if (audioRef.current) {
@@ -336,8 +690,183 @@ export default function App() {
   function handleModelChange(nextModel) {
     if (nextModel === selectedModel) return;
     setSelectedModel(nextModel);
-    setModelRevisions(DEFAULT_MODEL_REVISIONS);
-    setModelRevision('main');
+    setModelRevision(getCanonicalRevision(nextModel));
+  }
+
+  function applyLocalEntries(entries, folderName = '') {
+    console.log('[LocalFolder] Parsing selected local folder entries…', { count: entries.length, folderName });
+    setLocalEntries(entries);
+    setLocalFolderName(folderName);
+
+    const encOptions = detectLocalQuantModes(entries, 'encoder-model');
+    const decOptions = detectLocalQuantModes(entries, 'decoder_joint-model');
+    const nextEncOptions = encOptions.length ? encOptions : ['fp32'];
+    const nextDecOptions = decOptions.length ? decOptions : ['fp32'];
+
+    setEncoderQuantOptions(nextEncOptions);
+    setDecoderQuantOptions(nextDecOptions);
+    setEncoderQuant((current) =>
+      nextEncOptions.includes(current) ? current : pickPreferredQuant(nextEncOptions, backend, 'encoder')
+    );
+    setDecoderQuant((current) =>
+      nextDecOptions.includes(current) ? current : pickPreferredQuant(nextDecOptions, backend, 'decoder')
+    );
+
+    const tokenizerCandidates = [];
+    if (findLocalEntry(entries, 'vocab.txt')) tokenizerCandidates.push('vocab.txt');
+    if (findLocalEntry(entries, 'tokens.txt')) tokenizerCandidates.push('tokens.txt');
+    if (!tokenizerCandidates.length) {
+      for (const entry of entries) {
+        if (entry.basename.toLowerCase().endsWith('.txt')) {
+          tokenizerCandidates.push(entry.basename);
+        }
+      }
+    }
+    const dedupedTokenizer = [...new Set(tokenizerCandidates)];
+    if (dedupedTokenizer.length) {
+      setLocalTokenizerOptions(dedupedTokenizer);
+      setLocalTokenizerName((current) => (dedupedTokenizer.includes(current) ? current : dedupedTokenizer[0]));
+    } else {
+      setLocalTokenizerOptions([]);
+      setLocalTokenizerName('');
+    }
+
+    const preprocessorCandidates = [];
+    if (findLocalEntry(entries, 'nemo128.onnx')) preprocessorCandidates.push('nemo128');
+    if (findLocalEntry(entries, 'nemo80.onnx')) preprocessorCandidates.push('nemo80');
+    const dedupedPreprocessor = [...new Set(preprocessorCandidates)];
+    if (dedupedPreprocessor.length) {
+      setLocalPreprocessorOptions(dedupedPreprocessor);
+      setPreprocessor((current) => (dedupedPreprocessor.includes(current) ? current : dedupedPreprocessor[0]));
+    } else {
+      setLocalPreprocessorOptions([]);
+      if (preprocessorBackend === 'onnx') {
+        setPreprocessorBackend('js');
+        console.log('[LocalFolder] No local nemo*.onnx detected; falling back preprocessorBackend to js');
+      }
+    }
+
+    setLocalDetectedArtifacts({
+      encoder: encOptions,
+      decoder: decOptions,
+      tokenizers: dedupedTokenizer,
+      preprocessors: dedupedPreprocessor,
+    });
+
+    console.log('[LocalFolder] Detected artifacts', {
+      encoder: encOptions,
+      decoder: decOptions,
+      tokenizers: dedupedTokenizer,
+      preprocessors: dedupedPreprocessor,
+    });
+    setStatus(`Local folder selected (${entries.length} files)`);
+  }
+
+  async function restorePersistedLocalFolder({ requestPermission = false } = {}) {
+    if (!localHandlePersistenceSupported) return false;
+    try {
+      const dirHandle = await readPersistedDirectoryHandle();
+      if (!dirHandle) {
+        setHasPersistedLocalHandle(false);
+        setNeedsLocalHandleReconnect(false);
+        return false;
+      }
+
+      setHasPersistedLocalHandle(true);
+      const queryState = typeof dirHandle.queryPermission === 'function'
+        ? await dirHandle.queryPermission({ mode: 'read' })
+        : 'granted';
+
+      let permissionState = queryState;
+      if (permissionState !== 'granted' && requestPermission && typeof dirHandle.requestPermission === 'function') {
+        permissionState = await dirHandle.requestPermission({ mode: 'read' });
+      }
+
+      if (permissionState !== 'granted') {
+        setNeedsLocalHandleReconnect(true);
+        console.log('[LocalFolder] Persisted folder found but permission is not granted yet');
+        return false;
+      }
+
+      console.log('[LocalFolder] Restoring persisted directory handle', { name: dirHandle.name });
+      const entries = await collectDirectoryFilesRecursive(dirHandle);
+      applyLocalEntries(entries, dirHandle.name || '');
+      setNeedsLocalHandleReconnect(false);
+      setStatus(`Restored local folder "${dirHandle.name || ''}"`);
+      return true;
+    } catch (error) {
+      console.warn('[LocalFolder] Failed to restore persisted handle, clearing it', error);
+      try {
+        await clearPersistedDirectoryHandle();
+      } catch (clearError) {
+        console.warn('[LocalFolder] Failed to clear persisted handle', clearError);
+      }
+      setHasPersistedLocalHandle(false);
+      setNeedsLocalHandleReconnect(false);
+      return false;
+    }
+  }
+
+  async function pickLocalModelFolder() {
+    try {
+      console.log('[LocalFolder] Folder selection requested');
+      if (typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function') {
+        const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+        console.log('[LocalFolder] Directory handle acquired', { name: dirHandle.name });
+        const entries = await collectDirectoryFilesRecursive(dirHandle);
+        applyLocalEntries(entries, dirHandle.name || '');
+        if (localHandlePersistenceSupported) {
+          try {
+            await persistDirectoryHandle(dirHandle);
+            setHasPersistedLocalHandle(true);
+            setNeedsLocalHandleReconnect(false);
+            console.log('[LocalFolder] Persisted directory handle for future visits');
+          } catch (persistError) {
+            console.warn('[LocalFolder] Could not persist directory handle', persistError);
+          }
+        }
+        return;
+      }
+
+      if (modelFolderInputRef.current) {
+        modelFolderInputRef.current.click();
+        setStatus('Directory-handle persistence is unavailable in this browser. Folder will need to be reselected next visit.');
+        return;
+      }
+
+      alert('Directory picker is not available in this browser. Use Chromium-based browser or provide local files via folder input.');
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error('[LocalFolder] Failed to read directory', error);
+      setStatus(`Failed to read folder: ${error.message}`);
+    }
+  }
+
+  function handleLocalFolderInput(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    console.log('[LocalFolder] Folder input fallback selected files', { count: files.length });
+    const entries = files.map((file) => {
+      const relPath = normalizeRelPath(file.webkitRelativePath || file.name);
+      return {
+        path: relPath,
+        basename: getBasename(relPath),
+        file,
+      };
+    });
+    const folderName = entries[0]?.path?.split('/')?.[0] || '';
+    applyLocalEntries(entries, folderName);
+    if (!localHandlePersistenceSupported) {
+      setStatus(`Local folder selected (${entries.length} files). This browser cannot persist folder access; reselect next visit.`);
+    }
+    event.target.value = '';
+  }
+
+  async function reconnectPersistedFolder() {
+    const restored = await restorePersistedLocalFolder({ requestPermission: true });
+    if (!restored) {
+      setStatus('Could not restore saved folder access. Please choose folder again.');
+    }
   }
 
   // Fetch random audio sample from HuggingFace speech dataset
@@ -421,57 +950,149 @@ export default function App() {
   }
 
   async function loadModel() {
-    setStatus('Downloading model…');
+    const isLocalSource = modelSource === MODEL_SOURCE_OPTIONS.LOCAL;
+    const cleanupLocalBlobUrls = () => {
+      for (const url of localModelBlobUrlsRef.current) {
+        URL.revokeObjectURL(url);
+      }
+      localModelBlobUrlsRef.current = [];
+    };
+    setIsModelLoading(true);
+    setStatus(isLocalSource ? 'Preparing local model…' : 'Downloading model…');
     setProgressText('');
-    setProgressPct(0);
+    setProgressPct(isLocalSource ? null : 0);
     console.time('LoadModel');
 
     try {
-      const progressCallback = ({ loaded, total, file }) => {
-        const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
-        setProgressText(`${file}: ${pct}%`);
-        setProgressPct(pct);
-      };
+      cleanupLocalBlobUrls();
 
-      const modelLoadResult = await loadModelWithFallback({
-        repoIdOrModelKey: selectedModel,
-        options: {
-          revision: modelRevision,
-          encoderQuant,
-          decoderQuant,
-          preprocessor,
-          preprocessorBackend,
-          backend,
-          progress: progressCallback,
-          verbose: verboseLog,
-          cpuThreads,
-        },
-        getParakeetModelFn: getParakeetModel,
-        fromUrlsFn: ParakeetModel.fromUrls,
-        onBeforeCompile: ({ attempt, modelUrls }) => {
-          const resolvedQuant = formatResolvedQuantization(modelUrls.quantisation);
-          console.log(`[App] ${resolvedQuant}`);
+      if (isLocalSource) {
+        console.log('[LocalFolder] Starting model load from local artifacts');
+        if (!localEntries.length) {
+          throw new Error('Pick a local model folder first.');
+        }
 
-          if (attempt === 2) {
-            setStatus('Retrying compile with FP32…');
-            setProgressText(`${resolvedQuant} · retrying after FP16 compile failure`);
-          } else {
-            setStatus('Compiling model…');
-            setProgressText(`${resolvedQuant} · compiling may take ~10s on first load`);
+        const createdBlobUrls = [];
+        const toBlobUrl = (file) => {
+          const url = URL.createObjectURL(file);
+          createdBlobUrls.push(url);
+          return url;
+        };
+
+        try {
+          const encoderName = quantizedModelName('encoder-model', encoderQuant);
+          const decoderName = quantizedModelName('decoder_joint-model', decoderQuant);
+          const encoderEntry = findLocalEntry(localEntries, encoderName);
+          const decoderEntry = findLocalEntry(localEntries, decoderName);
+          const tokenizerEntry = findLocalEntry(localEntries, localTokenizerName);
+          console.log('[LocalFolder] Selected artifacts', {
+            encoder: encoderName,
+            decoder: decoderName,
+            tokenizer: localTokenizerName,
+            preprocessorBackend,
+            preprocessor: preprocessorBackend === 'onnx' ? `${preprocessor}.onnx` : null,
+          });
+
+          if (!encoderEntry) throw new Error(`Missing encoder file: ${encoderName}`);
+          if (!decoderEntry) throw new Error(`Missing decoder file: ${decoderName}`);
+          if (!tokenizerEntry) throw new Error(`Missing tokenizer file: ${localTokenizerName}`);
+
+          const cfg = {
+            encoderUrl: toBlobUrl(await getEntryFile(encoderEntry)),
+            decoderUrl: toBlobUrl(await getEntryFile(decoderEntry)),
+            tokenizerUrl: toBlobUrl(await getEntryFile(tokenizerEntry)),
+            filenames: {
+              encoder: encoderEntry.basename,
+              decoder: decoderEntry.basename,
+            },
+            preprocessorBackend,
+            backend,
+            verbose: verboseLog,
+            cpuThreads,
+          };
+
+          if (preprocessorBackend === 'onnx') {
+            const preprocessorName = `${preprocessor}.onnx`;
+            const preprocessorEntry = findLocalEntry(localEntries, preprocessorName);
+            if (!preprocessorEntry) {
+              throw new Error(`Missing preprocessor file: ${preprocessorName} (switch to JS preprocessor or add file to folder).`);
+            }
+            cfg.preprocessorUrl = toBlobUrl(await getEntryFile(preprocessorEntry));
           }
-          setProgressPct(null);
-        },
-      });
 
-      modelRef.current = modelLoadResult.model;
+          const encoderDataEntry = findLocalEntry(localEntries, `${encoderEntry.basename}.data`);
+          if (encoderDataEntry) {
+            cfg.encoderDataUrl = toBlobUrl(await getEntryFile(encoderDataEntry));
+          }
+          const decoderDataEntry = findLocalEntry(localEntries, `${decoderEntry.basename}.data`);
+          if (decoderDataEntry) {
+            cfg.decoderDataUrl = toBlobUrl(await getEntryFile(decoderDataEntry));
+          }
+
+          setStatus('Compiling model…');
+          setProgressText('Compiling local model artifacts');
+          setProgressPct(null);
+
+          console.log('[LocalFolder] Calling ParakeetModel.fromUrls with local blob URLs');
+          modelRef.current = await ParakeetModel.fromUrls(cfg);
+          localModelBlobUrlsRef.current = createdBlobUrls;
+          console.log('[LocalFolder] Model sessions created from local artifacts');
+        } catch (localLoadError) {
+          for (const url of createdBlobUrls) {
+            URL.revokeObjectURL(url);
+          }
+          throw localLoadError;
+        }
+      } else {
+        console.log('[Hub] Starting model load from HuggingFace');
+        const progressCallback = ({ loaded, total, file }) => {
+          const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+          setProgressText(`${file}: ${pct}%`);
+          setProgressPct(pct);
+        };
+
+        const modelLoadResult = await loadModelWithFallback({
+          repoIdOrModelKey: selectedModel,
+          options: {
+            revision: modelRevision,
+            encoderQuant,
+            decoderQuant,
+            preprocessor,
+            preprocessorBackend,
+            backend,
+            progress: progressCallback,
+            verbose: verboseLog,
+            cpuThreads,
+          },
+          getParakeetModelFn: getParakeetModel,
+          fromUrlsFn: ParakeetModel.fromUrls,
+          onBeforeCompile: ({ attempt, modelUrls }) => {
+            const resolvedQuant = formatResolvedQuantization(modelUrls.quantisation);
+            console.log(`[App] ${resolvedQuant}`);
+
+            if (attempt === 2) {
+              setStatus('Retrying compile with FP32…');
+              setProgressText(`${resolvedQuant} · retrying after FP16 compile failure`);
+            } else {
+              setStatus('Compiling model…');
+              setProgressText(`${resolvedQuant} · compiling may take ~10s on first load`);
+            }
+            setProgressPct(null);
+          },
+        });
+
+        modelRef.current = modelLoadResult.model;
+        console.log('[Hub] Model sessions created from HuggingFace artifacts');
+      }
 
       setStatus('Verifying…');
       setProgressText('Running test transcription');
+      console.log('[LoadModel] Running warm-up verification transcription');
       const expectedText = 'it is not life as we know or understand it';
 
       try {
         // Use GitHub raw URL for the test audio file
-        const audioUrl = './assets/life_Jim.wav';
+        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/life_Jim.wav';
         const audioBlob = await getCachedAudioFile(audioUrl, 'life_Jim.wav');
         const buf = await audioBlob.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });
@@ -488,10 +1109,16 @@ export default function App() {
         } else {
           console.error(`[App] Verification failed! Expected: "${expectedText}", Got: "${utterance_text}"`);
           setStatus('Verification failed');
+          setModelLoaded(false);
+          modelRef.current = null;
+          if (isLocalSource) cleanupLocalBlobUrls();
         }
       } catch (err) {
         console.error('[App] Warm-up failed', err);
         setStatus('Warm-up failed');
+        setModelLoaded(false);
+        modelRef.current = null;
+        if (isLocalSource) cleanupLocalBlobUrls();
       }
 
       console.timeEnd('LoadModel');
@@ -500,6 +1127,10 @@ export default function App() {
     } catch (e) {
       console.error(e);
       setStatus(`Failed: ${e.message}`);
+      setModelLoaded(false);
+      modelRef.current = null;
+    } finally {
+      setIsModelLoading(false);
     }
   }
 
@@ -591,14 +1222,29 @@ export default function App() {
               <div>parakeet.js {parakeetVersion} ({parakeetSource})</div>
             </div>
           </div>
-          <button
-            className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            onClick={() => setDarkMode(!darkMode)}
-          >
-            <span className="material-icons-outlined text-gray-600 dark:text-gray-300">
-              brightness_4
-            </span>
-          </button>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/ysdede/parakeet.js"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center hover:opacity-80 transition-opacity"
+              title="View on GitHub"
+            >
+              <img
+                src="https://img.shields.io/github/stars/ysdede/parakeet.js?style=social"
+                alt="GitHub stars"
+                className="h-6"
+              />
+            </a>
+            <button
+              className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              onClick={() => setDarkMode(!darkMode)}
+            >
+              <span className="material-icons-outlined text-gray-600 dark:text-gray-300">
+                brightness_4
+              </span>
+            </button>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -612,42 +1258,17 @@ export default function App() {
                 {/* Model Selection */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Model
+                    Model Source
                   </label>
                   <div className="relative">
                     <select
-                      value={selectedModel}
-                      onChange={e => handleModelChange(e.target.value)}
+                      value={modelSource}
+                      onChange={(e) => setModelSource(e.target.value)}
                       disabled={isLoading || isModelReady}
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
-                      {MODEL_OPTIONS.map(opt => (
-                        <option key={opt.key} value={opt.key}>
-                          {opt.displayName}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
-                      expand_more
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Model Branch
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={modelRevision}
-                      onChange={e => setModelRevision(e.target.value)}
-                      disabled={isLoading || isModelReady}
-                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
-                    >
-                      {modelRevisions.map(rev => (
-                        <option key={rev} value={rev}>
-                          {rev}
-                        </option>
-                      ))}
+                      <option value={MODEL_SOURCE_OPTIONS.HUGGINGFACE}>HuggingFace</option>
+                      {!isInIframe && <option value={MODEL_SOURCE_OPTIONS.LOCAL}>Local folder</option>}
                     </select>
                     <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
                       expand_more
@@ -655,6 +1276,89 @@ export default function App() {
                   </div>
                 </div>
 
+                {modelSource === MODEL_SOURCE_OPTIONS.HUGGINGFACE && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Model
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={selectedModel}
+                          onChange={e => handleModelChange(e.target.value)}
+                          disabled={isLoading || isModelReady}
+                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                        >
+                          {MODEL_OPTIONS.map(opt => (
+                            <option key={opt.key} value={opt.key}>
+                              {opt.displayName}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                          expand_more
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {modelSource === MODEL_SOURCE_OPTIONS.LOCAL && (
+                  <div className="space-y-2">
+                    <input
+                      ref={modelFolderInputRef}
+                      type="file"
+                      webkitdirectory=""
+                      directory=""
+                      multiple
+                      onChange={handleLocalFolderInput}
+                      className="hidden"
+                    />
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                      Local Model Folder
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200 truncate">
+                        {localFolderName || 'No folder selected'}
+                      </div>
+                      <button
+                        onClick={pickLocalModelFolder}
+                        disabled={isLoading || isModelReady}
+                        title="Browse local model folder"
+                        className="h-[38px] w-[38px] flex items-center justify-center rounded-lg bg-yellow-400 hover:bg-yellow-500 text-gray-900 border border-yellow-500 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-icons-outlined text-lg">folder_open</span>
+                      </button>
+                    </div>
+                    {localHandlePersistenceSupported && hasPersistedLocalHandle && needsLocalHandleReconnect && (
+                      <button
+                        onClick={reconnectPersistedFolder}
+                        disabled={isLoading || isModelReady}
+                        className="w-full bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-100 font-medium py-2 px-4 rounded-lg transition-all border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Restore Saved Folder
+                      </button>
+                    )}
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {localEntries.length
+                        ? `Selected ${localEntries.length} files${localFolderName ? ` from "${localFolderName}"` : ''}.`
+                        : 'Pick a folder containing encoder/decoder ONNX files and tokenizer text.'}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {localHandlePersistenceSupported
+                        ? 'Folder access can be persisted in this browser (you may be asked permission on revisit).'
+                        : 'This browser cannot persist folder access for local models. User must reselect folder on next visit.'}
+                    </p>
+                    {localEntries.length > 0 && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                        <p>Encoder dtypes: {localDetectedArtifacts.encoder.length ? localDetectedArtifacts.encoder.join(', ') : 'none'}</p>
+                        <p>Decoder dtypes: {localDetectedArtifacts.decoder.length ? localDetectedArtifacts.decoder.join(', ') : 'none'}</p>
+                        <p>Tokenizers: {localDetectedArtifacts.tokenizers.length ? localDetectedArtifacts.tokenizers.join(', ') : 'none'}</p>
+                        <p>Preprocessors: {localDetectedArtifacts.preprocessors.length ? localDetectedArtifacts.preprocessors.join(', ') : 'none'}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* Backend and Precision */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
@@ -768,12 +1472,52 @@ export default function App() {
                       expand_more
                     </span>
                   </div>
+                  {modelSource === MODEL_SOURCE_OPTIONS.LOCAL && preprocessorBackend === 'onnx' && localPreprocessorOptions.length > 0 && (
+                    <div className="relative mt-2">
+                      <select
+                        value={preprocessor}
+                        onChange={(e) => setPreprocessor(e.target.value)}
+                        disabled={isLoading || isModelReady}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                      >
+                        {localPreprocessorOptions.map((name) => (
+                          <option key={name} value={name}>{name}.onnx</option>
+                        ))}
+                      </select>
+                      <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                        expand_more
+                      </span>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     {preprocessorBackend === 'js'
                       ? 'Pure JS: no ONNX download, supports streaming caching'
                       : 'ONNX WASM+SIMD: slightly faster per-call, requires nemo128.onnx download'}
                   </p>
                 </div>
+
+                {modelSource === MODEL_SOURCE_OPTIONS.LOCAL && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                      Tokenizer
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={localTokenizerName}
+                        onChange={(e) => setLocalTokenizerName(e.target.value)}
+                        disabled={isLoading || isModelReady}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
+                      >
+                        {localTokenizerOptions.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                      <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
+                        expand_more
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Toggles */}
                 <div className="flex flex-col gap-3 pt-2">
