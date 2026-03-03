@@ -45,23 +45,34 @@ jobs:
           colorFrom: indigo
           colorTo: blue
           sdk: static
-          pinned: false
+          pinned: true
+          header: mini
+          fullWidth: true
           app_build_command: npm run build
           app_file: dist/index.html
           license: mit
           short_description: NVIDIA Parakeet speech recognition for the browser
           models:
-          - istupakov/parakeet-tdt-0.6b-v2-onnx
+          - ysdede/parakeet-tdt-0.6b-v2-onnx
+          - ysdede/parakeet-tdt-0.6b-v3-onnx
+          datasets:
+          - mozilla-foundation/common_voice_13_0
           tags:
           - parakeet-js
           - parakeet
           - onnx
           - webgpu
+          - wasm
           - asr
+          - speech-recognition
+          - nvidia
           custom_headers:
             cross-origin-embedder-policy: require-corp
             cross-origin-opener-policy: same-origin
             cross-origin-resource-policy: cross-origin
+          preload_from_hub:
+          - ysdede/parakeet-tdt-0.6b-v2-onnx
+          - ysdede/parakeet-tdt-0.6b-v3-onnx
           ---
 
           # 🦜 Parakeet.js Demo
@@ -72,6 +83,7 @@ jobs:
 
           - [GitHub Repository](https://github.com/ysdede/parakeet.js)
           - [npm Package](https://www.npmjs.com/package/parakeet.js)
+          - [API Documentation](https://ysdede.github.io/parakeet.js/api/)
           READMEEOF
 
           # ── vite.config.js (NPM-only, no local-source aliasing) ────
