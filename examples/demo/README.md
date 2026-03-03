@@ -1,9 +1,15 @@
 # Parakeet.js Demo
 
-This is the unified demo application for parakeet.js. It can be used for:
-- **Development**: Testing local source code changes
-- **NPM Testing**: Testing the published npm package
-- **Deployment**: Deploying to HuggingFace Spaces and GitHub Pages
+Unified React demo for parakeet.js development, npm-package validation, and deployment targets.
+
+## What's New
+
+- Added **Model Source** switch: `HuggingFace` or `Local folder`.
+- Added local-folder model loading from browser-selected files.
+- Added local folder artifact detection (encoder/decoder quant modes, tokenizer files, optional preprocessors).
+- Added persisted local folder handle restore (where browser permissions allow it).
+- Added automatic fallback of preprocessor backend from ONNX to JS when local `nemo*.onnx` is not present.
+- Added stronger local blob URL cleanup on failure paths.
 
 ## Quick Start
 
@@ -14,139 +20,115 @@ npm install
 
 ## Development Modes
 
-### Local Development (Test Local Changes)
-
-Use this when modifying the parakeet.js library source code:
+### Local Source Mode
 
 ```bash
 npm run dev:local
 ```
 
-This runs Vite with the `PARAKEET_LOCAL=true` environment variable, which aliases `parakeet.js` imports to `/src/index.js` instead of the npm package.
+Runs with `PARAKEET_LOCAL=true`, so `parakeet.js` resolves to the local repo source (`/src/index.js`).
 
-**When to use:**
-- Developing new features in `/src/`
-- Debugging issues in the library
-- Testing before publishing to npm
+Use this for library development and pre-publish validation.
 
-### NPM Package Testing
-
-Use this to test the published npm package (simulates end-user experience):
+### NPM Package Mode
 
 ```bash
 npm run dev
 ```
 
-This uses the `parakeet.js` package from npm (version specified in `package.json`).
+Uses the npm-installed `parakeet.js` dependency from `examples/demo/package.json`.
 
-**When to use:**
-- Verifying the published package works correctly
-- Testing after `npm publish`
-- Before deploying to production
+Use this for package-consumer behavior checks.
+
+## Model Sources in UI
+
+### HuggingFace
+
+- Select model in the UI.
+- Demo uses pinned canonical revisions per model.
+
+Canonical branches are pinned in code:
+- `parakeet-tdt-0.6b-v2` -> `feat/fp16-canonical-v2`
+- `parakeet-tdt-0.6b-v3` -> `feat/fp16-canonical-v3`
+
+### Local Folder
+
+- Pick a folder containing local model artifacts.
+- Expected minimum artifacts:
+  - encoder ONNX (e.g. `encoder-model.onnx` or quantized variants)
+  - decoder ONNX (e.g. `decoder_joint-model.onnx` or quantized variants)
+  - tokenizer text file (`vocab.txt`, `tokens.txt`, or other `.txt`)
+- Optional:
+  - preprocessor ONNX (`nemo128.onnx` / `nemo80.onnx`)
+  - external ONNX data files (`*.data`)
+
+If no local `nemo*.onnx` is found, the demo automatically switches preprocessor backend to JS.
+
+### Folder Access Persistence
+
+- On supported browsers, selected folder access can be persisted and restored.
+- If permission is not granted on revisit, the UI offers **Restore Saved Folder**.
+- On unsupported browsers, users must re-select the folder next visit.
 
 ## Version Display
 
-The demo header shows the active `parakeet.js` version/source and the loaded `onnxruntime-web` runtime version.
+Header shows active parakeet source/version:
 
-- **Local mode** (`PARAKEET_LOCAL=true`): shows the root repo version.
-- **NPM mode**: shows the version from `node_modules/parakeet.js`.
+- Local mode: repo version (with short commit hash when available).
+- NPM mode: `node_modules/parakeet.js` version.
 
-## Building
+## Build
 
-### Local Source Build
-```bash
-npm run build:local
-```
-
-### NPM Package Build
 ```bash
 npm run build
+npm run build:local
 ```
 
 ## Deployment
 
 ### HuggingFace Spaces
 
-Deploy to HuggingFace Spaces (uses npm package build):
+Run:
 
 ```bash
-npm run deploy-to-hf
+node scripts/deploy-to-hf.js
 ```
 
-This will:
-1. Build the app with `npm run build`
-2. Clone the HF Space repository
-3. Copy build files and space template
-4. Push to HuggingFace
-
-**Requirements:**
-- HuggingFace CLI logged in (`huggingface-cli login`)
-- Write access to the Space repository
+This script builds and pushes demo artifacts using the space template config.
 
 ### GitHub Pages
 
-GitHub Pages deployment is automated via GitHub Actions and uses a **local source build** (`build:local`) so the live page always reflects the latest repository code, even before an npm publish.
+Automated with GitHub Actions (local-source build path).
 
-**Automatic Deployment:**
-Pushing changes to `examples/demo/**` or `src/**` on the `master` branch triggers the workflow.
+Manual trigger:
 
-**Manual Trigger:**
 ```bash
 gh workflow run deploy-gh-pages.yml
 ```
 
-**Check Status:**
-```bash
-gh run list --workflow="deploy-gh-pages.yml"
-```
-
 ## Cross-Origin Isolation
 
-Both deployment targets require Cross-Origin Isolation headers for `SharedArrayBuffer` support (multi-threaded WASM):
+Required for `SharedArrayBuffer` / multithreaded WASM.
 
-### HuggingFace Spaces
-Headers are configured in `space_template/README.md`:
-```yaml
-custom_headers:
-  cross-origin-embedder-policy: credentialless
-  cross-origin-opener-policy: same-origin
-```
-
-### GitHub Pages
-Since GitHub Pages doesn't support custom headers, we use `coi-serviceworker.js` which is included in the build.
-
-## Directory Structure
-
-```
-demo/
-├── src/
-│   ├── App.jsx          # Main React component
-│   ├── App.css          # Styles
-│   └── utils/           # Utility functions
-├── public/
-│   ├── assets/          # Static assets (test audio)
-│   └── coi-serviceworker.js  # Cross-origin isolation workaround
-├── scripts/
-│   └── deploy-to-hf.js  # HF deployment script
-├── space_template/
-│   └── README.md        # HF Space configuration
-├── vite.config.js       # Vite config with local/npm switching
-└── package.json         # Scripts and dependencies
-```
+- Local dev server sets COOP/COEP headers.
+- HF Spaces headers are configured in `space_template/README.md`.
+- GitHub Pages uses `public/coi-serviceworker.js`.
 
 ## Troubleshooting
 
-### "SharedArrayBuffer unavailable" warning
-- **Local dev**: Should work automatically (Vite sets COOP/COEP headers)
-- **HF Spaces**: Check `space_template/README.md` has `custom_headers`
-- **GitHub Pages**: Ensure `coi-serviceworker.js` is in the build
+### SharedArrayBuffer unavailable
 
-### Model loading fails with memory error
-- Check browser DevTools isn't pausing on potential OOM
-- Try closing other browser tabs to free memory
-- Prefer `fp16` on WebGPU; this demo retries with `fp32` if `fp16` fails, while the core API does not auto-switch. Use `int8` for smallest files.
+- Local: verify dev server is used and headers are present.
+- HF Spaces: verify custom headers in space template.
+- GitHub Pages: ensure `coi-serviceworker.js` is deployed.
 
-### Changes not reflected after deployment
-- GitHub Pages: Wait 1-2 minutes for CDN cache
-- HF Spaces: Wait for Space rebuild (~1 minute)
-- Clear browser cache or use incognito window
+### Local folder model fails to load
+
+- Check required encoder/decoder/tokenizer files exist.
+- Confirm selected quantization exists in your folder.
+- If using ONNX preprocessor, confirm `nemo*.onnx` exists; otherwise switch to JS preprocessor.
+
+### Model load memory pressure
+
+- Close extra tabs/processes.
+- Prefer smaller quant modes (`fp16`/`int8`) where possible.
