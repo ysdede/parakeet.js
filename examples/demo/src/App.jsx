@@ -1084,7 +1084,7 @@ export default function App() {
 
       try {
         // Use GitHub raw URL for the test audio file
-        const audioUrl = './assets/life_Jim.wav';
+        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/life_Jim.wav';
         const audioBlob = await getCachedAudioFile(audioUrl, 'life_Jim.wav');
         const buf = await audioBlob.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });

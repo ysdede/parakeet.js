@@ -23,7 +23,7 @@ jobs:
           rm -rf hf_export && mkdir -p hf_export
 
           # Copy demo source (exclude dev artifacts)
-          rsync -a --exclude='node_modules' --exclude='dist' --exclude='.git' \
+          rsync -a --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='public/assets' \
             examples/demo/ hf_export/
 
           # ── 1) Remove GH-only files ────────────────────────────────
