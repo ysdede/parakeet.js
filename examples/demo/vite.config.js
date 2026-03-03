@@ -49,10 +49,8 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
     fs: {
-      // Allow serving this app root and shared helpers.
+      // Allow serving files from the repo root (needed for PARAKEET_LOCAL mode).
       allow: [
-        path.resolve(__dirname),
-        path.resolve(__dirname, '../shared'),
         searchForWorkspaceRoot(process.cwd()),
       ],
     },
