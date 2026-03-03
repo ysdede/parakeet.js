@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { loadModelWithFallback } from '../examples/shared/modelLoader.js';
+import { loadModelWithFallback } from '../examples/demo/src/shared/modelLoader.js';
 
 describe('loadModelWithFallback', () => {
   it('preserves first compile error context when fp32 retry download fails', async () => {
