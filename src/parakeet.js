@@ -708,7 +708,22 @@ export class ParakeetModel {
       // Optimization: avoid division in the hot loop.
       // max(logit/T) occurs at same index as max(logit).
       let maxLogit = -Infinity, maxId = 0;
-      for (let i = 0; i < tokenLogits.length; i++) {
+      const len = tokenLogits.length;
+      let i = 0;
+      // 8-way unrolled loop for argmax significantly improves throughput on V8
+      // for typical vocabulary sizes (~4000). Avoids local variables.
+      for (; i <= len - 8; i += 8) {
+        if (tokenLogits[i] > maxLogit) { maxLogit = tokenLogits[i]; maxId = i; }
+        if (tokenLogits[i+1] > maxLogit) { maxLogit = tokenLogits[i+1]; maxId = i+1; }
+        if (tokenLogits[i+2] > maxLogit) { maxLogit = tokenLogits[i+2]; maxId = i+2; }
+        if (tokenLogits[i+3] > maxLogit) { maxLogit = tokenLogits[i+3]; maxId = i+3; }
+        if (tokenLogits[i+4] > maxLogit) { maxLogit = tokenLogits[i+4]; maxId = i+4; }
+        if (tokenLogits[i+5] > maxLogit) { maxLogit = tokenLogits[i+5]; maxId = i+5; }
+        if (tokenLogits[i+6] > maxLogit) { maxLogit = tokenLogits[i+6]; maxId = i+6; }
+        if (tokenLogits[i+7] > maxLogit) { maxLogit = tokenLogits[i+7]; maxId = i+7; }
+      }
+      // Handle remaining elements
+      for (; i < len; i++) {
         const v = tokenLogits[i];
         if (v > maxLogit) { maxLogit = v; maxId = i; }
       }
