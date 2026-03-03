@@ -708,10 +708,22 @@ export class ParakeetModel {
       // Temperature scaling & argmax
       // Optimization: avoid division in the hot loop.
       // max(logit/T) occurs at same index as max(logit).
+      // Unroll loop 8x to improve throughput on tokenLogits array (typically ~4000 items)
       let maxLogit = -Infinity, maxId = 0;
-      for (let i = 0; i < tokenLogits.length; i++) {
-        const v = tokenLogits[i];
-        if (v > maxLogit) { maxLogit = v; maxId = i; }
+      const tLen = tokenLogits.length;
+      let i = 0;
+      for (; i < tLen % 8; i++) {
+        if (tokenLogits[i] > maxLogit) { maxLogit = tokenLogits[i]; maxId = i; }
+      }
+      for (; i < tLen; i += 8) {
+        if (tokenLogits[i] > maxLogit) { maxLogit = tokenLogits[i]; maxId = i; }
+        if (tokenLogits[i+1] > maxLogit) { maxLogit = tokenLogits[i+1]; maxId = i + 1; }
+        if (tokenLogits[i+2] > maxLogit) { maxLogit = tokenLogits[i+2]; maxId = i + 2; }
+        if (tokenLogits[i+3] > maxLogit) { maxLogit = tokenLogits[i+3]; maxId = i + 3; }
+        if (tokenLogits[i+4] > maxLogit) { maxLogit = tokenLogits[i+4]; maxId = i + 4; }
+        if (tokenLogits[i+5] > maxLogit) { maxLogit = tokenLogits[i+5]; maxId = i + 5; }
+        if (tokenLogits[i+6] > maxLogit) { maxLogit = tokenLogits[i+6]; maxId = i + 6; }
+        if (tokenLogits[i+7] > maxLogit) { maxLogit = tokenLogits[i+7]; maxId = i + 7; }
       }
 
       // Compute maxVal (scaled) only if needed for softmax stability or logProbs
