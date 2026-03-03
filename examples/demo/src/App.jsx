@@ -17,6 +17,11 @@ const MODEL_SOURCE_OPTIONS = {
   HUGGINGFACE: 'huggingface',
   LOCAL: 'local',
 };
+
+// showDirectoryPicker is blocked in cross-origin iframes (e.g. HF Spaces)
+const isInIframe = (() => {
+  try { return window.self !== window.top; } catch { return true; }
+})();
 const QUANT_TO_FILENAME = {
   fp32: '.onnx',
   fp16: '.fp16.onnx',
@@ -404,7 +409,7 @@ export default function App() {
   const initialModelSource = initialSettings.modelSource;
   const resolvedInitialModel = MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2';
   const [modelSource, setModelSource] = useState(
-    initialModelSource === MODEL_SOURCE_OPTIONS.LOCAL
+    initialModelSource === MODEL_SOURCE_OPTIONS.LOCAL && !isInIframe
       ? MODEL_SOURCE_OPTIONS.LOCAL
       : MODEL_SOURCE_OPTIONS.HUGGINGFACE
   );
@@ -1263,7 +1268,7 @@ export default function App() {
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary dark:text-white appearance-none"
                     >
                       <option value={MODEL_SOURCE_OPTIONS.HUGGINGFACE}>HuggingFace</option>
-                      <option value={MODEL_SOURCE_OPTIONS.LOCAL}>Local folder</option>
+                      {!isInIframe && <option value={MODEL_SOURCE_OPTIONS.LOCAL}>Local folder</option>}
                     </select>
                     <span className="material-icons-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-lg">
                       expand_more
