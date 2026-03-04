@@ -1385,6 +1385,7 @@ export class FrameAlignedMerger {
     this.confirmedTokens = [];  // Tokens that passed stability check
     this.pendingTokens = [];    // Tokens awaiting confirmation
     this.stabilityMap = new Map();  // tokenKey → appearance count
+    this.confirmedKeys = new Set(); // Fast lookup for confirmed tokens
   }
 
   /**
@@ -1439,7 +1440,10 @@ export class FrameAlignedMerger {
 
       // Confirm pending tokens up to anchor
       const toConfirm = this.pendingTokens.filter(t => t.absTime < anchorTime);
-      this.confirmedTokens.push(...toConfirm);
+      for (const t of toConfirm) {
+        this.confirmedTokens.push(t);
+        this.confirmedKeys.add(this._tokenKey(t.id, t.absTime));
+      }
 
       // Update stability for overlap tokens
       for (const token of overlapTokens) {
@@ -1449,11 +1453,9 @@ export class FrameAlignedMerger {
 
         if (count >= this.stabilityThreshold) {
           // Token is stable - add to confirmed if not already there
-          const alreadyConfirmed = this.confirmedTokens.some(
-            t => Math.abs(t.absTime - token.absTime) < this.timeTolerance && t.id === token.id
-          );
-          if (!alreadyConfirmed) {
+          if (!this.confirmedKeys.has(key)) {
             this.confirmedTokens.push(token);
+            this.confirmedKeys.add(key);
           }
         }
       }
@@ -1522,6 +1524,7 @@ export class FrameAlignedMerger {
     this.confirmedTokens = [];
     this.pendingTokens = [];
     this.stabilityMap.clear();
+    this.confirmedKeys.clear();
   }
 
   /**
