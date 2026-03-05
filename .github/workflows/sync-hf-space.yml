@@ -48,7 +48,7 @@ jobs:
           pinned: true
           header: mini
           fullWidth: true
-          app_build_command: npm run build
+          app_build_command: npm install && npm run build
           app_file: dist/index.html
           license: mit
           short_description: NVIDIA Parakeet speech recognition for the browser
@@ -69,7 +69,6 @@ jobs:
           custom_headers:
             cross-origin-embedder-policy: require-corp
             cross-origin-opener-policy: same-origin
-            cross-origin-resource-policy: cross-origin
           preload_from_hub:
           - ysdede/parakeet-tdt-0.6b-v2-onnx
           - ysdede/parakeet-tdt-0.6b-v3-onnx
@@ -154,12 +153,26 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          cd hf_export
-          git init
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add -A
-          git commit -m "Sync from GitHub (${GITHUB_SHA::7})"
-          git branch -M main
-          git remote add space "https://ysdede:${HF_TOKEN}@huggingface.co/spaces/ysdede/parakeet.js-demo"
-          git push --force space main
+          set -e
+          SPACE_URL="https://ysdede:${HF_TOKEN}@huggingface.co/spaces/ysdede/parakeet.js-demo"
+          if git clone --depth 1 "$SPACE_URL" space_repo 2>/dev/null; then
+            rsync -a --delete --exclude='.git' hf_export/ space_repo/
+            cd space_repo
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "Sync from GitHub (${GITHUB_SHA::7})"
+              git push origin main
+            fi
+          else
+            cd hf_export
+            git init
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            git add -A
+            git commit -m "Sync from GitHub (${GITHUB_SHA::7})"
+            git branch -M main
+            git remote add origin "$SPACE_URL"
+            git push -u origin main
+          fi
