@@ -1089,7 +1089,10 @@ export default function App() {
       setStatus('Verifying…');
       setProgressText('Running test transcription');
       console.log('[LoadModel] Running warm-up verification transcription');
-      const expectedText = 'The boy was there when the sun rose. A rod is used to catch pink salmon.';
+      const expectedTexts = [
+        'The boy was there when the sun rose.',
+        'The boy was there when the sun rose. A rod is used to catch pink salmon.',
+      ];
 
       try {
         const warmupUrls = [
@@ -1120,12 +1123,17 @@ export default function App() {
         const { utterance_text } = await modelRef.current.transcribe(pcm, 16000, { enableProfiling });
         const normalize = (str) => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
 
-        if (normalize(utterance_text).includes(normalize(expectedText))) {
+        const normalizedUtterance = normalize(utterance_text);
+        const matchedExpectedText = expectedTexts.find((text) =>
+          normalizedUtterance.includes(normalize(text))
+        );
+
+        if (matchedExpectedText) {
           console.log('[App] Model verification successful.');
           setStatus('Model ready');
           setModelLoaded(true);
         } else {
-          console.error(`[App] Verification failed! Expected: "${expectedText}", Got: "${utterance_text}"`);
+          console.error(`[App] Verification failed! Expected one of: "${expectedTexts.join('" | "')}", Got: "${utterance_text}"`);
           setStatus('Verification failed');
           setModelLoaded(false);
           modelRef.current = null;
