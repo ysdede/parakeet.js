@@ -7,6 +7,7 @@ import {
   pickPreferredQuant,
 } from './shared/modelSelection.js';
 import { formatResolvedQuantization, loadModelWithFallback } from './shared/modelLoader.js';
+import warmupAudioUrl from './assets/Harvard-L2-1.ogg?url';
 import './App.css';
 
 const SETTINGS_STORAGE_KEY = 'parakeet.demo.settings.v1';
@@ -310,7 +311,7 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
   languages: config.languages,
 }));
 
-// Cache audio file from GitHub raw URL to IndexedDB
+// Cache audio file (remote or local URL) to IndexedDB
 async function getCachedAudioFile(url, cacheKey) {
   const dbName = 'parakeet-demo-cache';
   const storeName = 'audio-files';
@@ -1088,12 +1089,29 @@ export default function App() {
       setStatus('Verifying…');
       setProgressText('Running test transcription');
       console.log('[LoadModel] Running warm-up verification transcription');
-      const expectedText = 'it is not life as we know or understand it';
+      const expectedText = 'The boy was there when the sun rose. A rod is used to catch pink salmon.';
 
       try {
-        // Use GitHub raw URL for the test audio file
-        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/life_Jim.wav';
-        const audioBlob = await getCachedAudioFile(audioUrl, 'life_Jim.wav');
+        const warmupUrls = [
+          // Prefer bundled local asset URL for deterministic local/prod behavior.
+          warmupAudioUrl,
+          // Fallback only if the deployed app is missing the local asset.
+          'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/Harvard-L2-1.ogg',
+        ];
+        let audioBlob = null;
+        let warmupFetchError = null;
+        for (const audioUrl of warmupUrls) {
+          try {
+            audioBlob = await getCachedAudioFile(audioUrl, 'Harvard-L2-1.ogg');
+            break;
+          } catch (e) {
+            warmupFetchError = e;
+            console.warn(`[App] Warm-up audio fetch failed for ${audioUrl}: ${e.message}`);
+          }
+        }
+        if (!audioBlob) {
+          throw warmupFetchError || new Error('Failed to load warm-up audio.');
+        }
         const buf = await audioBlob.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });
         const decoded = await audioCtx.decodeAudioData(buf);
@@ -1231,7 +1249,7 @@ export default function App() {
               title="View on GitHub"
             >
               <img
-                src="https://img.shields.io/github/stars/ysdede/parakeet.js?style=social"
+                src="https://img.shields.io/github/stars/ysdede/parakeet%2Ejs?style=social"
                 alt="GitHub stars"
                 className="h-6"
               />
