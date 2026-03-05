@@ -302,6 +302,13 @@ function saveSettings(settings) {
   }
 }
 
+function resolveDemoAssetUrl(assetPath) {
+  const normalizedPath = String(assetPath || '').replace(/^\/+/, '');
+  const baseUrl = import.meta?.env?.BASE_URL || '/';
+  const base = new URL(baseUrl, window.location.origin);
+  return new URL(normalizedPath, base).toString();
+}
+
 // Available models for selection
 const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
   key,
@@ -310,7 +317,7 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
   languages: config.languages,
 }));
 
-// Cache audio file from GitHub raw URL to IndexedDB
+// Cache audio file (remote or local URL) to IndexedDB
 async function getCachedAudioFile(url, cacheKey) {
   const dbName = 'parakeet-demo-cache';
   const storeName = 'audio-files';
@@ -1088,12 +1095,29 @@ export default function App() {
       setStatus('Verifying…');
       setProgressText('Running test transcription');
       console.log('[LoadModel] Running warm-up verification transcription');
-      const expectedText = 'it is not life as we know or understand it';
+      const expectedText = 'The boy was there when the sun rose. A rod is used to catch pink salmon.';
 
       try {
-        // Use GitHub raw URL for the test audio file
-        const audioUrl = 'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/life_Jim.wav';
-        const audioBlob = await getCachedAudioFile(audioUrl, 'life_Jim.wav');
+        const warmupUrls = [
+          // Prefer same-origin demo asset to avoid third-party CORS failures.
+          resolveDemoAssetUrl('assets/Harvard-L2-1.ogg'),
+          // Fallback only if the deployed app is missing the local asset.
+          'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/Harvard-L2-1.ogg',
+        ];
+        let audioBlob = null;
+        let warmupFetchError = null;
+        for (const audioUrl of warmupUrls) {
+          try {
+            audioBlob = await getCachedAudioFile(audioUrl, 'Harvard-L2-1.ogg');
+            break;
+          } catch (e) {
+            warmupFetchError = e;
+            console.warn(`[App] Warm-up audio fetch failed for ${audioUrl}: ${e.message}`);
+          }
+        }
+        if (!audioBlob) {
+          throw warmupFetchError || new Error('Failed to load warm-up audio.');
+        }
         const buf = await audioBlob.arrayBuffer();
         const audioCtx = new AudioContext({ sampleRate: 16000 });
         const decoded = await audioCtx.decodeAudioData(buf);
