@@ -618,17 +618,34 @@ export class ParakeetModel {
       transposed = new Float32Array(Tenc * D);
       const encData = enc.data;
 
-      // Optimized transpose with tight loops and better cache locality
-      // Process in blocks to improve cache performance
-      const blockSize = Math.min(64, D); // Tune block size for cache efficiency
-
-      for (let dBlock = 0; dBlock < D; dBlock += blockSize) {
-        const dEnd = Math.min(dBlock + blockSize, D);
-        for (let t = 0; t < Tenc; t++) {
-          const tOffset = t * D;
-          for (let d = dBlock; d < dEnd; d++) {
-            transposed[tOffset + d] = encData[d * Tenc + t];
-          }
+      // Optimized transpose with unrolled sequential loop.
+      // Benchmarks show V8 engine loop overhead makes manually blocked/tiled
+      // approaches significantly slower for these array sizes (e.g. 1000x640).
+      for (let t = 0; t < Tenc; t++) {
+        const tOffset = t * D;
+        let readIdx = t;
+        let d = 0;
+        for (; d <= D - 8; d += 8) {
+          transposed[tOffset + d]     = encData[readIdx];
+          readIdx += Tenc;
+          transposed[tOffset + d + 1] = encData[readIdx];
+          readIdx += Tenc;
+          transposed[tOffset + d + 2] = encData[readIdx];
+          readIdx += Tenc;
+          transposed[tOffset + d + 3] = encData[readIdx];
+          readIdx += Tenc;
+          transposed[tOffset + d + 4] = encData[readIdx];
+          readIdx += Tenc;
+          transposed[tOffset + d + 5] = encData[readIdx];
+          readIdx += Tenc;
+          transposed[tOffset + d + 6] = encData[readIdx];
+          readIdx += Tenc;
+          transposed[tOffset + d + 7] = encData[readIdx];
+          readIdx += Tenc;
+        }
+        for (; d < D; d++) {
+          transposed[tOffset + d] = encData[readIdx];
+          readIdx += Tenc;
         }
       }
     } else {
