@@ -1478,14 +1478,29 @@ export class FrameAlignedMerger {
   _findAnchors(overlapTokens) {
     const anchors = [];
 
-    for (const newTok of overlapTokens) {
-      for (const pendTok of this.pendingTokens) {
-        if (
-          newTok.id === pendTok.id &&
-          Math.abs(newTok.absTime - pendTok.absTime) < this.timeTolerance
-        ) {
-          anchors.push(newTok);
-          break;
+    // Optimization: O(N+M) Map lookup by token ID instead of O(N*M) nested loops.
+    // Group pending tokens by ID to quickly find time-aligned matches.
+    const pendingById = new Map();
+    for (let i = 0; i < this.pendingTokens.length; i++) {
+      const pendTok = this.pendingTokens[i];
+      let arr = pendingById.get(pendTok.id);
+      if (!arr) {
+        arr = [];
+        pendingById.set(pendTok.id, arr);
+      }
+      arr.push(pendTok);
+    }
+
+    for (let i = 0; i < overlapTokens.length; i++) {
+      const newTok = overlapTokens[i];
+      const candidates = pendingById.get(newTok.id);
+      if (candidates) {
+        for (let j = 0; j < candidates.length; j++) {
+          const pendTok = candidates[j];
+          if (Math.abs(newTok.absTime - pendTok.absTime) < this.timeTolerance) {
+            anchors.push(newTok);
+            break;
+          }
         }
       }
     }
