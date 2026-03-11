@@ -19,7 +19,7 @@ export async function fromUrls(cfg) {
   return ParakeetModel.fromUrls(cfg);
 }
 
-function usesRequestedFp16(options) {
+export function usesRequestedFp16(options) {
   return options?.encoderQuant === 'fp16' || options?.decoderQuant === 'fp16';
 }
 
