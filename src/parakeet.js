@@ -1322,7 +1322,7 @@ export class MelFeatureCache {
 
   /**
    * Generate a cache key from audio samples.
-   * Uses a fast hash based on length + sampled values.
+   * Uses full hashing for normal inputs and deterministic dense sampling for huge buffers.
    * @param {Float32Array} audio - Audio samples
    * @returns {string} Cache key
    */
@@ -1402,6 +1402,11 @@ export class MelFeatureCache {
 
     // Calculate size (Float32 = 4 bytes)
     const sizeMB = (features.length * 4) / (1024 * 1024);
+
+    // Skip caching entries that can never fit. Keep the existing cache warm.
+    if (sizeMB > this.maxCacheSizeMB) {
+      return { features, T, melBins, cached: false };
+    }
 
     // Evict old entries if needed
     while (this.currentSizeMB + sizeMB > this.maxCacheSizeMB && this.cache.size > 0) {
