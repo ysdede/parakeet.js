@@ -19,6 +19,7 @@ describe('long-audio chunking helpers', () => {
     expect(result).toEqual({ text: 'hello world' });
     expect(model.transcribe).toHaveBeenCalledTimes(1);
     expect(model.transcribe).toHaveBeenCalledWith(audio, 16000, expect.objectContaining({
+      _skipAudioValidation: true,
       returnTimestamps: false,
       timeOffset: 5,
     }));
@@ -51,6 +52,7 @@ describe('long-audio chunking helpers', () => {
       ],
     });
     expect(model.transcribe).toHaveBeenCalledWith(audio, 16000, expect.objectContaining({
+      _skipAudioValidation: true,
       returnTimestamps: true,
       timeOffset: 1.25,
     }));
@@ -115,6 +117,9 @@ describe('long-audio chunking helpers', () => {
     expect(seenOffsets[1]).toBeCloseTo(24.2, 6);
     expect(seenOffsets[2]).toBeCloseTo(26.0, 6);
     expect(seenOffsets[3]).toBeCloseTo(45.2, 6);
+    for (const call of model.transcribe.mock.calls) {
+      expect(call[2]._skipAudioValidation).toBe(true);
+    }
 
     expect(result.text).toBe('Hello world. Next sentence. Another one. Final bit.');
     expect(result.chunks).toEqual([
