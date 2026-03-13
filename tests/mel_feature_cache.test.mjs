@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { MelFeatureCache } from '../src/parakeet.js';
 
 describe('MelFeatureCache', () => {
@@ -26,5 +26,25 @@ describe('MelFeatureCache', () => {
     second[1_099_999] = 0.25;
 
     expect(cache._generateKey(first)).not.toBe(cache._generateKey(second));
+  });
+
+  it('does not cache entries that exceed the cache size by themselves', async () => {
+    const cache = new MelFeatureCache({ maxCacheSizeMB: 0.001 });
+    const audio = new Float32Array(1600);
+    const model = {
+      computeFeatures: vi.fn().mockResolvedValue({
+        features: new Float32Array(1024),
+        T: 8,
+        melBins: 128,
+      }),
+    };
+
+    const first = await cache.getFeatures(model, audio);
+    const second = await cache.getFeatures(model, audio);
+
+    expect(first.cached).toBe(false);
+    expect(second.cached).toBe(false);
+    expect(model.computeFeatures).toHaveBeenCalledTimes(2);
+    expect(cache.getStats().entries).toBe(0);
   });
 });
