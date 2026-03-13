@@ -396,6 +396,7 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
   const transcribeWindow = async (windowAudio, windowTimeOffset) => {
     const output = await model.transcribe(windowAudio, sampleRate, {
       ...transcribeOptions,
+      _skipAudioValidation: true,
       returnTimestamps: true,
       timeOffset: windowTimeOffset,
     });
@@ -424,6 +425,7 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
 
   const output = await model.transcribe(audio, sampleRate, {
     ...transcribeOptions,
+    _skipAudioValidation: true,
     returnTimestamps: wantTimestampChunks,
     timeOffset,
   });

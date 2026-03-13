@@ -394,8 +394,10 @@ export class ParakeetModel {
    * @returns {{features: Float32Array, T: number, melBins: number, cached?: boolean, cachedFrames?: number, newFrames?: number}}
    */
   async computeFeatures(audio, sampleRate = 16000, opts = {}) {
-    const { prefixSamples = 0 } = opts;
-    validateFiniteAudioSamples(audio, 'ParakeetModel.computeFeatures');
+    const { prefixSamples = 0, _skipAudioValidation = false } = opts;
+    if (!_skipAudioValidation) {
+      validateFiniteAudioSamples(audio, 'ParakeetModel.computeFeatures');
+    }
 
     // Use incremental mel processor if available and prefix is specified
     if (this._incrementalMel && prefixSamples > 0) {
@@ -579,13 +581,11 @@ export class ParakeetModel {
       prefixSamples = 0,            // Number of leading samples identical to previous call
       // Pre-computed mel features (bypass preprocessor entirely)
       precomputedFeatures = null,    // { features: Float32Array, T: number, melBins: number }
+      _skipAudioValidation = false,  // Internal: long-audio helpers can skip re-validating already checked windows
     } = opts;
 
     if (!Number.isFinite(timeOffset)) {
       throw new Error('ParakeetModel.transcribe expected `timeOffset` to be a finite number.');
-    }
-    if (!precomputedFeatures) {
-      validateFiniteAudioSamples(audio, 'ParakeetModel.transcribe');
     }
 
     const perfEnabled = debug || enableProfiling; // collect timings & populate result.metrics (default: true for backward compat)
@@ -606,14 +606,14 @@ export class ParakeetModel {
       console.log(`[Parakeet] Preprocessor: mel-worker (precomputed ${T} frames × ${melBins} mel bins, 0 ms)`);
     } else if (perfEnabled) {
       const s = performance.now();
-      ({ features, T, melBins, validLength, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
+      ({ features, T, melBins, validLength, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples, _skipAudioValidation }));
       tPreproc = performance.now() - s;
       const cacheStr = melCacheInfo?.cached
         ? ` (cached: ${melCacheInfo.cachedFrames} frames, new: ${melCacheInfo.newFrames} frames)`
         : '';
       console.log(`[Parakeet] Preprocessor: ${preprocessorPath}, ${T} frames × ${melBins} mel bins, ${tPreproc.toFixed(1)} ms${cacheStr}`);
     } else {
-      ({ features, T, melBins, validLength, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples }));
+      ({ features, T, melBins, validLength, ...melCacheInfo } = await this.computeFeatures(audio, sampleRate, { prefixSamples, _skipAudioValidation }));
     }
 
     // 2. Encode entire utterance
@@ -1329,6 +1329,9 @@ export class MelFeatureCache {
   _generateKey(audio) {
     const n = audio.length;
     if (n === 0) return '0_0';
+    const FULL_HASH_THRESHOLD = 1_000_000;
+    const EDGE_SAMPLE_COUNT = 1024;
+    const TARGET_SAMPLED_POINTS = 131072;
 
     // MurmurHash3-style 32-bit mix helper
     const mix32 = (h, v) => {
@@ -1355,8 +1358,25 @@ export class MelFeatureCache {
     // Seed with length so differently-sized arrays can never collide
     let h = n | 0;
 
-    // Hash all samples to minimize false cache hits across similar waveforms.
-    for (let i = 0; i < n; i++) h = mix32(h, audio[i]);
+    if (n <= FULL_HASH_THRESHOLD) {
+      // For the short/medium buffers this cache typically sees, full hashing
+      // remains the most robust collision guard.
+      for (let i = 0; i < n; i++) h = mix32(h, audio[i]);
+    } else {
+      // Very large buffers are sampled densely but deterministically to keep
+      // cache key generation from becoming a full-buffer O(n) bottleneck.
+      const edgeCount = Math.min(EDGE_SAMPLE_COUNT, Math.floor(n / 2));
+      for (let i = 0; i < edgeCount; i++) h = mix32(h, audio[i]);
+
+      const middleStart = edgeCount;
+      const middleEnd = n - edgeCount;
+      const middleLength = Math.max(0, middleEnd - middleStart);
+      const remainingBudget = Math.max(1, TARGET_SAMPLED_POINTS - (edgeCount * 2));
+      const stride = Math.max(1, Math.floor(middleLength / remainingBudget));
+      for (let i = middleStart; i < middleEnd; i += stride) h = mix32(h, audio[i]);
+
+      for (let i = Math.max(edgeCount, n - edgeCount); i < n; i++) h = mix32(h, audio[i]);
+    }
 
     return `${n}_${fmix32(h)}`;
   }

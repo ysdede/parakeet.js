@@ -17,4 +17,14 @@ describe('MelFeatureCache', () => {
 
     expect(cache._generateKey(first)).not.toBe(cache._generateKey(second));
   });
+
+  it('uses a deterministic large-buffer hash path for huge audio buffers', () => {
+    const cache = new MelFeatureCache({ maxCacheSizeMB: 1 });
+    const first = new Float32Array(1_100_000);
+    const second = new Float32Array(1_100_000);
+
+    second[1_099_999] = 0.25;
+
+    expect(cache._generateKey(first)).not.toBe(cache._generateKey(second));
+  });
 });
