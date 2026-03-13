@@ -78,6 +78,12 @@ function makeJoinerOutput(tokenLogits, durLogits) {
   };
 }
 
+function softmaxConfidence(logits, winnerIndex, temperature = 1) {
+  const scaledWinner = logits[winnerIndex] / temperature;
+  const sumExp = logits.reduce((sum, value) => sum + Math.exp((value / temperature) - scaledWinner), 0);
+  return 1 / sumExp;
+}
+
 describe('ParakeetModel decode loop', () => {
   it('emits multiple non-blank tokens on the same frame when step=0', async () => {
     const queue = [
@@ -164,6 +170,63 @@ describe('ParakeetModel decode loop', () => {
     expect(result.utterance_text).toBe('AA');
     expect(result.frameIndices.every((i) => i <= 2)).toBe(true);
     expect(joinerRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('clamps token end timestamps to the final encoder frame when TDT overshoots', async () => {
+    const queue = [
+      makeJoinerOutput([0.1, 9.0, 0.2], [0.1, 0.2, 9.0]), // token=1, step=2
+      makeJoinerOutput([0.1, 0.2, 9.0], [0.1, 0.2, 9.0]), // token=2, step=2 at final frame
+    ];
+
+    let idx = 0;
+    const joinerRun = vi.fn().mockImplementation(async () => {
+      const out = queue[Math.min(idx, queue.length - 1)];
+      idx += 1;
+      return out;
+    });
+
+    const model = createModelForDecodeLoop({ tEnc: 3, joinerRun });
+    const result = await model.transcribe(new Float32Array(16000), 16000, {
+      returnTimestamps: true,
+      enableProfiling: false,
+    });
+
+    expect(result.tokens.map((token) => [token.start_time, token.end_time])).toEqual([
+      [0, 0.16],
+      [0.16, 0.24],
+    ]);
+  });
+
+  it('aggregates frame confidences once per encoder frame even with multiple token emissions', async () => {
+    const queue = [
+      { token: [0.1, 4.0, 0.2], step: [5.0, 1.0, 0.1] }, // token=1, step=0
+      { token: [0.1, 0.2, 8.0], step: [5.0, 1.0, 0.1] }, // token=2, step=0
+      { token: [9.0, 0.1, 0.2], step: [0.1, 9.0, 0.2] }, // blank, step=1 to exit
+    ].map(({ token, step }) => makeJoinerOutput(token, step));
+
+    let idx = 0;
+    const joinerRun = vi.fn().mockImplementation(async () => {
+      const out = queue[Math.min(idx, queue.length - 1)];
+      idx += 1;
+      return out;
+    });
+
+    const model = createModelForDecodeLoop({ tEnc: 1, joinerRun });
+    const result = await model.transcribe(new Float32Array(16000), 16000, {
+      returnConfidences: true,
+      enableProfiling: false,
+    });
+
+    const expectedFrameConfidence = (
+      softmaxConfidence([0.1, 4.0, 0.2], 1) +
+      softmaxConfidence([0.1, 0.2, 8.0], 2) +
+      softmaxConfidence([9.0, 0.1, 0.2], 0)
+    ) / 3;
+
+    expect(result.confidence_scores.token).toHaveLength(2);
+    expect(result.confidence_scores.frame).toHaveLength(1);
+    expect(result.confidence_scores.frame[0]).toBeCloseTo(expectedFrameConfidence, 4);
+    expect(result.confidence_scores.frame_avg).toBeCloseTo(expectedFrameConfidence, 4);
   });
 
   it('copies the correct transposed frame slice into reusable encoder buffer each step', async () => {

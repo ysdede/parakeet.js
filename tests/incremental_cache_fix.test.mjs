@@ -35,8 +35,8 @@ describe('ParakeetModel Incremental Cache', () => {
   const mockJoinerSession = {
     run: async () => ({
       outputs: {
-        dims: [1, 1, 1, 3], // B, U, V, vocab (3) + dur (0)
-        data: new Float32Array([0.8, 0.1, 0.1]), // logits, index 0 (blank) is max
+        dims: [1, 1, 1, 6], // B, U, V, vocab (3) + dur (3)
+        data: new Float32Array([0.8, 0.1, 0.1, 9.0, 0.1, 0.1]), // blank token, step=0
       },
       output_states_1: { data: new Float32Array(10), dims: [1, 1, 10] },
       output_states_2: { data: new Float32Array(10), dims: [1, 1, 10] },
@@ -109,8 +109,8 @@ describe('ParakeetModel Incremental Cache', () => {
   it('should skip prefix frames only when cacheKey and prefixSeconds match', async () => {
     const joinerRun = vi.fn().mockResolvedValue({
       outputs: {
-        dims: [1, 1, 1, 3],
-        data: new Float32Array([0.8, 0.1, 0.1]), // blank
+        dims: [1, 1, 1, 6],
+        data: new Float32Array([0.8, 0.1, 0.1, 9.0, 0.1, 0.1]), // blank, step=0
       },
       output_states_1: { data: new Float32Array(10), dims: [1, 1, 10] },
       output_states_2: { data: new Float32Array(10), dims: [1, 1, 10] },

@@ -40,6 +40,8 @@ import type { GetParakeetModelOptions } from './hub';
 export type {
   TranscribeResult,
   TranscribeOptions,
+  LongAudioTranscribeOptions,
+  LongAudioTranscribeResult,
   FromUrlsConfig,
 } from './parakeet';
 

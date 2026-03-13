@@ -109,6 +109,22 @@ export interface TranscribeResult {
   tdtSteps?: number[];
 }
 
+export interface LongAudioChunk {
+  text: string;
+  timestamp: [number, number];
+}
+
+export interface LongAudioTranscribeOptions extends Omit<TranscribeOptions, 'returnTimestamps'> {
+  returnTimestamps?: boolean | 'word';
+  chunkLengthS?: number;
+}
+
+export interface LongAudioTranscribeResult {
+  text: string;
+  words?: TranscribeWord[];
+  chunks?: LongAudioChunk[];
+}
+
 export interface FromUrlsConfig {
   encoderUrl: string;
   decoderUrl: string;
@@ -155,6 +171,7 @@ export class ParakeetModel {
     maxTokensPerStep: number;
   };
   transcribe(audio: Float32Array | null, sampleRate?: number, opts?: TranscribeOptions): Promise<TranscribeResult>;
+  transcribeLongAudio(audio: Float32Array | Float64Array, sampleRate?: number, opts?: LongAudioTranscribeOptions): Promise<LongAudioTranscribeResult>;
   createStreamingTranscriber(opts?: StreamingTranscriberOptions): StatefulStreamingTranscriber;
   endProfiling(): Record<string, { gpu_us: number; cpu_us: number; total_us: number }> | null;
 }
