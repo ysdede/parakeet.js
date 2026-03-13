@@ -139,7 +139,7 @@ export async function fetchDatasetRows(langCode) {
  * @param {Object} [options]
  * @param {number} [options.targetSampleRate=16000] - Target sample rate for audio
  * @param {Function} [options.onProgress] - Progress callback
- * @returns {Promise<{audioBuffer: ArrayBuffer, pcm: Float32Array, transcription: string, duration: number, sampleIndex: number, dataset: string}>}
+ * @returns {Promise<{audioBuffer: ArrayBuffer, pcm: Float32Array, transcription: string, duration: number, sampleIndex: number, dataset: string, sourceAudioUrl: string, sourceFilename: string, sourceMimeType: string}>}
  */
 export async function fetchRandomSample(langCode, options = {}) {
   const { targetSampleRate = 16000, onProgress } = options;
@@ -170,6 +170,17 @@ export async function fetchRandomSample(langCode, options = {}) {
   }
   
   const audioBuffer = await audioRes.arrayBuffer();
+  const sourceMimeType = audioRes.headers.get('content-type') || 'application/octet-stream';
+  let sourceFilename = 'sample.bin';
+  try {
+    const pathname = new URL(audioUrl).pathname;
+    const basename = pathname.split('/').pop();
+    if (basename) {
+      sourceFilename = basename;
+    }
+  } catch {
+    // Keep fallback filename when the dataset URL cannot be parsed.
+  }
 
   onProgress?.({ stage: 'decoding_audio', message: 'Decoding audio...' });
 
@@ -190,6 +201,9 @@ export async function fetchRandomSample(langCode, options = {}) {
     sampleIndex: randomIndex,
     dataset: row._dataset,
     language: langCode,
+    sourceAudioUrl: audioUrl,
+    sourceFilename,
+    sourceMimeType,
   };
 }
 
