@@ -738,20 +738,32 @@ export class ParakeetModel {
       // Compute softmax denominator when confidences OR logProbs are requested
       if (returnConfidences || returnLogProbs) {
         const invTemp = 1.0 / temperature;
-        let s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+        let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0, s6 = 0, s7 = 0;
         let i = 0;
         const len = tokenLogits.length;
         // Optimization: (logit/T) - maxVal = (logit - maxLogit) / T
         // This avoids one division per item by using multiplication.
-        // Optimization: unroll the accumulation loop 4x with independent accumulators
-        // This reduces loop overhead and improves instruction-level parallelism.
-        for (; i <= len - 4; i += 4) {
-          s0 += Math.exp((tokenLogits[i] - maxLogit) * invTemp);
-          s1 += Math.exp((tokenLogits[i+1] - maxLogit) * invTemp);
-          s2 += Math.exp((tokenLogits[i+2] - maxLogit) * invTemp);
-          s3 += Math.exp((tokenLogits[i+3] - maxLogit) * invTemp);
+        // Optimization: unroll the accumulation loop 8x with independent accumulators
+        // and cache the multiplications to reduce repeated property accesses/calculations.
+        for (; i <= len - 8; i += 8) {
+          const v0 = (tokenLogits[i] - maxLogit) * invTemp;
+          const v1 = (tokenLogits[i+1] - maxLogit) * invTemp;
+          const v2 = (tokenLogits[i+2] - maxLogit) * invTemp;
+          const v3 = (tokenLogits[i+3] - maxLogit) * invTemp;
+          const v4 = (tokenLogits[i+4] - maxLogit) * invTemp;
+          const v5 = (tokenLogits[i+5] - maxLogit) * invTemp;
+          const v6 = (tokenLogits[i+6] - maxLogit) * invTemp;
+          const v7 = (tokenLogits[i+7] - maxLogit) * invTemp;
+          s0 += Math.exp(v0);
+          s1 += Math.exp(v1);
+          s2 += Math.exp(v2);
+          s3 += Math.exp(v3);
+          s4 += Math.exp(v4);
+          s5 += Math.exp(v5);
+          s6 += Math.exp(v6);
+          s7 += Math.exp(v7);
         }
-        let sumExp = s0 + s1 + s2 + s3;
+        let sumExp = s0 + s1 + s2 + s3 + s4 + s5 + s6 + s7;
         for (; i < len; i++) {
           sumExp += Math.exp((tokenLogits[i] - maxLogit) * invTemp);
         }
