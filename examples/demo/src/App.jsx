@@ -457,6 +457,8 @@ export default function App() {
     initialSettings.enableProfiling === undefined ? true : Boolean(initialSettings.enableProfiling)
   );
   const [audioUrl, setAudioUrl] = useState(null);
+  const [sampleDownload, setSampleDownload] = useState(null);
+  const [isDownloadingSample, setIsDownloadingSample] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [darkMode, setDarkMode] = useState(getInitialDarkMode(initialSettings));
   const [modelLoaded, setModelLoaded] = useState(false);
@@ -672,6 +674,29 @@ export default function App() {
     }
   }
 
+  function downloadCurrentSample() {
+    if (!sampleDownload) return;
+
+    try {
+      setIsDownloadingSample(true);
+      const blob = new Blob([sampleDownload.buffer], { type: sampleDownload.mimeType });
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = sampleDownload.filename;
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('[Dataset] Download failed:', error);
+      alert(`Download failed: ${error.message}`);
+    } finally {
+      setIsDownloadingSample(false);
+    }
+  }
+
   function handleLanguageChange(nextLanguage) {
     if (nextLanguage === selectedLanguage) return;
 
@@ -685,6 +710,7 @@ export default function App() {
     }
     setText('');
     setReferenceText('');
+    setSampleDownload(null);
     setSelectedLanguage(nextLanguage);
   }
 
@@ -882,6 +908,7 @@ export default function App() {
     setIsLoadingSample(true);
     setReferenceText('');
     setText('');
+    setSampleDownload(null);
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -901,6 +928,12 @@ export default function App() {
       const wavBlob = pcmToWavBlob(sample.pcm, 16000);
       const url = URL.createObjectURL(wavBlob);
       setAudioUrl(url);
+      setSampleDownload({
+        buffer: sample.audioBuffer,
+        filename: sample.sourceFilename,
+        mimeType: sample.sourceMimeType,
+        sourceUrl: sample.sourceAudioUrl,
+      });
 
       setReferenceText(sample.transcription);
       console.log(`[Dataset] Reference: "${sample.transcription}"`);
@@ -1167,6 +1200,7 @@ export default function App() {
 
     setText('');
     setReferenceText('');
+    setSampleDownload(null);
     setIsTranscribing(true);
     setStatus(`Transcribing "${file.name}"…`);
 
@@ -1222,6 +1256,7 @@ export default function App() {
     setText('');
     setReferenceText('');
     setLatestMetrics(null);
+    setSampleDownload(null);
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
       setAudioUrl(null);
@@ -1704,11 +1739,23 @@ export default function App() {
                           {isPlaying ? 'pause' : 'play_arrow'}
                         </span>
                       </button>
+                      {sampleDownload && (
+                        <button
+                          onClick={downloadCurrentSample}
+                          disabled={isDownloadingSample || isLoadingSample || isTranscribing}
+                          className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-white rounded-full w-[38px] h-[38px] flex items-center justify-center shadow-sm transition-all flex-shrink-0 group border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={sampleDownload.sourceUrl ? `Download original sample: ${sampleDownload.filename}` : 'Download original sample'}
+                        >
+                          <span className="material-icons-outlined text-lg text-primary group-hover:text-primary/80">
+                            download
+                          </span>
+                        </button>
+                      )}
                     </>
                   )}
                   <button
                     onClick={loadRandomSample}
-                    disabled={!isModelReady || isLoadingSample || isTranscribing}
+                    disabled={!isModelReady || isLoadingSample || isTranscribing || isDownloadingSample}
                     className="bg-primary hover:bg-opacity-90 text-white font-medium py-2 px-4 rounded-lg whitespace-nowrap shadow-sm transition-all text-sm h-[38px] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoadingSample ? 'Loading…' : `Load ${LANGUAGE_NAMES[selectedLanguage]} Sample`}
