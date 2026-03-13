@@ -312,20 +312,32 @@ export class ParakeetModel {
     // have no separate WASM allocation to leak — disposing them would be wrong.
 
     const vocab = this.tokenizer.id2token.length;
+    const failDecoderStep = (message) => {
+      logits?.dispose?.();
+
+      const disposed = new Set();
+      const disposeUniqueState = (state) => {
+        if (!state) return;
+        for (const tensor of [state.state1, state.state2]) {
+          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.has(tensor)) continue;
+          disposed.add(tensor);
+          tensor.dispose?.();
+        }
+      };
+
+      disposeUniqueState({ state1: outputState1, state2: outputState2 });
+      disposeUniqueState(currentState);
+      throw new Error(message);
+    };
     if (!logits || !logits.data || typeof logits.data.subarray !== 'function') {
-      this._disposeDecoderState({ state1: outputState1, state2: outputState2 }, currentState);
-      throw new Error('ParakeetModel decoder output did not include a valid `outputs` tensor.');
+      failDecoderStep('ParakeetModel decoder output did not include a valid `outputs` tensor.');
     }
     if (!outputState1 || !outputState2) {
-      logits.dispose?.();
-      this._disposeDecoderState({ state1: outputState1, state2: outputState2 }, currentState);
-      throw new Error('ParakeetModel decoder output did not include both decoder state tensors.');
+      failDecoderStep('ParakeetModel decoder output did not include both decoder state tensors.');
     }
     const data = logits.data;
     if (data.length < vocab) {
-      logits.dispose?.();
-      this._disposeDecoderState({ state1: outputState1, state2: outputState2 }, currentState);
-      throw new Error(`ParakeetModel decoder output is too small (${data.length}) for vocab size ${vocab}.`);
+      failDecoderStep(`ParakeetModel decoder output is too small (${data.length}) for vocab size ${vocab}.`);
     }
     const totalDim = data.length;
 
@@ -334,9 +346,7 @@ export class ParakeetModel {
     const tokenLogits = data.subarray(0, vocab);
     const durLogits = data.subarray(vocab, totalDim);
     if (durLogits.length === 0) {
-      logits.dispose?.();
-      this._disposeDecoderState({ state1: outputState1, state2: outputState2 }, currentState);
-      throw new Error('ParakeetModel decoder output is missing required TDT duration logits.');
+      failDecoderStep('ParakeetModel decoder output is missing required TDT duration logits.');
     }
 
     let step = 0;

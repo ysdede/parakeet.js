@@ -374,6 +374,9 @@ async function runAutoSentenceWindowing({
  */
 export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 16000, opts = {}) {
   validateAudio(audio);
+  if (typeof sampleRate !== 'number' || !Number.isFinite(sampleRate) || sampleRate <= 0) {
+    throw new Error('ParakeetModel.transcribeLongAudio expected `sampleRate` to be a positive finite number.');
+  }
 
   const {
     returnTimestamps = false,
@@ -381,6 +384,9 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
     timeOffset = 0,
     ...transcribeOptions
   } = opts;
+  if (typeof timeOffset !== 'number' || !Number.isFinite(timeOffset) || timeOffset < 0) {
+    throw new Error('ParakeetModel.transcribeLongAudio expected `timeOffset` to be a finite non-negative number.');
+  }
 
   const wantWordTimestamps = returnTimestamps === 'word';
   const wantTimestampChunks = returnTimestamps === true || wantWordTimestamps;

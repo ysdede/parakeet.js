@@ -139,4 +139,21 @@ describe('long-audio chunking helpers', () => {
       { text: 'bit.', start_time: 45.5, end_time: 45.9 },
     ]);
   });
+
+  it('rejects invalid sampleRate and timeOffset before scheduling windows', async () => {
+    const audio = new Float32Array(10 * 16000);
+    const model = {
+      transcribe: vi.fn(),
+    };
+
+    await expect(
+      transcribeLongAudioWithChunks(model, audio, 0, {}),
+    ).rejects.toThrow('positive finite number');
+
+    await expect(
+      transcribeLongAudioWithChunks(model, audio, 16000, { timeOffset: -1 }),
+    ).rejects.toThrow('finite non-negative number');
+
+    expect(model.transcribe).not.toHaveBeenCalled();
+  });
 });
