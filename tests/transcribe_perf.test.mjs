@@ -105,7 +105,7 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
 
     // Joiner output: logits + states all with .dispose()
     const makeJoinerOutput = () => {
-      const logits = { dims: [1, 1, 1, 3], data: new Float32Array([0.8, 0.1, 0.1]), dispose: vi.fn() };
+      const logits = { dims: [1, 1, 1, 6], data: new Float32Array([0.8, 0.1, 0.1, 9.0, 0.1, 0.1]), dispose: vi.fn() };
       const s1 = { dims: [2, 1, 640], data: new Float32Array(1280), dispose: vi.fn() };
       const s2 = { dims: [2, 1, 640], data: new Float32Array(1280), dispose: vi.fn() };
       return { outputs: logits, output_states_1: s1, output_states_2: s2 };
@@ -242,5 +242,348 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
     expect(joinerOutputs[1].output_states_1.dispose).toHaveBeenCalledTimes(1);
     expect(joinerOutputs[1].output_states_2.dispose).toHaveBeenCalledTimes(1);
     expect(stateDisposes.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('should dispose auxiliary decoder outputs returned by the joiner session', async () => {
+    class SpyTensor {
+      constructor(type, data, dims) {
+        this.type = type;
+        this.data = data;
+        this.dims = dims;
+      }
+      dispose() {}
+    }
+
+    const auxiliaryOutput = {
+      dims: [1, 4],
+      data: new Float32Array([1, 2, 3, 4]),
+      dispose: vi.fn(),
+    };
+
+    const model = new ParakeetModel({
+      tokenizer: {
+        blankId: 0,
+        id2token: ['<blank>', 'a'],
+        blankToken: '<blank>',
+        decode: () => '',
+        sanitizedTokens: ['<blank>', 'a'],
+      },
+      encoderSession: {
+        run: vi.fn().mockResolvedValue({
+          outputs: { dims: [1, 64, 1], data: new Float32Array(64), dispose: vi.fn() },
+        }),
+      },
+      joinerSession: {
+        run: vi.fn().mockResolvedValue({
+          outputs: { dims: [1, 1, 1, 4], data: new Float32Array([9, 0.1, 8, 0.1]), dispose: vi.fn() },
+          output_states_1: { dims: [2, 1, 640], data: new Float32Array(1280), dispose: vi.fn() },
+          output_states_2: { dims: [2, 1, 640], data: new Float32Array(1280), dispose: vi.fn() },
+          decoder_aux: auxiliaryOutput,
+        }),
+      },
+      preprocessor: {
+        process: vi.fn().mockResolvedValue({ features: new Float32Array(128), length: 1 }),
+        nMels: 128,
+      },
+      ort: { Tensor: SpyTensor },
+      nMels: 128,
+    });
+
+    await model.transcribe(new Float32Array(16000), 16000, { enableProfiling: false });
+
+    expect(auxiliaryOutput.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('should reject non-finite timeOffset values before decoding', async () => {
+    const validationModel = new ParakeetModel({
+      tokenizer: {
+        blankId: 0,
+        id2token: ['<blank>', 'a'],
+        blankToken: '<blank>',
+        decode: () => '',
+        sanitizedTokens: ['<blank>', 'a'],
+      },
+      encoderSession: { run: vi.fn() },
+      joinerSession: { run: vi.fn() },
+      preprocessor: { process: vi.fn(), nMels: 128 },
+      ort: {
+        Tensor: class {
+          constructor(type, data, dims) {
+            this.type = type;
+            this.data = data;
+            this.dims = dims;
+          }
+          dispose() {}
+        },
+      },
+      nMels: 128,
+    });
+
+    await expect(
+      validationModel.transcribe(new Float32Array(16000), 16000, { timeOffset: Number.NaN, enableProfiling: false }),
+    ).rejects.toThrow('finite number');
+
+    await expect(
+      validationModel.transcribe(new Float32Array(16000), 16000, { timeOffset: Number.POSITIVE_INFINITY, enableProfiling: false }),
+    ).rejects.toThrow('finite number');
+  });
+
+  it('should reject non-finite audio samples before preprocessing', async () => {
+    const preprocessor = {
+      process: vi.fn(),
+      nMels: 128,
+    };
+    const validationModel = new ParakeetModel({
+      tokenizer: {
+        blankId: 0,
+        id2token: ['<blank>', 'a'],
+        blankToken: '<blank>',
+        decode: () => '',
+        sanitizedTokens: ['<blank>', 'a'],
+      },
+      encoderSession: { run: vi.fn() },
+      joinerSession: { run: vi.fn() },
+      preprocessor,
+      ort: {
+        Tensor: class {
+          constructor(type, data, dims) {
+            this.type = type;
+            this.data = data;
+            this.dims = dims;
+          }
+          dispose() {}
+        },
+      },
+      nMels: 128,
+    });
+
+    await expect(
+      validationModel.transcribe(new Float32Array([0.1, Number.NaN, 0.2]), 16000, { enableProfiling: false }),
+    ).rejects.toThrow('finite audio samples');
+
+    expect(preprocessor.process).not.toHaveBeenCalled();
+  });
+
+  it('should dispose encoder input tensors when encoder execution fails', async () => {
+    const disposeCalls = [];
+
+    class SpyTensor {
+      constructor(type, data, dims) {
+        this.type = type;
+        this.data = data;
+        this.dims = dims;
+      }
+      dispose() {
+        disposeCalls.push(this.dims.join('x'));
+      }
+    }
+
+    const model = new ParakeetModel({
+      tokenizer: {
+        blankId: 0,
+        id2token: ['<blank>', 'a'],
+        blankToken: '<blank>',
+        decode: () => '',
+        sanitizedTokens: ['<blank>', 'a'],
+      },
+      encoderSession: {
+        run: vi.fn().mockRejectedValue(new Error('encoder boom')),
+      },
+      joinerSession: { run: vi.fn() },
+      preprocessor: {
+        process: vi.fn().mockResolvedValue({ features: new Float32Array(128), length: 1 }),
+        nMels: 128,
+      },
+      ort: { Tensor: SpyTensor },
+      nMels: 128,
+    });
+
+    await expect(
+      model.transcribe(new Float32Array(16000), 16000, { enableProfiling: false }),
+    ).rejects.toThrow('encoder boom');
+
+    expect(disposeCalls).toEqual(expect.arrayContaining(['1x128x1', '1']));
+  });
+
+  it('should dispose malformed decoder outputs before throwing', async () => {
+    const logits = {
+      dims: [1, 1, 1, 2],
+      data: new Float32Array([0.1, 9.0]),
+      dispose: vi.fn(),
+    };
+    const state1 = {
+      dims: [2, 1, 640],
+      data: new Float32Array(1280),
+      dispose: vi.fn(),
+    };
+
+    const model = new ParakeetModel({
+      tokenizer: {
+        blankId: 0,
+        id2token: ['<blank>', 'a', 'b'],
+        blankToken: '<blank>',
+        decode: () => '',
+        sanitizedTokens: ['<blank>', 'a', 'b'],
+      },
+      encoderSession: {
+        run: vi.fn().mockResolvedValue({
+          outputs: { dims: [1, 64, 1], data: new Float32Array(64), dispose: vi.fn() },
+        }),
+      },
+      joinerSession: {
+        run: vi.fn().mockResolvedValue({
+          outputs: logits,
+          output_states_1: state1,
+        }),
+      },
+      preprocessor: {
+        process: vi.fn().mockResolvedValue({ features: new Float32Array(128), length: 1 }),
+        nMels: 128,
+      },
+      ort: {
+        Tensor: class {
+          constructor(type, data, dims) {
+            this.type = type;
+            this.data = data;
+            this.dims = dims;
+          }
+          dispose() {}
+        },
+      },
+      nMels: 128,
+    });
+
+    await expect(
+      model.transcribe(new Float32Array(16000), 16000, { enableProfiling: false }),
+    ).rejects.toThrow('decoder output did not include both decoder state tensors');
+
+    expect(logits.dispose).toHaveBeenCalledTimes(1);
+    expect(state1.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('should reject decoder outputs that omit TDT duration logits', async () => {
+    const logits = {
+      dims: [1, 1, 1, 3],
+      data: new Float32Array([0.1, 9.0, 0.2]),
+      dispose: vi.fn(),
+    };
+    const state1 = {
+      dims: [2, 1, 640],
+      data: new Float32Array(1280),
+      dispose: vi.fn(),
+    };
+    const state2 = {
+      dims: [2, 1, 640],
+      data: new Float32Array(1280),
+      dispose: vi.fn(),
+    };
+
+    const model = new ParakeetModel({
+      tokenizer: {
+        blankId: 0,
+        id2token: ['<blank>', 'a', 'b'],
+        blankToken: '<blank>',
+        decode: () => '',
+        sanitizedTokens: ['<blank>', 'a', 'b'],
+      },
+      encoderSession: {
+        run: vi.fn().mockResolvedValue({
+          outputs: { dims: [1, 64, 1], data: new Float32Array(64), dispose: vi.fn() },
+        }),
+      },
+      joinerSession: {
+        run: vi.fn().mockResolvedValue({
+          outputs: logits,
+          output_states_1: state1,
+          output_states_2: state2,
+        }),
+      },
+      preprocessor: {
+        process: vi.fn().mockResolvedValue({ features: new Float32Array(128), length: 1 }),
+        nMels: 128,
+      },
+      ort: {
+        Tensor: class {
+          constructor(type, data, dims) {
+            this.type = type;
+            this.data = data;
+            this.dims = dims;
+          }
+          dispose() {}
+        },
+      },
+      nMels: 128,
+    });
+
+    await expect(
+      model.transcribe(new Float32Array(16000), 16000, { enableProfiling: false }),
+    ).rejects.toThrow('missing required TDT duration logits');
+
+    expect(logits.dispose).toHaveBeenCalledTimes(1);
+    expect(state1.dispose).toHaveBeenCalledTimes(1);
+    expect(state2.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('should dispose decoder outputs when logits are smaller than the tokenizer vocab', async () => {
+    const logits = {
+      dims: [1, 1, 1, 2],
+      data: new Float32Array([9.0, 0.1]),
+      dispose: vi.fn(),
+    };
+    const state1 = {
+      dims: [2, 1, 640],
+      data: new Float32Array(1280),
+      dispose: vi.fn(),
+    };
+    const state2 = {
+      dims: [2, 1, 640],
+      data: new Float32Array(1280),
+      dispose: vi.fn(),
+    };
+
+    const model = new ParakeetModel({
+      tokenizer: {
+        blankId: 0,
+        id2token: ['<blank>', 'a', 'b'],
+        blankToken: '<blank>',
+        decode: () => '',
+        sanitizedTokens: ['<blank>', 'a', 'b'],
+      },
+      encoderSession: {
+        run: vi.fn().mockResolvedValue({
+          outputs: { dims: [1, 64, 1], data: new Float32Array(64), dispose: vi.fn() },
+        }),
+      },
+      joinerSession: {
+        run: vi.fn().mockResolvedValue({
+          outputs: logits,
+          output_states_1: state1,
+          output_states_2: state2,
+        }),
+      },
+      preprocessor: {
+        process: vi.fn().mockResolvedValue({ features: new Float32Array(128), length: 1 }),
+        nMels: 128,
+      },
+      ort: {
+        Tensor: class {
+          constructor(type, data, dims) {
+            this.type = type;
+            this.data = data;
+            this.dims = dims;
+          }
+          dispose() {}
+        },
+      },
+      nMels: 128,
+    });
+
+    await expect(
+      model.transcribe(new Float32Array(16000), 16000, { enableProfiling: false }),
+    ).rejects.toThrow('too small');
+
+    expect(logits.dispose).toHaveBeenCalledTimes(1);
+    expect(state1.dispose).toHaveBeenCalledTimes(1);
+    expect(state2.dispose).toHaveBeenCalledTimes(1);
   });
 });

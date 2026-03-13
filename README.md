@@ -130,9 +130,34 @@ The demo flow in `examples/demo/src/App.jsx` is:
 Reference code:
 - `App` component in `examples/demo/src/App.jsx` (`loadModel` / `transcribeFile` flow)
 
-## Results
+## `transcribe()` options and result behavior
 
-`model.transcribe(...)` returns a `TranscribeResult` with this shape:
+`returnTimestamps` is **off by default**.  
+So: by default, `transcribe(...)` does **not** return meaningful timestamps.
+
+### `transcribe(audio, sampleRate, opts)` options
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `returnTimestamps` | `false` | Adds `start_time` / `end_time` to `tokens[]` and `words[]`. |
+| `returnConfidences` | `false` | Adds per-token/per-word confidence fields and detailed `confidence_scores`. |
+| `temperature` | `1.0` | Decoder temperature (`1.0` = greedy baseline behavior). |
+| `debug` | `false` | Enables debug logs; also causes `metrics` to be populated. |
+| `enableProfiling` | `true` | When `true`, returns timing/RTF in `metrics`. |
+| `skipCMVN` | `false` | Skips CMVN in preprocessing. |
+| `frameStride` | `1` | Decoder frame advance stride. |
+| `previousDecoderState` | `null` | Continue decoding from an earlier chunk (streaming/stateful usage). |
+| `returnDecoderState` | `false` | Includes `decoderState` in the result for next-call handoff. |
+| `timeOffset` | `0` | Offset (seconds) added to emitted timestamps. |
+| `returnTokenIds` | `false` | Includes `tokenIds` in result. |
+| `returnFrameIndices` | `false` | Includes `frameIndices` (token-to-encoder-frame alignment). |
+| `returnLogProbs` | `false` | Includes per-token `logProbs`. |
+| `returnTdtSteps` | `false` | Includes per-token `tdtSteps` (duration predictor outputs). |
+| `prefixSamples` | `0` | Enables incremental mel-cache reuse when prefix audio matches previous call. |
+| `precomputedFeatures` | `null` | Bypasses preprocessor by supplying already-computed mel features. |
+| `incremental` | `null` | Incremental decode cache config: `{ cacheKey, prefixSeconds }`. |
+
+### Result shape
 
 ```ts
 type TranscribeResult = {
@@ -167,9 +192,16 @@ type TranscribeResult = {
     tokenize_ms: number;
     total_ms: number;
     rtf: number;
-    mel_cache?: { cached_frames: number; new_frames: number };
+    mel_cache?: { cached_frames: number; new_frames: number } | null;
+    preprocessor_backend?: 'js' | 'onnx' | string; // runtime field
   } | null;
   is_final: boolean;
+  decoderState?: {
+    s1: Float32Array;
+    s2: Float32Array;
+    dims1: number[];
+    dims2: number[];
+  };
   tokenIds?: number[];
   frameIndices?: number[];
   logProbs?: number[];
@@ -177,9 +209,68 @@ type TranscribeResult = {
 };
 ```
 
-- Enable `returnTimestamps` for meaningful `start_time`/`end_time`.
-- Enable `returnConfidences` for per-token/per-word confidence fields.
-- Advanced alignment/debug outputs are opt-in: `returnTokenIds`, `returnFrameIndices`, `returnLogProbs`, `returnTdtSteps`.
+### What you get by default vs opt-in
+
+| Call options | `words` | `tokens` | `confidence_scores` | `metrics` |
+| --- | --- | --- | --- | --- |
+| default (`{}`) | `[]` (empty) | omitted | omitted | present (`enableProfiling` default is `true`) |
+| `{ returnTimestamps: true }` | timestamped words | timestamped tokens | minimal (`frame/frame_avg/overall_log_prob` are `null`) | present by default |
+| `{ returnConfidences: true }` | words with `confidence` | tokens with `confidence` | detailed token/word/frame confidence stats | present by default |
+| `{ returnTimestamps: true, returnConfidences: true }` | timestamped + confidence | timestamped + confidence | detailed token/word/frame confidence stats | present by default |
+
+Notes:
+- `start_time` / `end_time` are only meaningful when `returnTimestamps: true`.
+- Advanced alignment/debug arrays are opt-in: `returnTokenIds`, `returnFrameIndices`, `returnLogProbs`, `returnTdtSteps`.
+- If `enableProfiling: false` and `debug: false`, then `metrics` is `null`.
+- `timeOffset` must be finite.
+- Audio buffers passed to `transcribe(...)`, `computeFeatures(...)`, and `transcribeLongAudio(...)` must contain finite samples.
+
+## Long-audio retranscription
+
+Use `transcribeLongAudio(...)` when you want built-in sentence-aware windowing and chunk assembly for long recordings.
+
+```js
+const result = await model.transcribeLongAudio(pcm, 16000, {
+  returnTimestamps: true,
+  chunkLengthS: 30,
+  timeOffset: 12.5,
+});
+
+console.log(result.text);
+console.log(result.chunks);
+```
+
+### `transcribeLongAudio(audio, sampleRate, opts)` options
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `returnTimestamps` | `false` | `true` returns sentence-like chunks; `'word'` returns per-word chunks. |
+| `chunkLengthS` | `0` | Fixed window length in seconds. `0` enables auto window sizing for long inputs. |
+| `timeOffset` | `0` | Offset (seconds) added to returned chunk/word timestamps. |
+| other `transcribe()` options | varies | Forwarded to each internal transcription window. |
+
+### Result shape
+
+```ts
+type LongAudioTranscribeResult = {
+  text: string;
+  words?: Array<{
+    text: string;
+    start_time: number;
+    end_time: number;
+    confidence?: number;
+  }>;
+  chunks?: Array<{
+    text: string;
+    timestamp: [number, number];
+  }>;
+};
+```
+
+Notes:
+- `returnTimestamps: true` returns merged sentence-like chunks.
+- `returnTimestamps: 'word'` returns per-word chunks while still including merged `words`.
+- For shorter clips, `transcribeLongAudio(...)` falls back to a single internal `transcribe(...)` call.
 
 ## Real-time streaming (Keet)
 

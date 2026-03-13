@@ -2,6 +2,18 @@ import { initOrt } from './backend.js';
 import { ParakeetTokenizer } from './tokenizer.js';
 import { OnnxPreprocessor } from './preprocessor.js';
 import { JsPreprocessor, IncrementalMelProcessor, MEL_CONSTANTS } from './mel.js';
+import { transcribeLongAudioWithChunks } from './long_audio.js';
+
+function validateFiniteAudioSamples(audio, methodName) {
+  if (!(audio instanceof Float32Array || audio instanceof Float64Array)) {
+    return;
+  }
+  for (let i = 0; i < audio.length; ++i) {
+    if (!Number.isFinite(audio[i])) {
+      throw new Error(`${methodName} expected finite audio samples; found ${audio[i]} at index ${i}.`);
+    }
+  }
+}
 
 /**
  * Lightweight Parakeet model wrapper designed for browser usage.
@@ -285,19 +297,47 @@ export class ParakeetModel {
 
     const out = await this.joinerSession.run(feeds);
     const logits = out['outputs'];
+    const outputState1 = out['output_states_1'];
+    const outputState2 = out['output_states_2'];
+    const seenOutputs = new Set();
+    for (const value of Object.values(out)) {
+      if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
+      seenOutputs.add(value);
+      if (value === logits || value === outputState1 || value === outputState2) continue;
+      value.dispose();
+    }
     // Note: _targetTensor and _targetLenTensor are intentionally NOT disposed here.
     // They wrap a shared Int32Array (_targetIdArray / _targetLenArray) that is mutated
     // each call. ORT-WASM does not copy the data on Tensor creation, so these tensors
     // have no separate WASM allocation to leak — disposing them would be wrong.
 
     const vocab = this.tokenizer.id2token.length;
-    const totalDim = logits.dims[3];
+    if (!logits || !logits.data || typeof logits.data.subarray !== 'function') {
+      this._disposeDecoderState({ state1: outputState1, state2: outputState2 }, currentState);
+      throw new Error('ParakeetModel decoder output did not include a valid `outputs` tensor.');
+    }
+    if (!outputState1 || !outputState2) {
+      logits.dispose?.();
+      this._disposeDecoderState({ state1: outputState1, state2: outputState2 }, currentState);
+      throw new Error('ParakeetModel decoder output did not include both decoder state tensors.');
+    }
     const data = logits.data;
+    if (data.length < vocab) {
+      logits.dispose?.();
+      this._disposeDecoderState({ state1: outputState1, state2: outputState2 }, currentState);
+      throw new Error(`ParakeetModel decoder output is too small (${data.length}) for vocab size ${vocab}.`);
+    }
+    const totalDim = data.length;
 
     // subarray(): zero-copy view into joiner output buffer.
     // Do NOT mutate tokenLogits/durLogits without copying first (.slice()).
     const tokenLogits = data.subarray(0, vocab);
     const durLogits = data.subarray(vocab, totalDim);
+    if (durLogits.length === 0) {
+      logits.dispose?.();
+      this._disposeDecoderState({ state1: outputState1, state2: outputState2 }, currentState);
+      throw new Error('ParakeetModel decoder output is missing required TDT duration logits.');
+    }
 
     let step = 0;
     if (durLogits.length) {
@@ -306,8 +346,8 @@ export class ParakeetModel {
     }
 
     const newState = {
-      state1: out['output_states_1'] || state1,
-      state2: out['output_states_2'] || state2,
+      state1: outputState1,
+      state2: outputState2,
     };
 
     return { tokenLogits, step, newState, _logitsTensor: logits };
@@ -355,6 +395,7 @@ export class ParakeetModel {
    */
   async computeFeatures(audio, sampleRate = 16000, opts = {}) {
     const { prefixSamples = 0 } = opts;
+    validateFiniteAudioSamples(audio, 'ParakeetModel.computeFeatures');
 
     // Use incremental mel processor if available and prefix is specified
     if (this._incrementalMel && prefixSamples > 0) {
@@ -540,6 +581,13 @@ export class ParakeetModel {
       precomputedFeatures = null,    // { features: Float32Array, T: number, melBins: number }
     } = opts;
 
+    if (!Number.isFinite(timeOffset)) {
+      throw new Error('ParakeetModel.transcribe expected `timeOffset` to be a finite number.');
+    }
+    if (!precomputedFeatures) {
+      validateFiniteAudioSamples(audio, 'ParakeetModel.transcribe');
+    }
+
     const perfEnabled = debug || enableProfiling; // collect timings & populate result.metrics (default: true for backward compat)
     let t0, tPreproc = 0, tEncode = 0, tDecode = 0, tToken = 0;
     if (perfEnabled) t0 = performance.now();
@@ -594,19 +642,21 @@ export class ParakeetModel {
     const encoderLength = validLength ?? T;
     const lenTensor = new this.ort.Tensor('int64', BigInt64Array.from([BigInt(encoderLength)]), [1]);
     let enc;
-    if (perfEnabled) {
-      const s = performance.now();
-      const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
-      tEncode = performance.now() - s;
-      enc = encOut['outputs'] ?? Object.values(encOut)[0];
-    } else {
-      const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
-      enc = encOut['outputs'] ?? Object.values(encOut)[0];
+    try {
+      if (perfEnabled) {
+        const s = performance.now();
+        const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
+        tEncode = performance.now() - s;
+        enc = encOut['outputs'] ?? Object.values(encOut)[0];
+      } else {
+        const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
+        enc = encOut['outputs'] ?? Object.values(encOut)[0];
+      }
+    } finally {
+      // Dispose per-call input tensors even when encoder execution fails.
+      input.dispose?.();
+      lenTensor.dispose?.();
     }
-
-    // Dispose per-call input tensors (data is now in encOut; inputs no longer needed)
-    input.dispose?.();
-    lenTensor.dispose?.();
 
     // Transpose encoder output [B, D, T] -> [T, D] for B=1
     const [, D, Tenc] = enc.dims;
@@ -650,7 +700,7 @@ export class ParakeetModel {
     const ids = [];
     const tokenTimes = [];
     const tokenConfs = [];
-    const frameConfs = [];
+    const frameConfidenceStats = new Map();
     let overallLogProb = 0;
 
     // NEW: Frame-aligned streaming data
@@ -760,7 +810,13 @@ export class ParakeetModel {
         logProbVal = (maxLogit * invTemp) - maxVal - Math.log(sumExp);
 
         if (returnConfidences) {
-          frameConfs.push(confVal);
+          const stats = frameConfidenceStats.get(t);
+          if (stats) {
+            stats.sum += confVal;
+            stats.count += 1;
+          } else {
+            frameConfidenceStats.set(t, { sum: confVal, count: 1 });
+          }
           overallLogProb += Math.log(confVal);
         }
       }
@@ -786,9 +842,10 @@ export class ParakeetModel {
 
         if (returnTimestamps) {
           const durFrames = step > 0 ? step : 1;
+          const endFrame = Math.min(Tenc, t + Math.max(1, durFrames));
           // Use effectiveTimeOffset for streaming mode
           const start = effectiveTimeOffset + (t * TIME_STRIDE);
-          const end = effectiveTimeOffset + ((t + durFrames) * TIME_STRIDE);
+          const end = effectiveTimeOffset + (endFrame * TIME_STRIDE);
           tokenTimes.push([start, end]);
         }
         if (returnConfidences) tokenConfs.push(confVal);
@@ -945,6 +1002,10 @@ export class ParakeetModel {
       console.table({ Preprocess: `${tPreproc.toFixed(1)} ms`, Encode: `${tEncode.toFixed(1)} ms`, Decode: `${tDecode.toFixed(1)} ms`, Tokenize: `${tToken.toFixed(1)} ms`, Total: `${total.toFixed(1)} ms` });
     }
 
+    const frameConfs = Array.from(frameConfidenceStats.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([, stats]) => stats.sum / stats.count);
+
     const result = {
       utterance_text: text,
       words,
@@ -1014,6 +1075,20 @@ export class ParakeetModel {
    */
   createStreamingTranscriber(opts = {}) {
     return new StatefulStreamingTranscriber(this, opts);
+  }
+
+  /**
+   * Transcribe long-form audio with sentence-aware windowing and chunk assembly.
+   * This is intended for full recordings where a single `transcribe()` call is
+   * less convenient than a built-in windowing helper.
+   *
+   * @param {Float32Array|Float64Array} audio - Full audio buffer.
+   * @param {number} sampleRate - Sample rate (default 16000).
+   * @param {Object} opts - Long-audio transcription options.
+   * @returns {Promise<{ text: string, words?: Array<{ text: string, start_time: number, end_time: number, confidence?: number }>, chunks?: Array<{ text: string, timestamp: [number, number] }> }>}
+   */
+  async transcribeLongAudio(audio, sampleRate = 16000, opts = {}) {
+    return transcribeLongAudioWithChunks(this, audio, sampleRate, opts);
   }
 
   /**
@@ -1236,7 +1311,11 @@ export class MelFeatureCache {
    * @param {number} opts.maxCacheSizeMB - Maximum cache size in MB (default 50)
    */
   constructor(opts = {}) {
-    this.maxCacheSizeMB = opts.maxCacheSizeMB || 50;
+    const maxCacheSizeMB = opts.maxCacheSizeMB ?? 50;
+    if (!Number.isFinite(maxCacheSizeMB) || maxCacheSizeMB <= 0) {
+      throw new Error('MelFeatureCache expected `maxCacheSizeMB` to be a positive number.');
+    }
+    this.maxCacheSizeMB = maxCacheSizeMB;
     this.cache = new Map();  // key → { features, T, melBins, timestamp }
     this.currentSizeMB = 0;
   }
@@ -1254,7 +1333,9 @@ export class MelFeatureCache {
     // MurmurHash3-style 32-bit mix helper
     const mix32 = (h, v) => {
       // Quantise float to 16-bit signed integer range
-      let k = Math.floor(v * 32768) & 0xffff;
+      const sample = Number.isFinite(v) ? v : 0;
+      const quantized = Math.max(-32768, Math.min(32767, Math.round(sample * 32768)));
+      let k = quantized & 0xffff;
       k = Math.imul(k, 0xcc9e2d51);
       k = (k << 15) | (k >>> 17);
       k = Math.imul(k, 0x1b873593);
@@ -1274,14 +1355,8 @@ export class MelFeatureCache {
     // Seed with length so differently-sized arrays can never collide
     let h = n | 0;
 
-    // Always include boundary samples (catches edits at the start/end)
-    const boundary = Math.min(4, n);
-    for (let i = 0; i < boundary; i++) h = mix32(h, audio[i]);
-    for (let i = Math.max(boundary, n - 4); i < n; i++) h = mix32(h, audio[i]);
-
-    // Uniform interior sampling — ~128 evenly spaced positions
-    const stride = Math.max(1, Math.floor(n / 128));
-    for (let i = 0; i < n; i += stride) h = mix32(h, audio[i]);
+    // Hash all samples to minimize false cache hits across similar waveforms.
+    for (let i = 0; i < n; i++) h = mix32(h, audio[i]);
 
     return `${n}_${fmix32(h)}`;
   }
