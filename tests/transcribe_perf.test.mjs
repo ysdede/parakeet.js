@@ -294,7 +294,8 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
     expect(auxiliaryOutput.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it('should reject non-finite timeOffset values before decoding', async () => {
+  it('should coerce non-finite timeOffset values to 0 for compatibility', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const validationModel = new ParakeetModel({
       tokenizer: {
         blankId: 0,
@@ -305,7 +306,10 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
       },
       encoderSession: { run: vi.fn() },
       joinerSession: { run: vi.fn() },
-      preprocessor: { process: vi.fn(), nMels: 128 },
+      preprocessor: {
+        process: vi.fn().mockResolvedValue({ features: new Float32Array(0), length: 0 }),
+        nMels: 128,
+      },
       ort: {
         Tensor: class {
           constructor(type, data, dims) {
@@ -321,16 +325,20 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
 
     await expect(
       validationModel.transcribe(new Float32Array(16000), 16000, { timeOffset: Number.NaN, enableProfiling: false }),
-    ).rejects.toThrow('finite number');
+    ).resolves.toMatchObject({ utterance_text: '' });
 
     await expect(
       validationModel.transcribe(new Float32Array(16000), 16000, { timeOffset: Number.POSITIVE_INFINITY, enableProfiling: false }),
-    ).rejects.toThrow('finite number');
+    ).resolves.toMatchObject({ utterance_text: '' });
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('non-finite timeOffset'));
+    warnSpy.mockRestore();
   });
 
-  it('should reject non-finite audio samples before preprocessing', async () => {
+  it('should sanitize non-finite audio samples before preprocessing', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const preprocessor = {
-      process: vi.fn(),
+      process: vi.fn().mockResolvedValue({ features: new Float32Array(0), length: 0 }),
       nMels: 128,
     };
     const validationModel = new ParakeetModel({
@@ -359,9 +367,15 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
 
     await expect(
       validationModel.transcribe(new Float32Array([0.1, Number.NaN, 0.2]), 16000, { enableProfiling: false }),
-    ).rejects.toThrow('finite audio samples');
+    ).resolves.toMatchObject({ utterance_text: '' });
 
-    expect(preprocessor.process).not.toHaveBeenCalled();
+    expect(preprocessor.process).toHaveBeenCalledTimes(1);
+    const [sanitizedAudio] = preprocessor.process.mock.calls[0];
+    expect(sanitizedAudio[0]).toBeCloseTo(0.1);
+    expect(sanitizedAudio[1]).toBe(0);
+    expect(sanitizedAudio[2]).toBeCloseTo(0.2);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('non-finite audio sample'));
+    warnSpy.mockRestore();
   });
 
   it('should dispose encoder input tensors when encoder execution fails', async () => {
@@ -405,10 +419,11 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
     expect(disposeCalls).toEqual(expect.arrayContaining(['1x128x1', '1']));
   });
 
-  it('should dispose malformed decoder outputs before throwing', async () => {
+  it('should reuse the previous decoder state when one of the decoder state tensors is missing', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const logits = {
-      dims: [1, 1, 1, 2],
-      data: new Float32Array([0.1, 9.0]),
+      dims: [1, 1, 1, 4],
+      data: new Float32Array([0.1, 9.0, 0.2, 0.1]),
       dispose: vi.fn(),
     };
     const state1 = {
@@ -453,15 +468,24 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
       nMels: 128,
     });
 
-    await expect(
-      model.transcribe(new Float32Array(16000), 16000, { enableProfiling: false }),
-    ).rejects.toThrow('decoder output did not include both decoder state tensors');
+    const result = await model.transcribe(new Float32Array(16000), 16000, {
+      enableProfiling: false,
+      returnDecoderState: true,
+    });
 
-    expect(logits.dispose).toHaveBeenCalledTimes(1);
-    expect(state1.dispose).toHaveBeenCalledTimes(1);
+    expect(logits.dispose).toHaveBeenCalled();
+    expect(result.decoderState).toEqual({
+      s1: expect.any(Float32Array),
+      s2: expect.any(Float32Array),
+      dims1: [2, 1, 640],
+      dims2: [2, 1, 640],
+    });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('decoder state tensors'));
+    warnSpy.mockRestore();
   });
 
-  it('should reject decoder outputs that omit TDT duration logits', async () => {
+  it('should fall back to step 0 when decoder outputs omit TDT duration logits', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const logits = {
       dims: [1, 1, 1, 3],
       data: new Float32Array([0.1, 9.0, 0.2]),
@@ -515,16 +539,22 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
       nMels: 128,
     });
 
-    await expect(
-      model.transcribe(new Float32Array(16000), 16000, { enableProfiling: false }),
-    ).rejects.toThrow('missing required TDT duration logits');
+    const result = await model.transcribe(new Float32Array(16000), 16000, {
+      enableProfiling: false,
+      returnTdtSteps: true,
+    });
 
-    expect(logits.dispose).toHaveBeenCalledTimes(1);
-    expect(state1.dispose).toHaveBeenCalledTimes(1);
-    expect(state2.dispose).toHaveBeenCalledTimes(1);
+    expect(logits.dispose).toHaveBeenCalled();
+    expect(state1.dispose).toHaveBeenCalled();
+    expect(state2.dispose).toHaveBeenCalled();
+    expect(result.tdtSteps.length).toBeGreaterThan(0);
+    expect(result.tdtSteps.every((step) => step === 0)).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('TDT duration logits'));
+    warnSpy.mockRestore();
   });
 
-  it('should dispose the active decoder state when decoder output validation fails', async () => {
+  it('should preserve decoder state continuity when a later decoder step omits duration logits', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const logits = {
       dims: [1, 1, 1, 3],
       data: new Float32Array([0.1, 9.0, 0.2]),
@@ -575,11 +605,11 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
             output_states_1: activeState1,
             output_states_2: activeState2,
           })
-          .mockResolvedValueOnce({
+          .mockImplementation(async () => ({
             outputs: logits,
             output_states_1: returnedState1,
             output_states_2: returnedState2,
-          }),
+          })),
       },
       preprocessor: {
         process: vi.fn().mockResolvedValue({ features: new Float32Array(256), length: 2 }),
@@ -598,15 +628,24 @@ describe('ParakeetModel.transcribe tensor disposal', () => {
       nMels: 128,
     });
 
-    await expect(
-      model.transcribe(new Float32Array(32000), 16000, { enableProfiling: false }),
-    ).rejects.toThrow('missing required TDT duration logits');
+    const result = await model.transcribe(new Float32Array(32000), 16000, {
+      enableProfiling: false,
+      returnDecoderState: true,
+    });
 
-    expect(logits.dispose).toHaveBeenCalledTimes(1);
-    expect(returnedState1.dispose).toHaveBeenCalledTimes(1);
-    expect(returnedState2.dispose).toHaveBeenCalledTimes(1);
-    expect(activeState1.dispose).toHaveBeenCalledTimes(1);
-    expect(activeState2.dispose).toHaveBeenCalledTimes(1);
+    expect(result.decoderState).toEqual({
+      s1: expect.any(Float32Array),
+      s2: expect.any(Float32Array),
+      dims1: [2, 1, 640],
+      dims2: [2, 1, 640],
+    });
+    expect(logits.dispose).toHaveBeenCalled();
+    expect(returnedState1.dispose).toHaveBeenCalled();
+    expect(returnedState2.dispose).toHaveBeenCalled();
+    expect(activeState1.dispose).toHaveBeenCalled();
+    expect(activeState2.dispose).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('TDT duration logits'));
+    warnSpy.mockRestore();
   });
 
   it('should dispose decoder outputs when logits are smaller than the tokenizer vocab', async () => {

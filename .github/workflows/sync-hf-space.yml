@@ -133,7 +133,7 @@ jobs:
               "preview": "vite preview"
             },
             "dependencies": {
-              "parakeet.js": "^1.4.0",
+              "parakeet.js": "^1.4.2",
               "react": "^18.2.0",
               "react-dom": "^18.2.0"
             },
