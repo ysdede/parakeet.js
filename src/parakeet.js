@@ -4,15 +4,36 @@ import { OnnxPreprocessor } from './preprocessor.js';
 import { JsPreprocessor, IncrementalMelProcessor, MEL_CONSTANTS } from './mel.js';
 import { transcribeLongAudioWithChunks } from './long_audio.js';
 
-function validateFiniteAudioSamples(audio, methodName) {
+function sanitizeFiniteAudioSamples(audio, methodName) {
   if (!(audio instanceof Float32Array || audio instanceof Float64Array)) {
-    return;
+    return audio;
   }
+  let sanitized = null;
+  let invalidCount = 0;
   for (let i = 0; i < audio.length; ++i) {
     if (!Number.isFinite(audio[i])) {
-      throw new Error(`${methodName} expected finite audio samples; found ${audio[i]} at index ${i}.`);
+      if (!sanitized) {
+        sanitized = audio.slice();
+      }
+      sanitized[i] = 0;
+      invalidCount += 1;
     }
   }
+  if (!sanitized) {
+    return audio;
+  }
+  console.warn(
+    `[Parakeet.js] ${methodName} received ${invalidCount} non-finite audio sample(s); replacing them with 0 for compatibility.`,
+  );
+  return sanitized;
+}
+
+function coerceFiniteTimeOffset(value, methodName) {
+  if (Number.isFinite(value)) {
+    return value;
+  }
+  console.warn(`[Parakeet.js] ${methodName} received non-finite timeOffset; using 0 for compatibility.`);
+  return 0;
 }
 
 /**
@@ -86,6 +107,8 @@ export class ParakeetModel {
     // left-context on subsequent calls when the prefix is unchanged.
     this._incrementalCache = new Map();
     this.maxIncrementalCacheSize = maxIncrementalCacheSize;
+    this._warnedMissingDecoderStates = false;
+    this._warnedMissingDurationLogits = false;
   }
 
   /**
@@ -332,9 +355,6 @@ export class ParakeetModel {
     if (!logits || !logits.data || typeof logits.data.subarray !== 'function') {
       failDecoderStep('ParakeetModel decoder output did not include a valid `outputs` tensor.');
     }
-    if (!outputState1 || !outputState2) {
-      failDecoderStep('ParakeetModel decoder output did not include both decoder state tensors.');
-    }
     const data = logits.data;
     if (data.length < vocab) {
       failDecoderStep(`ParakeetModel decoder output is too small (${data.length}) for vocab size ${vocab}.`);
@@ -345,8 +365,17 @@ export class ParakeetModel {
     // Do NOT mutate tokenLogits/durLogits without copying first (.slice()).
     const tokenLogits = data.subarray(0, vocab);
     const durLogits = data.subarray(vocab, totalDim);
-    if (durLogits.length === 0) {
-      failDecoderStep('ParakeetModel decoder output is missing required TDT duration logits.');
+    if ((!outputState1 || !outputState2) && !this._warnedMissingDecoderStates) {
+      this._warnedMissingDecoderStates = true;
+      console.warn(
+        '[Parakeet.js] Decoder output did not include both decoder state tensors; reusing the previous state for compatibility.',
+      );
+    }
+    if (durLogits.length === 0 && !this._warnedMissingDurationLogits) {
+      this._warnedMissingDurationLogits = true;
+      console.warn(
+        '[Parakeet.js] Decoder output did not include TDT duration logits; defaulting duration step to 0 for compatibility.',
+      );
     }
 
     let step = 0;
@@ -356,8 +385,8 @@ export class ParakeetModel {
     }
 
     const newState = {
-      state1: outputState1,
-      state2: outputState2,
+      state1: outputState1 || state1,
+      state2: outputState2 || state2,
     };
 
     return { tokenLogits, step, newState, _logitsTensor: logits };
@@ -405,13 +434,11 @@ export class ParakeetModel {
    */
   async computeFeatures(audio, sampleRate = 16000, opts = {}) {
     const { prefixSamples = 0, _skipAudioValidation = false } = opts;
-    if (!_skipAudioValidation) {
-      validateFiniteAudioSamples(audio, 'ParakeetModel.computeFeatures');
-    }
+    const normalizedAudio = _skipAudioValidation ? audio : sanitizeFiniteAudioSamples(audio, 'ParakeetModel.computeFeatures');
 
     // Use incremental mel processor if available and prefix is specified
     if (this._incrementalMel && prefixSamples > 0) {
-      const result = this._incrementalMel.process(audio, prefixSamples);
+      const result = this._incrementalMel.process(normalizedAudio, prefixSamples);
       const T = result.length;
       return {
         features: result.features, T, melBins: this._nMels,
@@ -427,7 +454,7 @@ export class ParakeetModel {
     // Per the NeMo reference (onnx-asr), the encoder expects the FULL tensor as
     // audio_signal and features_lens as a SEPARATE length input. We must NOT
     // truncate or re-layout — just pass the data as-is with both values.
-    const { features, length } = await this.preprocessor.process(audio);
+    const { features, length } = await this.preprocessor.process(normalizedAudio);
     const nFrames = features.length / this._nMels;          // actual tensor dim (may be length+1)
     return { features, T: nFrames, melBins: this._nMels, validLength: length };
   }
@@ -594,9 +621,7 @@ export class ParakeetModel {
       _skipAudioValidation = false,  // Internal: long-audio helpers can skip re-validating already checked windows
     } = opts;
 
-    if (!Number.isFinite(timeOffset)) {
-      throw new Error('ParakeetModel.transcribe expected `timeOffset` to be a finite number.');
-    }
+    const normalizedTimeOffset = coerceFiniteTimeOffset(timeOffset, 'ParakeetModel.transcribe');
 
     const perfEnabled = debug || enableProfiling; // collect timings & populate result.metrics (default: true for backward compat)
     let t0, tPreproc = 0, tEncode = 0, tDecode = 0, tToken = 0;
@@ -721,7 +746,7 @@ export class ParakeetModel {
     // Incremental decode settings
     const TIME_STRIDE = this.subsampling * this.windowStride;
     let startFrame = 0;
-    let effectiveTimeOffset = timeOffset;  // Use the passed-in timeOffset
+    let effectiveTimeOffset = normalizedTimeOffset;  // Use the caller timeOffset unless we need a compatibility fallback
 
     // NEW: Initialize decoder state from previous chunk if provided (streaming mode)
     let decoderState = null;
@@ -738,7 +763,7 @@ export class ParakeetModel {
       const cached = this._incrementalCache.get(inc.cacheKey);
       if (cached && cached.prefixFrames === prefixFrames && cached.D === D) {
         startFrame = prefixFrames;
-        effectiveTimeOffset = timeOffset + prefixFrames * TIME_STRIDE;  // Preserve caller's timeOffset base
+        effectiveTimeOffset = normalizedTimeOffset + prefixFrames * TIME_STRIDE;  // Preserve caller's timeOffset base
         decoderState = this._restoreDecoderState(cached.state);
         if (debug) console.log(`[Parakeet] Incremental cache hit: skipping ${prefixFrames}/${Tenc} frames (${(prefixFrames / Tenc * 100).toFixed(0)}%)`);
 
@@ -1322,8 +1347,8 @@ export class MelFeatureCache {
    */
   constructor(opts = {}) {
     const maxCacheSizeMB = opts.maxCacheSizeMB ?? 50;
-    if (!Number.isFinite(maxCacheSizeMB) || maxCacheSizeMB <= 0) {
-      throw new Error('MelFeatureCache expected `maxCacheSizeMB` to be a positive number.');
+    if (!Number.isFinite(maxCacheSizeMB) || maxCacheSizeMB < 0) {
+      throw new Error('MelFeatureCache expected `maxCacheSizeMB` to be a non-negative number.');
     }
     this.maxCacheSizeMB = maxCacheSizeMB;
     this.cache = new Map();  // key → { features, T, melBins, timestamp }
@@ -1398,6 +1423,11 @@ export class MelFeatureCache {
    * @returns {Promise<{features: Float32Array, T: number, melBins: number, cached: boolean}>}
    */
   async getFeatures(model, audio) {
+    if (this.maxCacheSizeMB === 0) {
+      const { features, T, melBins } = await model.computeFeatures(audio);
+      return { features, T, melBins, cached: false };
+    }
+
     const key = this._generateKey(audio);
 
     if (this.cache.has(key)) {

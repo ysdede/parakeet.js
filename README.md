@@ -222,8 +222,8 @@ Notes:
 - `start_time` / `end_time` are only meaningful when `returnTimestamps: true`.
 - Advanced alignment/debug arrays are opt-in: `returnTokenIds`, `returnFrameIndices`, `returnLogProbs`, `returnTdtSteps`.
 - If `enableProfiling: false` and `debug: false`, then `metrics` is `null`.
-- `timeOffset` must be finite.
-- Audio buffers passed to `transcribe(...)`, `computeFeatures(...)`, and `transcribeLongAudio(...)` must contain finite samples.
+- Non-finite `timeOffset` values passed to `transcribe(...)` are coerced to `0` with a warning for compatibility.
+- Non-finite audio samples passed to `transcribe(...)` or `computeFeatures(...)` are sanitized to `0` with a warning for compatibility.
 
 ## Long-audio retranscription
 
