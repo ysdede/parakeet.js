@@ -13,7 +13,7 @@
  * @param {number} [opts.numThreads] Number of WASM threads to use when SharedArrayBuffer is available.
  * @returns {Promise<typeof import('onnxruntime-web').default>}
  */
-export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}) {
+export async function initOrt({ backend = 'webgpu', numThreads } = {}) {
   // Dynamic import to handle Vite bundling issues
   let ort;
 
