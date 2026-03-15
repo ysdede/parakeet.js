@@ -86,7 +86,7 @@ export function getModelConfig(modelKeyOrRepoId) {
   }
   
   // Search by repo ID
-  for (const [key, config] of Object.entries(MODELS)) {
+  for (const config of Object.values(MODELS)) {
     if (config.repoId === modelKeyOrRepoId) {
       return config;
     }
