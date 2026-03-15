@@ -1818,9 +1818,10 @@ export class LCSPTFAMerger {
     // Using 1D array for space efficiency: LCS[j] = LCS value at column j
     if (this._lcsBuffer.length < n + 1) {
       this._lcsBuffer = new Int32Array(n + 1 + 1024);
+    } else {
+      this._lcsBuffer.fill(0, 0, n + 1);
     }
     const LCS = this._lcsBuffer;
-    LCS.fill(0, 0, n + 1);
 
     let maxLen = 0;
     let endX = 0;
