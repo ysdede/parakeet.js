@@ -160,7 +160,6 @@ export class ParakeetModel {
 
     // 2. Configure session options for better performance
     const graphCaptureEnabled = !!enableGraphCapture && backend === 'webgpu-strict';
-    const isFullWasm = backend === 'wasm';
 
     const baseSessionOptions = {
       executionProviders: [],
