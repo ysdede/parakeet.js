@@ -390,6 +390,7 @@ export class JsPreprocessor {
     this._fftIm = new Float64Array(N_FFT >> 1);
     this._powerBuf = new Float32Array(N_FREQ_BINS);
     this._paddedBuffer = null;
+    this._featuresBuffer = null;
 
     // Precompute sparse filterbank bounds (start/end indices for each mel filter)
     this.fbBounds = new Int32Array(this.nMels * 2);
@@ -592,7 +593,11 @@ export class JsPreprocessor {
     if (outBuffer && outBuffer.length >= reqSize) {
       features = outBuffer.subarray(0, reqSize);
     } else {
-      features = new Float32Array(reqSize);
+      if (!this._featuresBuffer || this._featuresBuffer.length < reqSize) {
+        const newSize = Math.ceil(reqSize * 1.2);
+        this._featuresBuffer = new Float32Array(newSize);
+      }
+      features = this._featuresBuffer.subarray(0, reqSize);
     }
 
     for (let m = 0; m < nMels; m++) {
