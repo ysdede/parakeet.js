@@ -9,3 +9,7 @@ Action: Consider unrolling hot accumulation loops over TypedArrays where iterati
 ## 2024-11-20 - Unrolling Float32Array argmax
 Learning: When finding the maximum value (argmax) in a large typed array like `Float32Array`, unrolling the loop 8x is significantly faster than using a simple `for` loop, yielding a ~2x performance speedup in the hot path.
 Action: Apply loop unrolling for max reductions in high-frequency typed array operations.
+
+## 2025-03-10 - Map lookup for subset alignment
+Learning: In merging algorithms (e.g., `FrameAlignedMerger`), using an O(N*M) nested loop to find time-aligned tokens across overlapping chunks scales very poorly, causing significant latency for dense overlaps. Grouping pending items by ID in a `Map` achieves an O(N+M) lookup.
+Action: Use `Map` lookups instead of nested loops for subset/overlap matching when sizes exceed a few hundred items.
