@@ -9,3 +9,6 @@ Action: Consider unrolling hot accumulation loops over TypedArrays where iterati
 ## 2024-11-20 - Unrolling Float32Array argmax
 Learning: When finding the maximum value (argmax) in a large typed array like `Float32Array`, unrolling the loop 8x is significantly faster than using a simple `for` loop, yielding a ~2x performance speedup in the hot path.
 Action: Apply loop unrolling for max reductions in high-frequency typed array operations.
+## 2025-03-07 - Optimize encoder output transpose loop
+Learning: Manually blocked or tiled matrix transpose loops in V8 are significantly slower (~3-4x) than simple sequential double loops for transposing typical flat Float32Arrays.
+Action: Prefer simple sequential double loops for typed array transposition to minimize V8 engine loop bounds-checking and iteration overhead.
