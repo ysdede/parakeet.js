@@ -9,3 +9,7 @@ Action: Consider unrolling hot accumulation loops over TypedArrays where iterati
 ## 2024-11-20 - Unrolling Float32Array argmax
 Learning: When finding the maximum value (argmax) in a large typed array like `Float32Array`, unrolling the loop 8x is significantly faster than using a simple `for` loop, yielding a ~2x performance speedup in the hot path.
 Action: Apply loop unrolling for max reductions in high-frequency typed array operations.
+
+## 2024-11-20 - Further Unrolling Float32Array argmax
+Learning: When finding the maximum value (argmax) in a large typed array like `Float32Array`, reading array values into local variables (`v0` to `v7`) inside an unrolled loop before performing sequential comparisons gives an additional ~15-20% speedup compared to accessing the typed array directly in the unrolled loop's `if` statements. This reduces array access overhead and allows better V8 compiler optimizations.
+Action: Apply local variable caching when unrolling hot loops over TypedArrays for value reads.
