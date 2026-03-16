@@ -709,10 +709,30 @@ export class ParakeetModel {
 
       for (let dBlock = 0; dBlock < D; dBlock += blockSize) {
         const dEnd = Math.min(dBlock + blockSize, D);
-        for (let t = 0; t < Tenc; t++) {
-          const tOffset = t * D;
+        let t = 0;
+        // Unroll the Tenc loop 4x to reduce loop overhead and increase instruction level parallelism.
+        // We hoist the source index calculation (`srcIdx += Tenc`) to avoid multiplying `d * Tenc` inside the tight loop.
+        for (; t <= Tenc - 4; t += 4) {
+          const tOffset0 = t * D;
+          const tOffset1 = tOffset0 + D;
+          const tOffset2 = tOffset1 + D;
+          const tOffset3 = tOffset2 + D;
+
+          let srcIdx = dBlock * Tenc + t;
           for (let d = dBlock; d < dEnd; d++) {
-            transposed[tOffset + d] = encData[d * Tenc + t];
+            transposed[tOffset0 + d] = encData[srcIdx];
+            transposed[tOffset1 + d] = encData[srcIdx + 1];
+            transposed[tOffset2 + d] = encData[srcIdx + 2];
+            transposed[tOffset3 + d] = encData[srcIdx + 3];
+            srcIdx += Tenc;
+          }
+        }
+        for (; t < Tenc; t++) {
+          const tOffset = t * D;
+          let srcIdx = dBlock * Tenc + t;
+          for (let d = dBlock; d < dEnd; d++) {
+            transposed[tOffset + d] = encData[srcIdx];
+            srcIdx += Tenc;
           }
         }
       }
