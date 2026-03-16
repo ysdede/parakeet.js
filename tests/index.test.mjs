@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fromUrls, fromHub } from '../src/index.js';
+import { fromUrls, fromHub, usesRequestedFp16 } from '../src/index.js';
 import { ParakeetModel } from '../src/parakeet.js';
 import { getParakeetModel } from '../src/hub.js';
 
@@ -78,5 +78,33 @@ describe('index.js', () => {
     expect(error.message).toMatch(/compile failed/i);
     expect(getParakeetModel).toHaveBeenCalledTimes(1);
     expect(ParakeetModel.fromUrls).toHaveBeenCalledTimes(1);
+  });
+
+  describe('usesRequestedFp16', () => {
+    it('should return true if encoderQuant is fp16', () => {
+      expect(usesRequestedFp16({ encoderQuant: 'fp16' })).toBe(true);
+    });
+
+    it('should return true if decoderQuant is fp16', () => {
+      expect(usesRequestedFp16({ decoderQuant: 'fp16' })).toBe(true);
+    });
+
+    it('should return true if both are fp16', () => {
+      expect(usesRequestedFp16({ encoderQuant: 'fp16', decoderQuant: 'fp16' })).toBe(true);
+    });
+
+    it('should return false if neither is fp16', () => {
+      expect(usesRequestedFp16({ encoderQuant: 'fp32', decoderQuant: 'int8' })).toBe(false);
+    });
+
+    it('should return false if options is empty', () => {
+      expect(usesRequestedFp16({})).toBe(false);
+    });
+
+    it('should return false if options is null/undefined', () => {
+      expect(usesRequestedFp16(null)).toBe(false);
+      expect(usesRequestedFp16(undefined)).toBe(false);
+      expect(usesRequestedFp16()).toBe(false);
+    });
   });
 });
