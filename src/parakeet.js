@@ -603,7 +603,6 @@ export class ParakeetModel {
       temperature = 1.0, // Greedy decoding (1.0) is better for ASR than sampling (1.2)
       debug = false,
       enableProfiling = true,
-      skipCMVN = false,
       frameStride = 1,
       // NEW: Streaming options
       previousDecoderState = null,  // Accept state from previous chunk

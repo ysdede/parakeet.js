@@ -30,7 +30,6 @@ export interface TranscribeOptions {
   temperature?: number;
   debug?: boolean;
   enableProfiling?: boolean;
-  skipCMVN?: boolean;
   frameStride?: number;
   previousDecoderState?: DecoderStateSnapshot | null;
   returnDecoderState?: boolean;
