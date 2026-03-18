@@ -1,11 +1,3 @@
-## 2024-05-22 - JS Loops vs TypedArray.set
-Learning: Manual loops over TypedArrays in V8 are significantly slower (~10x) than `set` + `subarray` for bulk copies, even for moderate sizes (D=640).
-Action: Prefer `set` + `subarray` for contiguous memory copies in hot loops.
-
-## 2024-06-25 - Softmax math.exp unrolling
-Learning: Unrolling the `Math.exp` accumulation loop (4x split variables) over the token logits (size 4097) in V8 provides a ~15% speedup by reducing loop maintenance overheads and increasing instruction level parallelism.
-Action: Consider unrolling hot accumulation loops over TypedArrays where iteration count is high and bounds checking overhead is significant.
-
-## 2024-11-20 - Unrolling Float32Array argmax
-Learning: When finding the maximum value (argmax) in a large typed array like `Float32Array`, unrolling the loop 8x is significantly faster than using a simple `for` loop, yielding a ~2x performance speedup in the hot path.
-Action: Apply loop unrolling for max reductions in high-frequency typed array operations.
+## 2024-05-14 - Transpose Optimization in V8
+Learning: Replacing a cache-blocked matrix transpose implementation (which optimizes memory access patterns) with an 8x unrolled sequential write loop (which reduces JIT loop overhead) yielded roughly a 50% performance improvement in `src/parakeet.js`.
+Action: When transposing small to medium matrices in performance-critical JavaScript loops (e.g., audio feature arrays), prefer unrolling inner loops over complex block-tiling strategies, as V8's loop overhead often outweighs the cache locality benefits of blocking for these specific workloads.
