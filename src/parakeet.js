@@ -800,15 +800,26 @@ export class ParakeetModel {
       for (; i < tLen % 8; i++) {
         if (tokenLogits[i] > maxLogit) { maxLogit = tokenLogits[i]; maxId = i; }
       }
+      // Optimization: Reading values into local variables (v0 to v7) within the
+      // unrolled block before sequential comparisons avoids redundant TypedArray
+      // index lookups and bounds-checking overhead in V8 when a new max is found.
       for (; i < tLen; i += 8) {
-        if (tokenLogits[i] > maxLogit) { maxLogit = tokenLogits[i]; maxId = i; }
-        if (tokenLogits[i+1] > maxLogit) { maxLogit = tokenLogits[i+1]; maxId = i + 1; }
-        if (tokenLogits[i+2] > maxLogit) { maxLogit = tokenLogits[i+2]; maxId = i + 2; }
-        if (tokenLogits[i+3] > maxLogit) { maxLogit = tokenLogits[i+3]; maxId = i + 3; }
-        if (tokenLogits[i+4] > maxLogit) { maxLogit = tokenLogits[i+4]; maxId = i + 4; }
-        if (tokenLogits[i+5] > maxLogit) { maxLogit = tokenLogits[i+5]; maxId = i + 5; }
-        if (tokenLogits[i+6] > maxLogit) { maxLogit = tokenLogits[i+6]; maxId = i + 6; }
-        if (tokenLogits[i+7] > maxLogit) { maxLogit = tokenLogits[i+7]; maxId = i + 7; }
+        const v0 = tokenLogits[i];
+        const v1 = tokenLogits[i+1];
+        const v2 = tokenLogits[i+2];
+        const v3 = tokenLogits[i+3];
+        const v4 = tokenLogits[i+4];
+        const v5 = tokenLogits[i+5];
+        const v6 = tokenLogits[i+6];
+        const v7 = tokenLogits[i+7];
+        if (v0 > maxLogit) { maxLogit = v0; maxId = i; }
+        if (v1 > maxLogit) { maxLogit = v1; maxId = i + 1; }
+        if (v2 > maxLogit) { maxLogit = v2; maxId = i + 2; }
+        if (v3 > maxLogit) { maxLogit = v3; maxId = i + 3; }
+        if (v4 > maxLogit) { maxLogit = v4; maxId = i + 4; }
+        if (v5 > maxLogit) { maxLogit = v5; maxId = i + 5; }
+        if (v6 > maxLogit) { maxLogit = v6; maxId = i + 6; }
+        if (v7 > maxLogit) { maxLogit = v7; maxId = i + 7; }
       }
 
       // Compute maxVal (scaled) only if needed for softmax stability or logProbs
