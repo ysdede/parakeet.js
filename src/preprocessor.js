@@ -55,7 +55,8 @@ export class OnnxPreprocessor {
           const msg = (e.message || '') + '';
           if (sessOpts.enableGraphCapture && msg.includes('graph capture')) {
             console.warn('[Preprocessor] Graph capture unsupported, retrying without it');
-            return await this.ort.InferenceSession.create(this.modelUrl, { ...sessOpts, enableGraphCapture: false });
+            const { enableGraphCapture, ...retryOpts } = sessOpts;
+            return await this.ort.InferenceSession.create(this.modelUrl, retryOpts);
           }
           throw e;
         }
