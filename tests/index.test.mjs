@@ -79,4 +79,37 @@ describe('index.js', () => {
     expect(getParakeetModel).toHaveBeenCalledTimes(1);
     expect(ParakeetModel.fromUrls).toHaveBeenCalledTimes(1);
   });
+
+  it('fromHub should NOT throw actionable FP16 hint when fp16 is not requested', async () => {
+    const repoId = 'some-repo';
+    const options = { encoderQuant: 'fp32' };
+    const modelData = { urls: {}, filenames: {}, preprocessorBackend: 'js' };
+
+    getParakeetModel.mockResolvedValue(modelData);
+    ParakeetModel.fromUrls.mockRejectedValue(new Error('some other error'));
+
+    const error = await fromHub(repoId, options).catch((err) => err);
+    expect(error.message).toBe('some other error');
+    expect(error.message).not.toMatch(/FP16 compile\/session load failed/i);
+  });
+
+  it('fromHub should throw actionable FP16 hint when ONLY encoderQuant is fp16', async () => {
+    const repoId = 'some-repo';
+    const options = { encoderQuant: 'fp16' };
+    getParakeetModel.mockResolvedValue({ urls: {}, filenames: {}, preprocessorBackend: 'js' });
+    ParakeetModel.fromUrls.mockRejectedValue(new Error('fail'));
+
+    const error = await fromHub(repoId, options).catch((err) => err);
+    expect(error.message).toMatch(/FP16 compile\/session load failed/i);
+  });
+
+  it('fromHub should throw actionable FP16 hint when ONLY decoderQuant is fp16', async () => {
+    const repoId = 'some-repo';
+    const options = { decoderQuant: 'fp16' };
+    getParakeetModel.mockResolvedValue({ urls: {}, filenames: {}, preprocessorBackend: 'js' });
+    ParakeetModel.fromUrls.mockRejectedValue(new Error('fail'));
+
+    const error = await fromHub(repoId, options).catch((err) => err);
+    expect(error.message).toMatch(/FP16 compile\/session load failed/i);
+  });
 });
