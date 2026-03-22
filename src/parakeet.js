@@ -618,17 +618,12 @@ export class ParakeetModel {
       transposed = new Float32Array(Tenc * D);
       const encData = enc.data;
 
-      // Optimized transpose with tight loops and better cache locality
-      // Process in blocks to improve cache performance
-      const blockSize = Math.min(64, D); // Tune block size for cache efficiency
-
-      for (let dBlock = 0; dBlock < D; dBlock += blockSize) {
-        const dEnd = Math.min(dBlock + blockSize, D);
+      // Simple sequential loops are faster in V8 for these array dimensions
+      // than manual block-tiled approaches (loop overhead > cache benefits for flat Float32Arrays).
+      for (let d = 0; d < D; d++) {
+        const dOffset = d * Tenc;
         for (let t = 0; t < Tenc; t++) {
-          const tOffset = t * D;
-          for (let d = dBlock; d < dEnd; d++) {
-            transposed[tOffset + d] = encData[d * Tenc + t];
-          }
+          transposed[t * D + d] = encData[dOffset + t];
         }
       }
     } else {
