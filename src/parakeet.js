@@ -170,8 +170,8 @@ export class ParakeetModel {
       enableCpuMemArena: true,
       enableMemPattern: true,
       enableProfiling,
-      enableGraphCapture: graphCaptureEnabled,
       logSeverityLevel: verbose ? 0 : 2,
+      ...(graphCaptureEnabled && { enableGraphCapture: true }),
     };
 
     // Set execution provider based on backend
@@ -231,7 +231,7 @@ export class ParakeetModel {
         const msg = (e.message || '') + '';
         if (opts.enableGraphCapture && msg.includes('graph capture')) {
           console.warn('[Parakeet] Graph-capture unsupported for this model/backend; retrying without it');
-          const retryOpts = { ...opts, enableGraphCapture: false };
+          const { enableGraphCapture, ...retryOpts } = opts;
           return await ort.InferenceSession.create(url, retryOpts);
         }
         throw e;
@@ -251,7 +251,6 @@ export class ParakeetModel {
         backend: 'wasm',
         wasmPaths,
         enableProfiling,
-        enableGraphCapture: false,
         numThreads: cpuThreads
       });
       console.log(`[Parakeet.js] ONNX preprocessor session created (${detectedMels} mel bins)`);
