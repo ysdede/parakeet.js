@@ -769,7 +769,7 @@ export class ParakeetModel {
       _logitsTensor?.dispose?.();
 
       if (maxId !== this.blankId) {
-        // CRITICAL FIX: Only update decoder state on non-blank token emission
+        // Only update decoder state on non-blank token emission
         // This matches the Python reference in onnx-asr/src/onnx_asr/asr.py line 212
         this._disposeDecoderState(decoderState, newState); // free old state tensors
         decoderState = newState;
