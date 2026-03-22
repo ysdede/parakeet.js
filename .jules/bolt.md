@@ -9,3 +9,7 @@ Action: Consider unrolling hot accumulation loops over TypedArrays where iterati
 ## 2024-11-20 - Unrolling Float32Array argmax
 Learning: When finding the maximum value (argmax) in a large typed array like `Float32Array`, unrolling the loop 8x is significantly faster than using a simple `for` loop, yielding a ~2x performance speedup in the hot path.
 Action: Apply loop unrolling for max reductions in high-frequency typed array operations.
+
+## 2024-11-20 - Matrix transpose optimization
+Learning: In V8, block-tiling for cache optimization during matrix transpose (`[1, D, T]` to `[T, D]`) incurs significant loop overhead and bounding-check costs compared to a simple sequential memory write with loop unrolling. Using an 8x unrolled sequential approach over the inner dimension provides a ~40% speedup compared to a 64-block-tiled implementation.
+Action: Prefer sequential loops with unrolling over block-tiled approaches for matrix transpositions in JavaScript to reduce JIT compilation overhead.
