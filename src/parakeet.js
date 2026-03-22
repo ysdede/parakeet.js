@@ -40,6 +40,7 @@ function coerceFiniteTimeOffset(value, methodName) {
  * Lightweight Parakeet model wrapper designed for browser usage.
  * Currently supports the *combined* decoder_joint-model ONNX (encoder+decoder+joiner in '
  * transformerjs' style) exported by parakeet TDT.
+ * Internal decode buffers are reused aggressively to keep browser hot paths stable without changing public API behavior.
  */
 export class ParakeetModel {
   /**
@@ -1545,6 +1546,7 @@ export class FrameAlignedMerger {
    * @param {number} opts.frameTimeStride - Time per encoder frame (default 0.08s)
    * @param {number} opts.timeTolerance - Max time difference for token matching (default 0.2s)
    * @param {number} opts.stabilityThreshold - Appearances needed to confirm token (default 2)
+   * Internal overlap scans are optimized for repeated streaming-window use; matching semantics remain the same.
    */
   constructor(opts = {}) {
     this.frameTimeStride = opts.frameTimeStride || 0.08;
@@ -1737,6 +1739,7 @@ export class LCSPTFAMerger {
    * @param {number} opts.timeTolerance - Max time diff for frame alignment (default 0.15s)
    * @param {number} opts.sequenceAnchorLength - Min consecutive matches for anchor (default 3)
    * @param {number} opts.vignetteSigmaFactor - Gaussian sigma as fraction of total (default 0.25)
+   * The internal DP fill path is tuned for streaming overlap workloads while preserving the existing API contract.
    */
   constructor(opts = {}) {
     this.frameTimeStride = opts.frameTimeStride || 0.08;
