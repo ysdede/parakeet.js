@@ -324,7 +324,8 @@ export class ParakeetModel {
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
     const seenOutputs = new Set();
-    for (const value of Object.values(out)) {
+    for (const key in out) {
+      const value = out[key];
       if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
       seenOutputs.add(value);
       if (value === logits || value === outputState1 || value === outputState2) continue;
