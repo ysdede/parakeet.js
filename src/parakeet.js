@@ -792,7 +792,6 @@ export class ParakeetModel {
       const frameStart = t * D;
       // Benchmark-driven hot path: keep this as set(subarray) (see tests/bench_ops.mjs, tests/verify_copy.mjs).
       this._encoderFrameBuffer.set(transposed.subarray(frameStart, frameStart + D));
-      // const encTensor = new this.ort.Tensor('float32', this._encoderFrameBuffer, [1, D, 1]);
 
       const prevTok = ids.length ? ids[ids.length - 1] : this.blankId;
       const { tokenLogits, step, newState, _logitsTensor } = await this._runCombinedStep(this._encoderFrameTensor, prevTok, decoderState);
