@@ -9,3 +9,7 @@ Action: Consider unrolling hot accumulation loops over TypedArrays where iterati
 ## 2024-11-20 - Unrolling Float32Array argmax
 Learning: When finding the maximum value (argmax) in a large typed array like `Float32Array`, unrolling the loop 8x is significantly faster than using a simple `for` loop, yielding a ~2x performance speedup in the hot path.
 Action: Apply loop unrolling for max reductions in high-frequency typed array operations.
+
+## 2025-01-28 - Transpose optimization
+Learning: In JavaScript/V8 engines running on flat TypedArrays, loop overhead often dominates cache locality benefits. A simple, unblocked `for` loop over `t` and `d` is faster than a tiled (blocked) approach for transposing encoder outputs.
+Action: Prefer simple loops over blocked/tiled approaches for matrix operations on TypedArrays in JavaScript unless dealing with extremely large sizes where cache misses become the primary bottleneck.
