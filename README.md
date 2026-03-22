@@ -89,6 +89,16 @@ This keeps feature compatibility with the previous implementation while reducing
 
 If you need exact ONNX preprocessor execution instead of JS mel, set `preprocessorBackend: 'onnx'`.
 
+## Hot-Path Perf Refresh (v1.4.3)
+
+`v1.4.3` keeps the public API unchanged and focuses on internal decode/merge hot paths that show up in the browser demo, Keet, and streaming consumers.
+
+- Faster encoder-frame transpose and softmax/argmax loops in the main decoder path.
+- Lower overhead in streaming merger anchor search and LCS alignment checks.
+- No behavioral option changes: existing `transcribe(...)`, `transcribeLongAudio(...)`, and merger APIs stay the same.
+
+This release is intended as a safe patch-level throughput/latency improvement, not a feature release.
+
 ## FP16 Examples
 
 Before using FP16 examples: ensure FP16 artifacts exist in the target repo and your browser/runtime supports FP16 execution (WebGPU FP16 path).
