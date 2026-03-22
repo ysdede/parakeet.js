@@ -476,14 +476,16 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   }
 
   const optionalFiles = buildOptionalExternalDataDownloads(components, repoFiles);
-  for (const file of optionalFiles) {
-    try {
-      results.urls[file.key] = await getModelFile(repoId, file.name, { ...options, progress });
-    } catch {
-      console.warn(`[Hub] Optional external data file not found: ${file.name}. This is expected if the model is small.`);
-      results.urls[file.key] = null;
-    }
-  }
+  await Promise.all(
+    optionalFiles.map(async (file) => {
+      try {
+        results.urls[file.key] = await getModelFile(repoId, file.name, { ...options, progress });
+      } catch {
+        console.warn(`[Hub] Optional external data file not found: ${file.name}. This is expected if the model is small.`);
+        results.urls[file.key] = null;
+      }
+    })
+  );
 
   return results;
 }
