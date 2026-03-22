@@ -1630,14 +1630,25 @@ export class FrameAlignedMerger {
   _findAnchors(overlapTokens) {
     const anchors = [];
 
+    // Pre-group pending tokens by ID for O(1) lookup
+    const pendingById = new Map();
+    for (const pendTok of this.pendingTokens) {
+      const list = pendingById.get(pendTok.id);
+      if (list) {
+        list.push(pendTok);
+      } else {
+        pendingById.set(pendTok.id, [pendTok]);
+      }
+    }
+
     for (const newTok of overlapTokens) {
-      for (const pendTok of this.pendingTokens) {
-        if (
-          newTok.id === pendTok.id &&
-          Math.abs(newTok.absTime - pendTok.absTime) < this.timeTolerance
-        ) {
-          anchors.push(newTok);
-          break;
+      const candidates = pendingById.get(newTok.id);
+      if (candidates) {
+        for (const pendTok of candidates) {
+          if (Math.abs(newTok.absTime - pendTok.absTime) < this.timeTolerance) {
+            anchors.push(newTok);
+            break;
+          }
         }
       }
     }
