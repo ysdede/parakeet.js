@@ -13,3 +13,7 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2026-03-24 - One-pass calculation of mean and variance
+Learning: The mean and variance of a sequence can be computed in a single pass instead of two passes by utilizing the identity `varSum = sumSq - (sum * sum) / N`. A lower bound on the variance should be applied when utilizing this formula due to numerical instability causing small negative values. This speeds up tight numeric normalization loops.
+Action: Compute both the sum and sum of squares in a single loop when iterating over typed arrays to optimize normalization functions.

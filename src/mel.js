@@ -599,17 +599,20 @@ export class JsPreprocessor {
       const srcBase = m * nFrames;
       const dstBase = m * featuresLen;
 
+      // Performance optimization: compute sum and sum of squares in a single pass
+      // to avoid iterating over the rawMel array twice.
       let sum = 0;
+      let sumSq = 0;
       for (let t = 0; t < featuresLen; t++) {
-        sum += rawMel[srcBase + t];
+        const val = rawMel[srcBase + t];
+        sum += val;
+        sumSq += val * val;
       }
-      const mean = sum / featuresLen;
 
-      let varSum = 0;
-      for (let t = 0; t < featuresLen; t++) {
-        const d = rawMel[srcBase + t] - mean;
-        varSum += d * d;
-      }
+      const mean = sum / featuresLen;
+      let varSum = sumSq - (sum * sum) / featuresLen;
+      if (varSum < 0) varSum = 0; // numerical stability
+
       const invStd =
         featuresLen > 1
           ? 1.0 / (Math.sqrt(varSum / (featuresLen - 1)) + 1e-5)
