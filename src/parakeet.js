@@ -1621,9 +1621,20 @@ export class FrameAlignedMerger {
 
         if (count >= this.stabilityThreshold) {
           // Token is stable - add to confirmed if not already there
-          const alreadyConfirmed = this.confirmedTokens.some(
-            t => Math.abs(t.absTime - token.absTime) < this.timeTolerance && t.id === token.id
-          );
+          // confirmedTokens are time-ordered, so we search backwards and early-exit
+          // to avoid an O(N) array scan over long transcriptions.
+          let alreadyConfirmed = false;
+          for (let i = this.confirmedTokens.length - 1; i >= 0; i--) {
+            const t = this.confirmedTokens[i];
+            // If the confirmed token is older than our tolerance window, stop searching
+            if (token.absTime - t.absTime > this.timeTolerance) break;
+
+            if (t.id === token.id && Math.abs(t.absTime - token.absTime) < this.timeTolerance) {
+              alreadyConfirmed = true;
+              break;
+            }
+          }
+
           if (!alreadyConfirmed) {
             this.confirmedTokens.push(token);
           }
