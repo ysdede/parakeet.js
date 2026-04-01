@@ -32,6 +32,10 @@ const MODEL_CANONICAL_REVISIONS = {
   'parakeet-tdt-0.6b-v2': 'feat/fp16-canonical-v2',
   'parakeet-tdt-0.6b-v3': 'feat/fp16-canonical-v3',
 };
+const LONG_AUDIO_UPLOAD_THRESHOLD_S = 150;
+const LONG_AUDIO_UPLOAD_CHUNK_LENGTH_S = 90;
+const STREAMED_WAV_CHUNK_DURATION_S = 30;
+const WAV_HEADER_PROBE_BYTES = 1024 * 1024;
 
 function getBasename(path) {
   return String(path || '').split('/').pop() || '';
@@ -62,6 +66,214 @@ function findLocalEntry(entries, expectedName) {
 
 function quantizedModelName(baseName, quant) {
   return `${baseName}${QUANT_TO_FILENAME[quant] || '.onnx'}`;
+}
+
+function getAverageWordConfidence(words) {
+  const confidences = Array.isArray(words)
+    ? words.map((word) => word?.confidence).filter((value) => Number.isFinite(value))
+    : [];
+  if (confidences.length === 0) return null;
+  return confidences.reduce((sum, value) => sum + value, 0) / confidences.length;
+}
+
+function buildDisplayMetrics(metrics, durationS, startedAtMs) {
+  const elapsedMs = Math.max(0, performance.now() - startedAtMs);
+  const baseMetrics = metrics && typeof metrics === 'object' ? metrics : {};
+  const wallRtf = Number.isFinite(durationS) && durationS > 0 && elapsedMs > 0
+    ? durationS / (elapsedMs / 1000)
+    : null;
+
+  return {
+    ...baseMetrics,
+    wall_ms: elapsedMs,
+    wall_rtf: wallRtf,
+  };
+}
+
+function formatMetricDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const totalSeconds = ms / 1000;
+  if (totalSeconds < 60) {
+    return `${totalSeconds.toFixed(totalSeconds >= 10 ? 1 : 2)}s`;
+  }
+
+  const totalWholeSeconds = Math.round(totalSeconds);
+  const minutes = Math.floor(totalWholeSeconds / 60);
+  const seconds = totalWholeSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function readAscii(view, offset, length) {
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += String.fromCharCode(view.getUint8(offset + i));
+  }
+  return out;
+}
+
+function isLikelyWavFile(file) {
+  const name = String(file?.name || '').toLowerCase();
+  const type = String(file?.type || '').toLowerCase();
+  return type === 'audio/wav' || type === 'audio/wave' || type === 'audio/x-wav' || name.endsWith('.wav');
+}
+
+function parseWavHeader(buffer) {
+  const view = new DataView(buffer);
+  if (view.byteLength < 12) {
+    throw new Error('WAV header is too small.');
+  }
+  if (readAscii(view, 0, 4) !== 'RIFF' || readAscii(view, 8, 4) !== 'WAVE') {
+    throw new Error('File is not a RIFF/WAVE stream.');
+  }
+
+  let fmt = null;
+  let data = null;
+  let offset = 12;
+  while (offset + 8 <= view.byteLength) {
+    const chunkId = readAscii(view, offset, 4);
+    const chunkSize = view.getUint32(offset + 4, true);
+    const chunkDataOffset = offset + 8;
+
+    if (chunkId === 'fmt ' && chunkSize >= 16 && chunkDataOffset + chunkSize <= view.byteLength) {
+      fmt = {
+        audioFormat: view.getUint16(chunkDataOffset, true),
+        channels: view.getUint16(chunkDataOffset + 2, true),
+        sampleRate: view.getUint32(chunkDataOffset + 4, true),
+        byteRate: view.getUint32(chunkDataOffset + 8, true),
+        blockAlign: view.getUint16(chunkDataOffset + 12, true),
+        bitsPerSample: view.getUint16(chunkDataOffset + 14, true),
+      };
+    } else if (chunkId === 'data') {
+      data = {
+        offset: chunkDataOffset,
+        size: chunkSize,
+      };
+      break;
+    }
+
+    offset = chunkDataOffset + chunkSize + (chunkSize % 2);
+  }
+
+  if (!fmt) {
+    throw new Error('WAV fmt chunk not found.');
+  }
+  if (!data) {
+    throw new Error('WAV data chunk not found in header probe.');
+  }
+  if (fmt.channels <= 0) {
+    throw new Error('WAV channel count must be positive.');
+  }
+  if (!Number.isFinite(fmt.sampleRate) || fmt.sampleRate <= 0) {
+    throw new Error('WAV sample rate must be positive.');
+  }
+  if (!Number.isFinite(fmt.blockAlign) || fmt.blockAlign <= 0) {
+    throw new Error('WAV blockAlign must be positive.');
+  }
+
+  return {
+    audioFormat: fmt.audioFormat,
+    channels: fmt.channels,
+    sampleRate: fmt.sampleRate,
+    byteRate: fmt.byteRate,
+    blockAlign: fmt.blockAlign,
+    bitsPerSample: fmt.bitsPerSample,
+    dataOffset: data.offset,
+    dataBytes: data.size,
+    durationS: data.size / fmt.blockAlign / fmt.sampleRate,
+  };
+}
+
+function decodePcmSample(view, offset, audioFormat, bitsPerSample) {
+  if (audioFormat === 3) {
+    if (bitsPerSample === 32) return view.getFloat32(offset, true);
+    if (bitsPerSample === 64) return view.getFloat64(offset, true);
+    throw new Error(`Unsupported WAV float bit depth: ${bitsPerSample}`);
+  }
+
+  if (audioFormat !== 1) {
+    throw new Error(`Unsupported WAV audio format: ${audioFormat}`);
+  }
+
+  if (bitsPerSample === 8) {
+    return (view.getUint8(offset) - 128) / 128;
+  }
+  if (bitsPerSample === 16) {
+    return view.getInt16(offset, true) / 32768;
+  }
+  if (bitsPerSample === 24) {
+    let value =
+      view.getUint8(offset) |
+      (view.getUint8(offset + 1) << 8) |
+      (view.getUint8(offset + 2) << 16);
+    if (value & 0x800000) value |= 0xff000000;
+    return value / 8388608;
+  }
+  if (bitsPerSample === 32) {
+    return view.getInt32(offset, true) / 2147483648;
+  }
+
+  throw new Error(`Unsupported WAV PCM bit depth: ${bitsPerSample}`);
+}
+
+function decodeWavChunkToMonoFloat32(buffer, wavInfo) {
+  const bytesPerSample = wavInfo.bitsPerSample / 8;
+  const frameCount = Math.floor(buffer.byteLength / wavInfo.blockAlign);
+  const mono = new Float32Array(frameCount);
+  const view = new DataView(buffer);
+
+  for (let frame = 0; frame < frameCount; frame++) {
+    const frameOffset = frame * wavInfo.blockAlign;
+    let sum = 0;
+    for (let channel = 0; channel < wavInfo.channels; channel++) {
+      const sampleOffset = frameOffset + channel * bytesPerSample;
+      sum += decodePcmSample(view, sampleOffset, wavInfo.audioFormat, wavInfo.bitsPerSample);
+    }
+    mono[frame] = sum / wavInfo.channels;
+  }
+
+  return mono;
+}
+
+class StreamingLinearResampler {
+  constructor(inputRate, outputRate) {
+    this.inputRate = inputRate;
+    this.outputRate = outputRate;
+    this.step = inputRate / outputRate;
+    this.position = 0;
+    this.tailSample = null;
+  }
+
+  process(chunk) {
+    if (this.inputRate === this.outputRate) {
+      return chunk;
+    }
+    if (!(chunk instanceof Float32Array) || chunk.length === 0) {
+      return new Float32Array(0);
+    }
+
+    let input = chunk;
+    if (this.tailSample !== null) {
+      input = new Float32Array(chunk.length + 1);
+      input[0] = this.tailSample;
+      input.set(chunk, 1);
+    }
+
+    const out = [];
+    const lastUsableIndex = input.length - 1;
+    let pos = this.position;
+    while (pos < lastUsableIndex) {
+      const i = Math.floor(pos);
+      const frac = pos - i;
+      const a = input[i];
+      const b = input[i + 1];
+      out.push(a + (b - a) * frac);
+      pos += this.step;
+    }
+
+    this.position = pos - lastUsableIndex;
+    this.tailSample = input[input.length - 1];
+    return Float32Array.from(out);
+  }
 }
 
 function getCanonicalRevision(modelKey) {
@@ -941,6 +1153,7 @@ export default function App() {
       setStatus('Transcribing…');
       setIsTranscribing(true);
 
+      const transcribeStartedAt = performance.now();
       console.time('Transcribe-Sample');
       const res = await modelRef.current.transcribe(sample.pcm, 16000, {
         returnTimestamps: true,
@@ -955,7 +1168,8 @@ export default function App() {
       }
 
       setText(res.utterance_text);
-      setLatestMetrics(res.metrics);
+      const displayMetrics = buildDisplayMetrics(res.metrics, sample.duration, transcribeStartedAt);
+      setLatestMetrics(displayMetrics);
 
       const langName = LANGUAGE_NAMES[selectedLanguage] || selectedLanguage;
       const datasetName = sample.dataset.split('/').pop();
@@ -968,7 +1182,7 @@ export default function App() {
         duration: sample.duration,
         wordCount: res.words?.length || 0,
         confidence: res.confidence_scores?.token_avg ?? res.confidence_scores?.word_avg ?? null,
-        metrics: res.metrics,
+        metrics: displayMetrics,
         language: selectedLanguage
       };
       setTranscriptions(prev => [newTranscription, ...prev]);
@@ -1205,38 +1419,132 @@ export default function App() {
     setStatus(`Transcribing "${file.name}"…`);
 
     try {
+      const canStreamWav = isLikelyWavFile(file);
+      if (canStreamWav) {
+        const headerProbe = await file.slice(0, Math.min(file.size, WAV_HEADER_PROBE_BYTES)).arrayBuffer();
+        const wavInfo = parseWavHeader(headerProbe);
+
+        if (wavInfo.durationS >= LONG_AUDIO_UPLOAD_THRESHOLD_S) {
+          const streamer = modelRef.current.createStreamingTranscriber({
+            returnTimestamps: true,
+            returnConfidences: true,
+            sampleRate: 16000,
+            debug: verboseLog,
+          });
+          const transcribeStartedAt = performance.now();
+          const resampler = new StreamingLinearResampler(wavInfo.sampleRate, 16000);
+          const chunkBytesRaw = Math.max(
+            wavInfo.blockAlign,
+            Math.floor(wavInfo.sampleRate * STREAMED_WAV_CHUNK_DURATION_S) * wavInfo.blockAlign,
+          );
+          const chunkBytes = chunkBytesRaw - (chunkBytesRaw % wavInfo.blockAlign);
+          const dataEnd = wavInfo.dataOffset + wavInfo.dataBytes;
+          let offset = wavInfo.dataOffset;
+          let lastResult = null;
+
+          console.info(
+            `[App] Streaming WAV upload for ${file.name} (${wavInfo.durationS.toFixed(1)} s, ${wavInfo.sampleRate} Hz, ${wavInfo.channels} ch).`,
+          );
+
+          while (offset < dataEnd) {
+            const nextOffset = Math.min(dataEnd, offset + chunkBytes);
+            const chunkBuffer = await file.slice(offset, nextOffset).arrayBuffer();
+            const monoChunk = decodeWavChunkToMonoFloat32(chunkBuffer, wavInfo);
+            const pcmChunk = resampler.process(monoChunk);
+            const progressPct = ((nextOffset - wavInfo.dataOffset) / wavInfo.dataBytes) * 100;
+            setStatus(`Streaming WAV transcription "${file.name}"… ${progressPct.toFixed(0)}%`);
+
+            if (pcmChunk.length > 0) {
+              lastResult = await streamer.processChunk(pcmChunk);
+            }
+
+            offset = nextOffset;
+          }
+
+          const finalResult = streamer.finalize();
+          const transcriptText = finalResult.text ?? lastResult?.text ?? '';
+          const avgConfidence = getAverageWordConfidence(finalResult.words);
+          const finalMetrics = buildDisplayMetrics(
+            finalResult.metrics ?? lastResult?.metrics ?? null,
+            wavInfo.durationS,
+            transcribeStartedAt,
+          );
+
+          setLatestMetrics(finalMetrics);
+
+          const newTranscription = {
+            id: Date.now(),
+            filename: file.name,
+            text: transcriptText,
+            timestamp: new Date().toLocaleTimeString(),
+            duration: wavInfo.durationS,
+            wordCount: finalResult.words?.length || 0,
+            confidence: avgConfidence,
+            metrics: finalMetrics,
+          };
+
+          setTranscriptions(prev => [newTranscription, ...prev]);
+          setText(transcriptText);
+          setStatus('Model ready');
+          return;
+        }
+      }
+
       const buf = await file.arrayBuffer();
       const audioCtx = new AudioContext({ sampleRate: 16000 });
       const decoded = await audioCtx.decodeAudioData(buf);
       const pcm = decoded.getChannelData(0);
-
-      console.time(`Transcribe-${file.name}`);
-      const res = await modelRef.current.transcribe(pcm, 16_000, {
+      const durationS = pcm.length / 16000;
+      const useLongForm = durationS >= LONG_AUDIO_UPLOAD_THRESHOLD_S;
+      const baseTranscribeOptions = {
         returnTimestamps: true,
         returnConfidences: true,
         frameStride,
-        enableProfiling
-      });
+        enableProfiling,
+      };
+
+      if (useLongForm) {
+        setStatus(`Transcribing long audio "${file.name}"…`);
+        console.info(
+          `[App] Using transcribeLongAudio() for ${file.name} (${durationS.toFixed(1)} s, chunkLengthS=${LONG_AUDIO_UPLOAD_CHUNK_LENGTH_S}).`,
+        );
+      }
+
+      const transcribeStartedAt = performance.now();
+      console.time(`Transcribe-${file.name}`);
+      const res = useLongForm
+        ? await modelRef.current.transcribeLongAudio(pcm, 16_000, {
+          ...baseTranscribeOptions,
+          chunkLengthS: LONG_AUDIO_UPLOAD_CHUNK_LENGTH_S,
+        })
+        : await modelRef.current.transcribe(pcm, 16_000, baseTranscribeOptions);
       console.timeEnd(`Transcribe-${file.name}`);
 
       if (dumpDetail) {
         console.log('[Parakeet] Result:', res);
       }
-      setLatestMetrics(res.metrics);
+      const displayMetrics = buildDisplayMetrics(res.metrics ?? null, durationS, transcribeStartedAt);
+      setLatestMetrics(displayMetrics);
+
+      const transcriptText = res.text ?? res.utterance_text ?? '';
+      const avgConfidence =
+        res.confidence_scores?.token_avg ??
+        res.confidence_scores?.word_avg ??
+        getAverageWordConfidence(res.words);
 
       const newTranscription = {
         id: Date.now(),
         filename: file.name,
-        text: res.utterance_text,
+        text: transcriptText,
         timestamp: new Date().toLocaleTimeString(),
-        duration: pcm.length / 16000,
+        duration: durationS,
         wordCount: res.words?.length || 0,
-        confidence: res.confidence_scores?.token_avg ?? res.confidence_scores?.word_avg ?? null,
-        metrics: res.metrics
+        confidence: avgConfidence,
+        metrics: displayMetrics
       };
 
       setTranscriptions(prev => [newTranscription, ...prev]);
-      setText(res.utterance_text);
+      setText(transcriptText);
       setStatus('Model ready');
 
     } catch (error) {
@@ -1842,10 +2150,24 @@ export default function App() {
               {latestMetrics && (
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex flex-wrap gap-4 text-xs font-mono text-gray-600 dark:text-gray-400">
-                    <span><strong className="text-gray-900 dark:text-white">RTF:</strong> {latestMetrics.rtf?.toFixed(2)}x</span>
-                    <span><strong className="text-gray-900 dark:text-white">Total:</strong> {latestMetrics.total_ms?.toFixed(0)}ms</span>
-                    <span><strong className="text-gray-900 dark:text-white">Encode:</strong> {latestMetrics.encode_ms?.toFixed(0)}ms</span>
-                    <span><strong className="text-gray-900 dark:text-white">Decode:</strong> {latestMetrics.decode_ms?.toFixed(0)}ms</span>
+                    {Number.isFinite(latestMetrics.rtf) && (
+                      <span><strong className="text-gray-900 dark:text-white">RTFx:</strong> {latestMetrics.rtf.toFixed(2)}x</span>
+                    )}
+                    {Number.isFinite(latestMetrics.wall_rtf) && (
+                      <span><strong className="text-gray-900 dark:text-white">Wall RTFx:</strong> {latestMetrics.wall_rtf.toFixed(2)}x</span>
+                    )}
+                    {Number.isFinite(latestMetrics.wall_ms) && (
+                      <span><strong className="text-gray-900 dark:text-white">Elapsed:</strong> {formatMetricDuration(latestMetrics.wall_ms)}</span>
+                    )}
+                    {Number.isFinite(latestMetrics.total_ms) && (
+                      <span><strong className="text-gray-900 dark:text-white">Model:</strong> {formatMetricDuration(latestMetrics.total_ms)}</span>
+                    )}
+                    {Number.isFinite(latestMetrics.encode_ms) && (
+                      <span><strong className="text-gray-900 dark:text-white">Encode:</strong> {formatMetricDuration(latestMetrics.encode_ms)}</span>
+                    )}
+                    {Number.isFinite(latestMetrics.decode_ms) && (
+                      <span><strong className="text-gray-900 dark:text-white">Decode:</strong> {formatMetricDuration(latestMetrics.decode_ms)}</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -1884,7 +2206,9 @@ export default function App() {
                       <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 font-mono">
                         {trans.duration.toFixed(1)}s · {trans.wordCount} words
                         {trans.confidence && ` · ${(trans.confidence * 100).toFixed(0)}% conf`}
-                        {trans.metrics && ` · RTF ${trans.metrics.rtf?.toFixed(2)}x`}
+                        {Number.isFinite(trans.metrics?.rtf) && ` · RTFx ${trans.metrics.rtf.toFixed(2)}x`}
+                        {Number.isFinite(trans.metrics?.wall_rtf) && ` · Wall ${trans.metrics.wall_rtf.toFixed(2)}x`}
+                        {Number.isFinite(trans.metrics?.wall_ms) && ` · ${formatMetricDuration(trans.metrics.wall_ms)}`}
                       </div>
                       {trans.reference && (
                         <div className="mb-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded text-sm text-emerald-800 dark:text-emerald-300">

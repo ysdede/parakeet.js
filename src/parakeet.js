@@ -1252,6 +1252,69 @@ export class StatefulStreamingTranscriber {
     this._totalTokenIds = [];
     this._chunkCount = 0;
     this._isFinalized = false;
+    this._metrics = {
+      preprocess_ms: 0,
+      encode_ms: 0,
+      decode_ms: 0,
+      tokenize_ms: 0,
+      total_ms: 0,
+      cached_frames: 0,
+      new_frames: 0,
+    };
+    this._hasMetrics = false;
+    this._hasMelCacheMetrics = false;
+  }
+
+  _accumulateMetrics(metrics) {
+    if (!metrics || typeof metrics !== 'object') {
+      return;
+    }
+
+    this._hasMetrics = true;
+
+    for (const key of ['preprocess_ms', 'encode_ms', 'decode_ms', 'tokenize_ms', 'total_ms']) {
+      if (typeof metrics[key] === 'number' && Number.isFinite(metrics[key])) {
+        this._metrics[key] += metrics[key];
+      }
+    }
+
+    if (metrics.mel_cache && typeof metrics.mel_cache === 'object') {
+      this._hasMelCacheMetrics = true;
+      if (typeof metrics.mel_cache.cached_frames === 'number' && Number.isFinite(metrics.mel_cache.cached_frames)) {
+        this._metrics.cached_frames += metrics.mel_cache.cached_frames;
+      }
+      if (typeof metrics.mel_cache.new_frames === 'number' && Number.isFinite(metrics.mel_cache.new_frames)) {
+        this._metrics.new_frames += metrics.mel_cache.new_frames;
+      }
+    }
+  }
+
+  _getCumulativeMetrics() {
+    if (!this._hasMetrics) {
+      return null;
+    }
+
+    const total_ms = this._metrics.total_ms > 0
+      ? this._metrics.total_ms
+      : this._metrics.preprocess_ms + this._metrics.encode_ms + this._metrics.decode_ms + this._metrics.tokenize_ms;
+
+    const metrics = {
+      preprocess_ms: this._metrics.preprocess_ms,
+      encode_ms: this._metrics.encode_ms,
+      decode_ms: this._metrics.decode_ms,
+      tokenize_ms: this._metrics.tokenize_ms,
+      total_ms,
+      rtf: total_ms > 0 ? this._currentOffset / (total_ms / 1000) : 0,
+    };
+
+    if (this._hasMelCacheMetrics) {
+      metrics.mel_cache = {
+        cached_frames: this._metrics.cached_frames,
+        new_frames: this._metrics.new_frames,
+      };
+    }
+
+    return metrics;
   }
 
   /**
@@ -1281,6 +1344,7 @@ export class StatefulStreamingTranscriber {
     this._decoderState = result.decoderState;
     this._currentOffset += chunkDuration;
     this._chunkCount++;
+    this._accumulateMetrics(result.metrics);
 
     // Append new words to cumulative list
     if (result.words && result.words.length > 0) {
@@ -1314,7 +1378,7 @@ export class StatefulStreamingTranscriber {
       // Optional data
       ...(this.opts.returnTokenIds ? { tokenIds: this._totalTokenIds.slice() } : {}),
       ...(this.opts.returnConfidences && result.confidence_scores ? { confidence_scores: result.confidence_scores } : {}),
-      metrics: result.metrics,
+      metrics: this._getCumulativeMetrics(),
     };
   }
 
@@ -1334,6 +1398,7 @@ export class StatefulStreamingTranscriber {
       chunkCount: this._chunkCount,
       is_final: true,
       ...(this.opts.returnTokenIds ? { tokenIds: this._totalTokenIds.slice() } : {}),
+      metrics: this._getCumulativeMetrics(),
     };
   }
 
@@ -1348,6 +1413,17 @@ export class StatefulStreamingTranscriber {
     this._totalTokenIds = [];
     this._chunkCount = 0;
     this._isFinalized = false;
+    this._metrics = {
+      preprocess_ms: 0,
+      encode_ms: 0,
+      decode_ms: 0,
+      tokenize_ms: 0,
+      total_ms: 0,
+      cached_frames: 0,
+      new_frames: 0,
+    };
+    this._hasMetrics = false;
+    this._hasMelCacheMetrics = false;
   }
 
   /**

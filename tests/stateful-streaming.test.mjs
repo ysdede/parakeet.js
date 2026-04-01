@@ -30,10 +30,26 @@ describe('StatefulStreamingTranscriber', () => {
     const first = await streamer.processChunk(new Float32Array(16000)); // 1.0s
     expect(first.text).toBe('hello');
     expect(first.totalDuration).toBe(1);
+    expect(first.metrics).toEqual({
+      preprocess_ms: 0,
+      encode_ms: 0,
+      decode_ms: 0,
+      tokenize_ms: 0,
+      total_ms: 10,
+      rtf: 100,
+    });
 
     const second = await streamer.processChunk(new Float32Array(8000)); // +0.5s
     expect(second.text).toBe('hello hello world');
     expect(second.totalDuration).toBe(1.5);
+    expect(second.metrics).toEqual({
+      preprocess_ms: 0,
+      encode_ms: 0,
+      decode_ms: 0,
+      tokenize_ms: 0,
+      total_ms: 22,
+      rtf: expect.closeTo(1.5 / 0.022, 6),
+    });
 
     expect(transcribe).toHaveBeenCalledTimes(2);
     expect(transcribe.mock.calls[0][2].previousDecoderState).toBeNull();
@@ -56,6 +72,14 @@ describe('StatefulStreamingTranscriber', () => {
     const finalResult = streamer.finalize();
     expect(finalResult.is_final).toBe(true);
     expect(finalResult.text).toBe('test');
+    expect(finalResult.metrics).toEqual({
+      preprocess_ms: 0,
+      encode_ms: 0,
+      decode_ms: 0,
+      tokenize_ms: 0,
+      total_ms: 1,
+      rtf: 200,
+    });
 
     await expect(streamer.processChunk(new Float32Array(3200))).rejects.toThrow(
       'Streamer is finalized. Create a new instance to process more audio.',
@@ -84,5 +108,6 @@ describe('StatefulStreamingTranscriber', () => {
     expect(transcribe.mock.calls[1][2].timeOffset).toBe(0);
     expect(secondSession.text).toBe('second');
     expect(secondSession.totalDuration).toBe(0.5);
+    expect(secondSession.metrics).toBeNull();
   });
 });

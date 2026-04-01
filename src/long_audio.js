@@ -28,6 +28,74 @@ function normalizeChunkLengthS(value) {
   return Math.max(MIN_CHUNK_LENGTH_S, Math.min(MAX_CHUNK_LENGTH_S, num));
 }
 
+function createMetricsAccumulator(audioDurationS) {
+  return {
+    audioDurationS,
+    preprocess_ms: 0,
+    encode_ms: 0,
+    decode_ms: 0,
+    tokenize_ms: 0,
+    total_ms: 0,
+    cached_frames: 0,
+    new_frames: 0,
+    hasMetrics: false,
+    hasMelCache: false,
+  };
+}
+
+function addMetricValue(accumulator, key, value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    accumulator[key] += value;
+  }
+}
+
+function accumulateMetrics(accumulator, metrics) {
+  if (!metrics || typeof metrics !== 'object') {
+    return;
+  }
+
+  accumulator.hasMetrics = true;
+  addMetricValue(accumulator, 'preprocess_ms', metrics.preprocess_ms);
+  addMetricValue(accumulator, 'encode_ms', metrics.encode_ms);
+  addMetricValue(accumulator, 'decode_ms', metrics.decode_ms);
+  addMetricValue(accumulator, 'tokenize_ms', metrics.tokenize_ms);
+  addMetricValue(accumulator, 'total_ms', metrics.total_ms);
+
+  if (metrics.mel_cache && typeof metrics.mel_cache === 'object') {
+    accumulator.hasMelCache = true;
+    addMetricValue(accumulator, 'cached_frames', metrics.mel_cache.cached_frames);
+    addMetricValue(accumulator, 'new_frames', metrics.mel_cache.new_frames);
+  }
+}
+
+function finalizeMetrics(accumulator) {
+  if (!accumulator?.hasMetrics) {
+    return null;
+  }
+
+  const total_ms = accumulator.total_ms > 0
+    ? accumulator.total_ms
+    : accumulator.preprocess_ms + accumulator.encode_ms + accumulator.decode_ms + accumulator.tokenize_ms;
+
+  const metrics = {
+    preprocess_ms: accumulator.preprocess_ms,
+    encode_ms: accumulator.encode_ms,
+    decode_ms: accumulator.decode_ms,
+    tokenize_ms: accumulator.tokenize_ms,
+    total_ms,
+    rtf: total_ms > 0 ? accumulator.audioDurationS / (total_ms / 1000) : 0,
+  };
+
+  if (accumulator.hasMelCache) {
+    metrics.mel_cache = {
+      cached_frames: accumulator.cached_frames,
+      new_frames: accumulator.new_frames,
+    };
+  }
+
+  return metrics;
+}
+
 function joinTimedWords(words) {
   let text = '';
   for (const word of words) {
@@ -398,6 +466,7 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
     : autoWindowing
       ? AUTO_CHUNK_LENGTH_S
       : 0;
+  const metricsAccumulator = createMetricsAccumulator(audioDurationS);
 
   const transcribeWindow = async (windowAudio, windowTimeOffset) => {
     const output = await model.transcribe(windowAudio, sampleRate, {
@@ -406,6 +475,7 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
       returnTimestamps: true,
       timeOffset: windowTimeOffset,
     });
+    accumulateMetrics(metricsAccumulator, output.metrics);
     return {
       text: output.utterance_text ?? '',
       words: Array.isArray(output.words) ? output.words : [],
@@ -421,7 +491,7 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
       transcribeWindow,
     });
 
-    const result = { text: merged.text };
+    const result = { text: merged.text, metrics: finalizeMetrics(metricsAccumulator) };
     if (wantTimestampChunks) {
       result.words = merged.words;
       result.chunks = wantWordTimestamps ? buildWordChunks(merged.words) : merged.chunks;
@@ -435,9 +505,10 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
     returnTimestamps: wantTimestampChunks,
     timeOffset,
   });
+  accumulateMetrics(metricsAccumulator, output.metrics);
   const text = output.utterance_text ?? '';
   if (!wantTimestampChunks) {
-    return { text };
+    return { text, metrics: finalizeMetrics(metricsAccumulator) };
   }
 
   const words = Array.isArray(output.words) ? output.words : [];
@@ -445,5 +516,6 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
     text,
     words,
     chunks: wantWordTimestamps ? buildWordChunks(words) : buildSegmentChunks(words, text),
+    metrics: finalizeMetrics(metricsAccumulator),
   };
 }

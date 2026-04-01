@@ -123,6 +123,7 @@ export interface LongAudioTranscribeResult {
   text: string;
   words?: TranscribeWord[];
   chunks?: LongAudioChunk[];
+  metrics?: TranscribeResult['metrics'];
 }
 
 export interface FromUrlsConfig {
@@ -197,6 +198,7 @@ export class StatefulStreamingTranscriber {
     chunkCount: number;
     is_final: boolean;
     tokenIds?: number[];
+    metrics?: TranscribeResult['metrics'];
   };
   reset(): void;
   getState(): {
