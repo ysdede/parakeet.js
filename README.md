@@ -2,9 +2,18 @@
 
 [Live Demo](https://ysdede.github.io/parakeet.js/) | [Keet](https://ysdede.github.io/keet/) | [NPM Package](https://www.npmjs.com/package/parakeet.js)
 
-## What is parakeet.js
+High-performance WebGPU speech recognition for NVIDIA Parakeet in the browser.
 
 `parakeet.js` is browser speech-to-text for NVIDIA Parakeet ONNX models. It runs fully client-side using `onnxruntime-web` with WebGPU or WASM execution.
+
+If you are looking for a JavaScript or browser runtime for NVIDIA Parakeet, `parakeet.js` is the package for that use case.
+
+## Features
+
+- browser-based transcription with no server round-trip
+- single-shot file transcription with timestamps and confidence scores
+- long-form transcription with built-in chunking via `transcribeLongAudio(...)`
+- real-time and stateful streaming flows such as [Keet](https://ysdede.github.io/keet/)
 
 ## Installation
 
@@ -23,7 +32,7 @@ yarn add parakeet.js
 import { fromHub } from 'parakeet.js';
 
 const model = await fromHub('parakeet-tdt-0.6b-v3', {
-  backend: 'webgpu-hybrid',
+  backend: 'webgpu',
   encoderQuant: 'fp32',
   decoderQuant: 'int8',
 });
@@ -40,6 +49,15 @@ console.log(result.utterance_text);
 
 Use your existing app audio pipeline for `getMono16kPcm(file)` (Web Audio API, ffmpeg, server-side decode, etc.). A complete browser example is available in `examples/demo/src/App.jsx` (`transcribeFile` flow).
 
+## Which API to use
+
+- `transcribe(audio, sampleRate, opts)`:
+  best for short clips, direct uploads, chunk-by-chunk processing, or when your app already owns the chunking strategy
+- `transcribeLongAudio(audio, sampleRate, opts)`:
+  best for longer recordings where you want built-in windowing, chunk assembly, and timestamped merged output
+- `createStreamingTranscriber(opts)`:
+  best for contiguous real-time or near-real-time streaming flows
+
 ## Loading models
 
 - `fromHub(repoIdOrModelKey, options)`: easiest path. Accepts model keys like `parakeet-tdt-0.6b-v3` or full repo IDs.
@@ -54,7 +72,7 @@ const model = await fromUrls({
   tokenizerUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt',
   // Only needed if you choose preprocessorBackend: 'onnx'
   preprocessorUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/nemo128.onnx',
-  backend: 'webgpu-hybrid',
+  backend: 'webgpu',
   preprocessorBackend: 'js',
 });
 ```
@@ -62,42 +80,27 @@ const model = await fromUrls({
 ## Backends and quantization
 
 - Backends are selected with `backend`:
-  - `webgpu` (alias accepted)
+  - `webgpu`
+  - `webgpu-hybrid` (same execution behavior as `webgpu`; accepted for compatibility)
   - `wasm`
-  - advanced: `webgpu-hybrid`, `webgpu-strict`
-- In WebGPU modes, the encoder prefers WebGPU but decoder session runs on WASM (hybrid execution).
+- In this library, `webgpu` means encoder on WebGPU and decoder on WASM.
+- `webgpu-hybrid` is equivalent to `webgpu` in this library.
+- `wasm` runs both encoder and decoder on WASM.
 - In `getParakeetModel`/`fromHub`, if backend starts with `webgpu` and `encoderQuant` is `int8`, encoder quantization is forced to `fp32`.
 - Encoder/decoder quantization supports `int8`, `fp32`, and `fp16`.
 - FP16 requires FP16 ONNX artifacts (for example `encoder-model.fp16.onnx`).
 - ONNX Runtime Web does **not** convert FP32 model files into FP16 at load time.
 - `getParakeetModel`/`fromHub` are strict about requested quantization: they do not auto-switch `fp16` to `fp32`.
 - If requested FP16 artifacts are missing or fail to load, API calls throw actionable errors so callers can choose a different quantization explicitly.
-- Decoder runs on WASM in WebGPU modes; if decoder FP16 is unsupported in your runtime, choose `decoderQuant: 'int8'` or `decoderQuant: 'fp32'` explicitly.
+- Decoder quantization controls which decoder artifact is loaded, but in this library the decoder session itself runs on WASM in every WebGPU mode.
 - `preprocessorBackend` is `js` (default) or `onnx`.
 
-## JS Mel FFT Update (v1.4.0)
+## Long-form transcription
 
-`parakeet.js` now uses the `pr74` real-FFT path in the default JS preprocessor (`preprocessorBackend: 'js'`).
-This keeps feature compatibility with the previous implementation while reducing mel extraction cost.
+`transcribeLongAudio()` is the long-form helper API for built-in sentence-aware chunking.
+Its exported TypeScript types are `LongAudioTranscribeOptions` and `LongAudioTranscribeResult`.
 
-| Item | Previous JS path | New JS path (default) |
-| --- | --- | --- |
-| FFT strategy | Full `N=512` complex FFT per frame | Real-FFT via one `N/2=256` complex FFT + spectrum reconstruction (`pr74`) |
-| Expected speed | Baseline | Faster mel stage (commonly around `~1.5x` in local mel benchmarks) |
-| Output behavior | NeMo-compatible normalized log-mel | Same behavior and ONNX-reference accuracy thresholds preserved |
-| API changes | N/A | None (`JsPreprocessor` / `IncrementalMelProcessor` unchanged) |
-
-If you need exact ONNX preprocessor execution instead of JS mel, set `preprocessorBackend: 'onnx'`.
-
-## Hot-Path Perf Refresh (v1.4.3)
-
-`v1.4.3` keeps the public API unchanged and focuses on internal decode/merge hot paths that show up in the browser demo, Keet, and streaming consumers.
-
-- Faster encoder-frame transpose and softmax/argmax loops in the main decoder path.
-- Lower overhead in streaming merger anchor search and LCS alignment checks.
-- No behavioral option changes: existing `transcribe(...)`, `transcribeLongAudio(...)`, and merger APIs stay the same.
-
-This release is intended as a safe patch-level throughput/latency improvement, not a feature release.
+Use it when you want built-in sentence-aware windowing and merged chunks for long recordings instead of manually splitting audio in application code.
 
 ## FP16 Examples
 
@@ -109,9 +112,9 @@ Load known FP16 model key:
 import { fromHub } from 'parakeet.js';
 
 const model = await fromHub('parakeet-tdt-0.6b-v3', {
-  backend: 'webgpu-hybrid',
+  backend: 'webgpu',
   encoderQuant: 'fp16',
-  decoderQuant: 'fp16',
+  decoderQuant: 'int8',
 });
 ```
 
@@ -125,7 +128,7 @@ const model = await fromUrls({
   decoderUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.fp16.onnx',
   tokenizerUrl: 'https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt',
   preprocessorBackend: 'js',
-  backend: 'webgpu-hybrid',
+  backend: 'webgpu',
 });
 ```
 
@@ -235,18 +238,40 @@ Notes:
 - Non-finite `timeOffset` values passed to `transcribe(...)` are coerced to `0` with a warning for compatibility.
 - Non-finite audio samples passed to `transcribe(...)` or `computeFeatures(...)` are sanitized to `0` with a warning for compatibility.
 
-## Long-audio retranscription
+## `transcribeLongAudio()` behavior
 
-Use `transcribeLongAudio(...)` when you want built-in sentence-aware windowing and chunk assembly for long recordings.
+Use it when you want built-in sentence-aware windowing and chunk assembly for long recordings such as meetings, podcasts, call recordings, interviews, or lectures.
+
+Internally, long-form transcription does not just emit fixed overlapping windows.
+It transcribes windows, detects sentence boundaries from timestamped words, finalizes completed segments, and advances from the last stable boundary when possible.
 
 ```js
 const result = await model.transcribeLongAudio(pcm, 16000, {
   returnTimestamps: true,
-  chunkLengthS: 30,
-  timeOffset: 12.5,
+  chunkLengthS: 95,
 });
 
 console.log(result.text);
+console.log(result.chunks);
+```
+
+Use `timeOffset` only when this audio starts later inside a larger source:
+
+```js
+const result = await model.transcribeLongAudio(pcmSlice, 16000, {
+  returnTimestamps: true,
+  timeOffset: 12.5,
+});
+```
+
+Word-level chunk output:
+
+```js
+const result = await model.transcribeLongAudio(pcm, 16000, {
+  returnTimestamps: 'word',
+});
+
+console.log(result.words);
 console.log(result.chunks);
 ```
 
@@ -255,8 +280,8 @@ console.log(result.chunks);
 | Option | Default | Effect |
 | --- | --- | --- |
 | `returnTimestamps` | `false` | `true` returns sentence-like chunks; `'word'` returns per-word chunks. |
-| `chunkLengthS` | `0` | Fixed window length in seconds. `0` enables auto window sizing for long inputs. |
-| `timeOffset` | `0` | Offset (seconds) added to returned chunk/word timestamps. |
+| `chunkLengthS` | `0` | Fixed window length in seconds. `0` enables automatic window sizing for long inputs. |
+| `timeOffset` | `0` | Optional base offset (seconds) added to returned chunk/word timestamps. |
 | other `transcribe()` options | varies | Forwarded to each internal transcription window. |
 
 ### Result shape
@@ -278,9 +303,12 @@ type LongAudioTranscribeResult = {
 ```
 
 Notes:
+- Exported TypeScript names are `LongAudioTranscribeOptions` and `LongAudioTranscribeResult`.
 - `returnTimestamps: true` returns merged sentence-like chunks.
 - `returnTimestamps: 'word'` returns per-word chunks while still including merged `words`.
 - For shorter clips, `transcribeLongAudio(...)` falls back to a single internal `transcribe(...)` call.
+- Window stitching is sentence-aware: completed segments are finalized from word timestamps instead of being exposed as raw fixed windows.
+- Standard transcription options such as `returnConfidences`, `debug`, `enableProfiling`, `temperature`, and `skipCMVN` are forwarded to the internal transcription windows.
 
 ## Real-time streaming (Keet)
 
@@ -296,6 +324,7 @@ Notes:
 ## API Reference
 
 - Published API docs: https://ysdede.github.io/parakeet.js/api/
+- Release history: [CHANGELOG.md](CHANGELOG.md)
 - Generate locally:
 
 ```bash
