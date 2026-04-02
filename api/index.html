@@ -1,0 +1,328 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>parakeet.js API</title><meta name="description" content="Documentation for parakeet.js API"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">parakeet.js API</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>parakeet.js API</h1></div><div class="tsd-panel tsd-typography"><h1 id="parakeetjs" class="tsd-anchor-link">Parakeet.js<a href="#parakeetjs" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
+<p><a href="https://ysdede.github.io/parakeet.js/">Live Demo</a> | <a href="https://ysdede.github.io/keet/">Keet</a> | <a href="https://www.npmjs.com/package/parakeet.js">NPM Package</a></p>
+<p>High-performance WebGPU speech recognition for NVIDIA Parakeet in the browser.</p>
+<p><code>parakeet.js</code> is browser speech-to-text for NVIDIA Parakeet ONNX models. It runs fully client-side using <code>onnxruntime-web</code> with WebGPU or WASM execution.</p>
+<p>If you are looking for a JavaScript or browser runtime for NVIDIA Parakeet, <code>parakeet.js</code> is the package for that use case.</p>
+<h2 id="features" class="tsd-anchor-link">Features<a href="#features" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li>browser-based transcription with no server round-trip</li>
+<li>single-shot file transcription with timestamps and confidence scores</li>
+<li>long-form transcription with built-in chunking via <code>transcribeLongAudio(...)</code></li>
+<li>real-time and stateful streaming flows such as <a href="https://ysdede.github.io/keet/">Keet</a></li>
+</ul>
+<h2 id="installation" class="tsd-anchor-link">Installation<a href="#installation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">i</span><span class="hl-1"> </span><span class="hl-2">parakeet.js</span><br/><span class="hl-3"># or</span><br/><span class="hl-0">yarn</span><span class="hl-1"> </span><span class="hl-2">add</span><span class="hl-1"> </span><span class="hl-2">parakeet.js</span>
+</code><button type="button">Copy</button></pre>
+
+<ul>
+<li>Use WebGPU when available for best throughput.</li>
+<li>Use WASM when WebGPU is not available or for compatibility-first setups.</li>
+</ul>
+<h2 id="quickstart" class="tsd-anchor-link">Quickstart<a href="#quickstart" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="js"><span class="hl-4">import</span><span class="hl-1"> { </span><span class="hl-5">fromHub</span><span class="hl-1"> } </span><span class="hl-4">from</span><span class="hl-1"> </span><span class="hl-2">&#39;parakeet.js&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">model</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-0">fromHub</span><span class="hl-1">(</span><span class="hl-2">&#39;parakeet-tdt-0.6b-v3&#39;</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-5">backend:</span><span class="hl-1"> </span><span class="hl-2">&#39;webgpu&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">encoderQuant:</span><span class="hl-1"> </span><span class="hl-2">&#39;fp32&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">decoderQuant:</span><span class="hl-1"> </span><span class="hl-2">&#39;int8&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-3">// `file` should be a File (for example from &lt;input type=&quot;file&quot;&gt;)</span><br/><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">pcm</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-0">getMono16kPcm</span><span class="hl-1">(</span><span class="hl-5">file</span><span class="hl-1">); </span><span class="hl-3">// returns mono Float32Array at 16 kHz</span><br/><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">result</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-5">model</span><span class="hl-1">.</span><span class="hl-0">transcribe</span><span class="hl-1">(</span><span class="hl-5">pcm</span><span class="hl-1">, </span><span class="hl-8">16000</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-5">returnTimestamps:</span><span class="hl-1"> </span><span class="hl-6">true</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">returnConfidences:</span><span class="hl-1"> </span><span class="hl-6">true</span><span class="hl-1">,</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-5">console</span><span class="hl-1">.</span><span class="hl-0">log</span><span class="hl-1">(</span><span class="hl-5">result</span><span class="hl-1">.</span><span class="hl-5">utterance_text</span><span class="hl-1">);</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Use your existing app audio pipeline for <code>getMono16kPcm(file)</code> (Web Audio API, ffmpeg, server-side decode, etc.). A complete browser example is available in <code>examples/demo/src/App.jsx</code> (<code>transcribeFile</code> flow).</p>
+<h2 id="which-api-to-use" class="tsd-anchor-link">Which API to use<a href="#which-api-to-use" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li><code>transcribe(audio, sampleRate, opts)</code>:
+best for short clips, direct uploads, chunk-by-chunk processing, or when your app already owns the chunking strategy</li>
+<li><code>transcribeLongAudio(audio, sampleRate, opts)</code>:
+best for longer recordings where you want built-in windowing, chunk assembly, and timestamped merged output</li>
+<li><code>createStreamingTranscriber(opts)</code>:
+best for contiguous real-time or near-real-time streaming flows</li>
+</ul>
+<h2 id="loading-models" class="tsd-anchor-link">Loading models<a href="#loading-models" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li><code>fromHub(repoIdOrModelKey, options)</code>: easiest path. Accepts model keys like <code>parakeet-tdt-0.6b-v3</code> or full repo IDs.</li>
+<li><code>fromUrls(cfg)</code>: explicit URL wiring when you host assets yourself.</li>
+</ul>
+<pre><code class="js"><span class="hl-4">import</span><span class="hl-1"> { </span><span class="hl-5">fromUrls</span><span class="hl-1"> } </span><span class="hl-4">from</span><span class="hl-1"> </span><span class="hl-2">&#39;parakeet.js&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">model</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-0">fromUrls</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-5">encoderUrl:</span><span class="hl-1"> </span><span class="hl-2">&#39;https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/encoder-model.onnx&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">decoderUrl:</span><span class="hl-1"> </span><span class="hl-2">&#39;https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.int8.onnx&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">tokenizerUrl:</span><span class="hl-1"> </span><span class="hl-2">&#39;https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-3">// Only needed if you choose preprocessorBackend: &#39;onnx&#39;</span><br/><span class="hl-1">  </span><span class="hl-5">preprocessorUrl:</span><span class="hl-1"> </span><span class="hl-2">&#39;https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/nemo128.onnx&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">backend:</span><span class="hl-1"> </span><span class="hl-2">&#39;webgpu&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">preprocessorBackend:</span><span class="hl-1"> </span><span class="hl-2">&#39;js&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="backends-and-quantization" class="tsd-anchor-link">Backends and quantization<a href="#backends-and-quantization" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li>Backends are selected with <code>backend</code>:
+<ul>
+<li><code>webgpu</code></li>
+<li><code>webgpu-hybrid</code> (same execution behavior as <code>webgpu</code>; accepted for compatibility)</li>
+<li><code>wasm</code></li>
+</ul>
+</li>
+<li>In this library, <code>webgpu</code> means encoder on WebGPU and decoder on WASM.</li>
+<li><code>webgpu-hybrid</code> is equivalent to <code>webgpu</code> in this library.</li>
+<li><code>wasm</code> runs both encoder and decoder on WASM.</li>
+<li>In <code>getParakeetModel</code>/<code>fromHub</code>, if backend starts with <code>webgpu</code> and <code>encoderQuant</code> is <code>int8</code>, encoder quantization is forced to <code>fp32</code>.</li>
+<li>Encoder/decoder quantization supports <code>int8</code>, <code>fp32</code>, and <code>fp16</code>.</li>
+<li>FP16 requires FP16 ONNX artifacts (for example <code>encoder-model.fp16.onnx</code>).</li>
+<li>ONNX Runtime Web does <strong>not</strong> convert FP32 model files into FP16 at load time.</li>
+<li><code>getParakeetModel</code>/<code>fromHub</code> are strict about requested quantization: they do not auto-switch <code>fp16</code> to <code>fp32</code>.</li>
+<li>If requested FP16 artifacts are missing or fail to load, API calls throw actionable errors so callers can choose a different quantization explicitly.</li>
+<li>Decoder quantization controls which decoder artifact is loaded, but in this library the decoder session itself runs on WASM in every WebGPU mode.</li>
+<li><code>preprocessorBackend</code> is <code>js</code> (default) or <code>onnx</code>.</li>
+</ul>
+<h2 id="long-form-transcription" class="tsd-anchor-link">Long-form transcription<a href="#long-form-transcription" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>transcribeLongAudio()</code> is the long-form helper API for built-in sentence-aware chunking.
+Its exported TypeScript types are <code>LongAudioTranscribeOptions</code> and <code>LongAudioTranscribeResult</code>.</p>
+<p>Use it when you want built-in sentence-aware windowing and merged chunks for long recordings instead of manually splitting audio in application code.</p>
+<h2 id="fp16-examples" class="tsd-anchor-link">FP16 Examples<a href="#fp16-examples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Before using FP16 examples: ensure FP16 artifacts exist in the target repo and your browser/runtime supports FP16 execution (WebGPU FP16 path).</p>
+<p>Load known FP16 model key:</p>
+<pre><code class="js"><span class="hl-4">import</span><span class="hl-1"> { </span><span class="hl-5">fromHub</span><span class="hl-1"> } </span><span class="hl-4">from</span><span class="hl-1"> </span><span class="hl-2">&#39;parakeet.js&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">model</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-0">fromHub</span><span class="hl-1">(</span><span class="hl-2">&#39;parakeet-tdt-0.6b-v3&#39;</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-5">backend:</span><span class="hl-1"> </span><span class="hl-2">&#39;webgpu&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">encoderQuant:</span><span class="hl-1"> </span><span class="hl-2">&#39;fp16&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">decoderQuant:</span><span class="hl-1"> </span><span class="hl-2">&#39;int8&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Use explicit FP16 URLs:</p>
+<pre><code class="js"><span class="hl-4">import</span><span class="hl-1"> { </span><span class="hl-5">fromUrls</span><span class="hl-1"> } </span><span class="hl-4">from</span><span class="hl-1"> </span><span class="hl-2">&#39;parakeet.js&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">model</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-0">fromUrls</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-5">encoderUrl:</span><span class="hl-1"> </span><span class="hl-2">&#39;https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/encoder-model.fp16.onnx&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">decoderUrl:</span><span class="hl-1"> </span><span class="hl-2">&#39;https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.fp16.onnx&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">tokenizerUrl:</span><span class="hl-1"> </span><span class="hl-2">&#39;https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">preprocessorBackend:</span><span class="hl-1"> </span><span class="hl-2">&#39;js&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">backend:</span><span class="hl-1"> </span><span class="hl-2">&#39;webgpu&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="transcribing-a-file-single-shot" class="tsd-anchor-link">Transcribing a file (single-shot)<a href="#transcribing-a-file-single-shot" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>The demo flow in <code>examples/demo/src/App.jsx</code> is:</p>
+<ol>
+<li>Load a model with public APIs (<code>fromHub(...)</code> for hub loading, or <code>fromUrls(...)</code> for explicit URLs).</li>
+<li>Decode uploaded audio with <code>AudioContext({ sampleRate: 16000 })</code> + <code>decodeAudioData(...)</code>.</li>
+<li>Convert decoded audio to mono 16 kHz PCM (<code>Float32Array</code>) by averaging channels when needed.</li>
+<li>Call <code>model.transcribe(pcm, 16000, options)</code> and render <code>utterance_text</code>.</li>
+</ol>
+<p>Reference code:</p>
+<ul>
+<li><code>App</code> component in <code>examples/demo/src/App.jsx</code> (<code>loadModel</code> / <code>transcribeFile</code> flow)</li>
+</ul>
+<h2 id="options-and-result-behavior" class="tsd-anchor-link"><code>transcribe()</code> options and result behavior<a href="#options-and-result-behavior" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>returnTimestamps</code> is <strong>off by default</strong>.<br>
+So: by default, <code>transcribe(...)</code> does <strong>not</strong> return meaningful timestamps.</p>
+<h3 id="options" class="tsd-anchor-link"><code>transcribe(audio, sampleRate, opts)</code> options<a href="#options" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>returnTimestamps</code></td>
+<td><code>false</code></td>
+<td>Adds <code>start_time</code> / <code>end_time</code> to <code>tokens[]</code> and <code>words[]</code>.</td>
+</tr>
+<tr>
+<td><code>returnConfidences</code></td>
+<td><code>false</code></td>
+<td>Adds per-token/per-word confidence fields and detailed <code>confidence_scores</code>.</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td><code>1.0</code></td>
+<td>Decoder temperature (<code>1.0</code> = greedy baseline behavior).</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td><code>false</code></td>
+<td>Enables debug logs; also causes <code>metrics</code> to be populated.</td>
+</tr>
+<tr>
+<td><code>enableProfiling</code></td>
+<td><code>true</code></td>
+<td>When <code>true</code>, returns timing/RTF in <code>metrics</code>.</td>
+</tr>
+<tr>
+<td><code>skipCMVN</code></td>
+<td><code>false</code></td>
+<td>Skips CMVN in preprocessing.</td>
+</tr>
+<tr>
+<td><code>frameStride</code></td>
+<td><code>1</code></td>
+<td>Decoder frame advance stride.</td>
+</tr>
+<tr>
+<td><code>previousDecoderState</code></td>
+<td><code>null</code></td>
+<td>Continue decoding from an earlier chunk (streaming/stateful usage).</td>
+</tr>
+<tr>
+<td><code>returnDecoderState</code></td>
+<td><code>false</code></td>
+<td>Includes <code>decoderState</code> in the result for next-call handoff.</td>
+</tr>
+<tr>
+<td><code>timeOffset</code></td>
+<td><code>0</code></td>
+<td>Offset (seconds) added to emitted timestamps.</td>
+</tr>
+<tr>
+<td><code>returnTokenIds</code></td>
+<td><code>false</code></td>
+<td>Includes <code>tokenIds</code> in result.</td>
+</tr>
+<tr>
+<td><code>returnFrameIndices</code></td>
+<td><code>false</code></td>
+<td>Includes <code>frameIndices</code> (token-to-encoder-frame alignment).</td>
+</tr>
+<tr>
+<td><code>returnLogProbs</code></td>
+<td><code>false</code></td>
+<td>Includes per-token <code>logProbs</code>.</td>
+</tr>
+<tr>
+<td><code>returnTdtSteps</code></td>
+<td><code>false</code></td>
+<td>Includes per-token <code>tdtSteps</code> (duration predictor outputs).</td>
+</tr>
+<tr>
+<td><code>prefixSamples</code></td>
+<td><code>0</code></td>
+<td>Enables incremental mel-cache reuse when prefix audio matches previous call.</td>
+</tr>
+<tr>
+<td><code>precomputedFeatures</code></td>
+<td><code>null</code></td>
+<td>Bypasses preprocessor by supplying already-computed mel features.</td>
+</tr>
+<tr>
+<td><code>incremental</code></td>
+<td><code>null</code></td>
+<td>Incremental decode cache config: <code>{ cacheKey, prefixSeconds }</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="result-shape" class="tsd-anchor-link">Result shape<a href="#result-shape" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="ts"><span class="hl-6">type</span><span class="hl-1"> </span><span class="hl-9">TranscribeResult</span><span class="hl-1"> = {</span><br/><span class="hl-1">  </span><span class="hl-5">utterance_text</span><span class="hl-1">: </span><span class="hl-9">string</span><span class="hl-1">;</span><br/><span class="hl-1">  </span><span class="hl-5">words</span><span class="hl-1">: </span><span class="hl-9">Array</span><span class="hl-1">&lt;{</span><br/><span class="hl-1">    </span><span class="hl-5">text</span><span class="hl-1">: </span><span class="hl-9">string</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">start_time</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">end_time</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">confidence</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">  }&gt;;</span><br/><span class="hl-1">  </span><span class="hl-5">tokens</span><span class="hl-1">?: </span><span class="hl-9">Array</span><span class="hl-1">&lt;{</span><br/><span class="hl-1">    </span><span class="hl-5">token</span><span class="hl-1">: </span><span class="hl-9">string</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">raw_token</span><span class="hl-1">?: </span><span class="hl-9">string</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">is_word_start</span><span class="hl-1">?: </span><span class="hl-9">boolean</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">start_time</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">end_time</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">confidence</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">  }&gt;;</span><br/><span class="hl-1">  </span><span class="hl-5">confidence_scores</span><span class="hl-1">?: {</span><br/><span class="hl-1">    </span><span class="hl-5">token</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">[] | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">token_avg</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1"> | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">word</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">[] | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">word_avg</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1"> | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">frame</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">[] | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">frame_avg</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1"> | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">overall_log_prob</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1"> | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">  };</span><br/><span class="hl-1">  </span><span class="hl-5">metrics</span><span class="hl-1">?: {</span><br/><span class="hl-1">    </span><span class="hl-5">preprocess_ms</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">encode_ms</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">decode_ms</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">tokenize_ms</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">total_ms</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">rtf</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">mel_cache</span><span class="hl-1">?: { </span><span class="hl-5">cached_frames</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">; </span><span class="hl-5">new_frames</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1"> } | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">preprocessor_backend</span><span class="hl-1">?: </span><span class="hl-2">&#39;js&#39;</span><span class="hl-1"> | </span><span class="hl-2">&#39;onnx&#39;</span><span class="hl-1"> | </span><span class="hl-9">string</span><span class="hl-1">; </span><span class="hl-3">// runtime field</span><br/><span class="hl-1">  } | </span><span class="hl-9">null</span><span class="hl-1">;</span><br/><span class="hl-1">  </span><span class="hl-5">is_final</span><span class="hl-1">: </span><span class="hl-9">boolean</span><span class="hl-1">;</span><br/><span class="hl-1">  </span><span class="hl-5">decoderState</span><span class="hl-1">?: {</span><br/><span class="hl-1">    </span><span class="hl-5">s1</span><span class="hl-1">: </span><span class="hl-9">Float32Array</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">s2</span><span class="hl-1">: </span><span class="hl-9">Float32Array</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">dims1</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">[];</span><br/><span class="hl-1">    </span><span class="hl-5">dims2</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">[];</span><br/><span class="hl-1">  };</span><br/><span class="hl-1">  </span><span class="hl-5">tokenIds</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">[];</span><br/><span class="hl-1">  </span><span class="hl-5">frameIndices</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">[];</span><br/><span class="hl-1">  </span><span class="hl-5">logProbs</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">[];</span><br/><span class="hl-1">  </span><span class="hl-5">tdtSteps</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">[];</span><br/><span class="hl-1">};</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="what-you-get-by-default-vs-opt-in" class="tsd-anchor-link">What you get by default vs opt-in<a href="#what-you-get-by-default-vs-opt-in" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
+<thead>
+<tr>
+<th>Call options</th>
+<th><code>words</code></th>
+<th><code>tokens</code></th>
+<th><code>confidence_scores</code></th>
+<th><code>metrics</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>default (<code>{}</code>)</td>
+<td><code>[]</code> (empty)</td>
+<td>omitted</td>
+<td>omitted</td>
+<td>present (<code>enableProfiling</code> default is <code>true</code>)</td>
+</tr>
+<tr>
+<td><code>{ returnTimestamps: true }</code></td>
+<td>timestamped words</td>
+<td>timestamped tokens</td>
+<td>minimal (<code>frame/frame_avg/overall_log_prob</code> are <code>null</code>)</td>
+<td>present by default</td>
+</tr>
+<tr>
+<td><code>{ returnConfidences: true }</code></td>
+<td>words with <code>confidence</code></td>
+<td>tokens with <code>confidence</code></td>
+<td>detailed token/word/frame confidence stats</td>
+<td>present by default</td>
+</tr>
+<tr>
+<td><code>{ returnTimestamps: true, returnConfidences: true }</code></td>
+<td>timestamped + confidence</td>
+<td>timestamped + confidence</td>
+<td>detailed token/word/frame confidence stats</td>
+<td>present by default</td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li><code>start_time</code> / <code>end_time</code> are only meaningful when <code>returnTimestamps: true</code>.</li>
+<li>Advanced alignment/debug arrays are opt-in: <code>returnTokenIds</code>, <code>returnFrameIndices</code>, <code>returnLogProbs</code>, <code>returnTdtSteps</code>.</li>
+<li>If <code>enableProfiling: false</code> and <code>debug: false</code>, then <code>metrics</code> is <code>null</code>.</li>
+<li>Non-finite <code>timeOffset</code> values passed to <code>transcribe(...)</code> are coerced to <code>0</code> with a warning for compatibility.</li>
+<li>Non-finite audio samples passed to <code>transcribe(...)</code> or <code>computeFeatures(...)</code> are sanitized to <code>0</code> with a warning for compatibility.</li>
+</ul>
+<h2 id="behavior" class="tsd-anchor-link"><code>transcribeLongAudio()</code> behavior<a href="#behavior" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Use it when you want built-in sentence-aware windowing and chunk assembly for long recordings such as meetings, podcasts, call recordings, interviews, or lectures.</p>
+<p>Internally, long-form transcription does not just emit fixed overlapping windows.
+It transcribes windows, detects sentence boundaries from timestamped words, finalizes completed segments, and advances from the last stable boundary when possible.</p>
+<pre><code class="js"><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">result</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-5">model</span><span class="hl-1">.</span><span class="hl-0">transcribeLongAudio</span><span class="hl-1">(</span><span class="hl-5">pcm</span><span class="hl-1">, </span><span class="hl-8">16000</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-5">returnTimestamps:</span><span class="hl-1"> </span><span class="hl-6">true</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">chunkLengthS:</span><span class="hl-1"> </span><span class="hl-8">95</span><span class="hl-1">,</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-5">console</span><span class="hl-1">.</span><span class="hl-0">log</span><span class="hl-1">(</span><span class="hl-5">result</span><span class="hl-1">.</span><span class="hl-5">text</span><span class="hl-1">);</span><br/><span class="hl-5">console</span><span class="hl-1">.</span><span class="hl-0">log</span><span class="hl-1">(</span><span class="hl-5">result</span><span class="hl-1">.</span><span class="hl-5">chunks</span><span class="hl-1">);</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Use <code>timeOffset</code> only when this audio starts later inside a larger source:</p>
+<pre><code class="js"><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">result</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-5">model</span><span class="hl-1">.</span><span class="hl-0">transcribeLongAudio</span><span class="hl-1">(</span><span class="hl-5">pcmSlice</span><span class="hl-1">, </span><span class="hl-8">16000</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-5">returnTimestamps:</span><span class="hl-1"> </span><span class="hl-6">true</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-5">timeOffset:</span><span class="hl-1"> </span><span class="hl-8">12.5</span><span class="hl-1">,</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Word-level chunk output:</p>
+<pre><code class="js"><span class="hl-6">const</span><span class="hl-1"> </span><span class="hl-7">result</span><span class="hl-1"> = </span><span class="hl-4">await</span><span class="hl-1"> </span><span class="hl-5">model</span><span class="hl-1">.</span><span class="hl-0">transcribeLongAudio</span><span class="hl-1">(</span><span class="hl-5">pcm</span><span class="hl-1">, </span><span class="hl-8">16000</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-5">returnTimestamps:</span><span class="hl-1"> </span><span class="hl-2">&#39;word&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-5">console</span><span class="hl-1">.</span><span class="hl-0">log</span><span class="hl-1">(</span><span class="hl-5">result</span><span class="hl-1">.</span><span class="hl-5">words</span><span class="hl-1">);</span><br/><span class="hl-5">console</span><span class="hl-1">.</span><span class="hl-0">log</span><span class="hl-1">(</span><span class="hl-5">result</span><span class="hl-1">.</span><span class="hl-5">chunks</span><span class="hl-1">);</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="options-1" class="tsd-anchor-link"><code>transcribeLongAudio(audio, sampleRate, opts)</code> options<a href="#options-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>returnTimestamps</code></td>
+<td><code>false</code></td>
+<td><code>true</code> returns sentence-like chunks; <code>'word'</code> returns per-word chunks.</td>
+</tr>
+<tr>
+<td><code>chunkLengthS</code></td>
+<td><code>0</code></td>
+<td>Fixed window length in seconds. <code>0</code> enables automatic window sizing for long inputs.</td>
+</tr>
+<tr>
+<td><code>timeOffset</code></td>
+<td><code>0</code></td>
+<td>Optional base offset (seconds) added to returned chunk/word timestamps.</td>
+</tr>
+<tr>
+<td>other <code>transcribe()</code> options</td>
+<td>varies</td>
+<td>Forwarded to each internal transcription window.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="result-shape-1" class="tsd-anchor-link">Result shape<a href="#result-shape-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="ts"><span class="hl-6">type</span><span class="hl-1"> </span><span class="hl-9">LongAudioTranscribeResult</span><span class="hl-1"> = {</span><br/><span class="hl-1">  </span><span class="hl-5">text</span><span class="hl-1">: </span><span class="hl-9">string</span><span class="hl-1">;</span><br/><span class="hl-1">  </span><span class="hl-5">words</span><span class="hl-1">?: </span><span class="hl-9">Array</span><span class="hl-1">&lt;{</span><br/><span class="hl-1">    </span><span class="hl-5">text</span><span class="hl-1">: </span><span class="hl-9">string</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">start_time</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">end_time</span><span class="hl-1">: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">confidence</span><span class="hl-1">?: </span><span class="hl-9">number</span><span class="hl-1">;</span><br/><span class="hl-1">  }&gt;;</span><br/><span class="hl-1">  </span><span class="hl-5">chunks</span><span class="hl-1">?: </span><span class="hl-9">Array</span><span class="hl-1">&lt;{</span><br/><span class="hl-1">    </span><span class="hl-5">text</span><span class="hl-1">: </span><span class="hl-9">string</span><span class="hl-1">;</span><br/><span class="hl-1">    </span><span class="hl-5">timestamp</span><span class="hl-1">: [</span><span class="hl-9">number</span><span class="hl-1">, </span><span class="hl-9">number</span><span class="hl-1">];</span><br/><span class="hl-1">  }&gt;;</span><br/><span class="hl-1">};</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Notes:</p>
+<ul>
+<li>Exported TypeScript names are <code>LongAudioTranscribeOptions</code> and <code>LongAudioTranscribeResult</code>.</li>
+<li><code>returnTimestamps: true</code> returns merged sentence-like chunks.</li>
+<li><code>returnTimestamps: 'word'</code> returns per-word chunks while still including merged <code>words</code>.</li>
+<li>For shorter clips, <code>transcribeLongAudio(...)</code> falls back to a single internal <code>transcribe(...)</code> call.</li>
+<li>Window stitching is sentence-aware: completed segments are finalized from word timestamps instead of being exposed as raw fixed windows.</li>
+<li>Standard transcription options such as <code>returnConfidences</code>, <code>debug</code>, <code>enableProfiling</code>, <code>temperature</code>, and <code>skipCMVN</code> are forwarded to the internal transcription windows.</li>
+</ul>
+<h2 id="real-time-streaming-keet" class="tsd-anchor-link">Real-time streaming (Keet)<a href="#real-time-streaming-keet" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><a href="https://ysdede.github.io/keet/">Keet</a> is a reference real-time app built on <code>parakeet.js</code> (<a href="https://github.com/ysdede/keet">repo</a>).</p>
+<ul>
+<li>For contiguous chunk streams, Keet uses <code>createStreamingTranscriber(...)</code>.</li>
+<li>Keet currently defaults to v4 utterance-based merging (<code>UtteranceBasedMerger</code>) with cursor/windowed chunk processing.</li>
+</ul>
+<a href="https://ysdede.github.io/keet/" target="_blank" rel="noopener noreferrer">
+  <img src="https://raw.githubusercontent.com/ysdede/keet/refs/heads/master/public/img/streaming-preview.jpg" alt="Real-time transcription with Keet and parakeet.js" />
+</a>
+<h2 id="api-reference" class="tsd-anchor-link">API Reference<a href="#api-reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li>Published API docs: <a href="https://ysdede.github.io/parakeet.js/api/">https://ysdede.github.io/parakeet.js/api/</a></li>
+<li>Release history: <a href="media/CHANGELOG.md">CHANGELOG.md</a></li>
+<li>Generate locally:</li>
+</ul>
+<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">docs:api</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>MIT</p>
+<h2 id="credits" class="tsd-anchor-link">Credits<a href="#credits" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li><a href="https://github.com/istupakov/onnx-asr">istupakov/onnx-asr</a> for the reference implementation and model tooling foundations.</li>
+</ul>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#parakeetjs"><span>Parakeet.js</span></a><ul><li><a href="#features"><span>Features</span></a></li><li><a href="#installation"><span>Installation</span></a></li><li><a href="#quickstart"><span>Quickstart</span></a></li><li><a href="#which-api-to-use"><span>Which <wbr/>API to use</span></a></li><li><a href="#loading-models"><span>Loading models</span></a></li><li><a href="#backends-and-quantization"><span>Backends and quantization</span></a></li><li><a href="#long-form-transcription"><span>Long-<wbr/>form transcription</span></a></li><li><a href="#fp16-examples"><span>FP16 <wbr/>Examples</span></a></li><li><a href="#transcribing-a-file-single-shot"><span>Transcribing a file (single-<wbr/>shot)</span></a></li><li><a href="#options-and-result-behavior"><span> options and result behavior</span></a></li><li><ul><li><a href="#options"><span> options</span></a></li><li><a href="#result-shape"><span>Result shape</span></a></li><li><a href="#what-you-get-by-default-vs-opt-in"><span>What you get by default vs opt-<wbr/>in</span></a></li></ul></li><li><a href="#behavior"><span> behavior</span></a></li><li><ul><li><a href="#options-1"><span> options</span></a></li><li><a href="#result-shape-1"><span>Result shape</span></a></li></ul></li><li><a href="#real-time-streaming-keet"><span>Real-<wbr/>time streaming (<wbr/>Keet)</span></a></li><li><a href="#api-reference"><span>API <wbr/>Reference</span></a></li><li><a href="#license"><span>License</span></a></li><li><a href="#credits"><span>Credits</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">parakeet.js API</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
