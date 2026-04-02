@@ -1,13 +1,19 @@
+import { SentenceBoundaryDetector } from './sentence_boundary.js';
+
 const AUTO_WINDOW_THRESHOLD_S = 180;
 const MIN_CHUNK_LENGTH_S = 20;
 const MAX_CHUNK_LENGTH_S = 180;
 const AUTO_CHUNK_LENGTH_S = 90;
 const AUTO_WINDOW_FALLBACK_OVERLAP_S = 10;
+const AUTO_WINDOW_BALANCE_THRESHOLD_S = 120;
+const AUTO_WINDOW_TARGET_FINAL_S = 60;
 const AUTO_WINDOW_EPSILON_S = 1e-6;
 const SEGMENT_DEDUP_TOLERANCE_S = 0.15;
 const CURSOR_MIN_ADVANCE_S = 1.0;
-const CURSOR_GAP_THRESHOLD_S = 0.2;
-const CURSOR_SNAP_WINDOW_S = 0.5;
+const TAIL_RESCAN_TRIGGER_S = 1.5;
+const TAIL_RESCAN_CONTEXT_S = 0.5;
+const TAIL_RESCAN_MAX_WINDOW_S = 12.0;
+const TAIL_RESCAN_ACTIVITY_THRESHOLD = 0.005;
 
 function validateAudio(audio) {
   if (!(audio instanceof Float32Array || audio instanceof Float64Array)) {
@@ -26,6 +32,29 @@ function normalizeChunkLengthS(value) {
     return 0;
   }
   return Math.max(MIN_CHUNK_LENGTH_S, Math.min(MAX_CHUNK_LENGTH_S, num));
+}
+
+function planWindowBounds(startS, audioDurationS, chunkLengthS) {
+  const remainingS = Math.max(0, audioDurationS - startS);
+  let windowLengthS = Math.min(chunkLengthS, remainingS);
+
+  if (
+    remainingS > chunkLengthS + AUTO_WINDOW_EPSILON_S &&
+    remainingS <= AUTO_WINDOW_BALANCE_THRESHOLD_S + AUTO_WINDOW_EPSILON_S
+  ) {
+    // Near the tail, avoid leaving a tiny final fallback window by reserving
+    // roughly 60 seconds for the last pass.
+    windowLengthS = Math.max(
+      MIN_CHUNK_LENGTH_S,
+      Math.min(windowLengthS, remainingS - AUTO_WINDOW_TARGET_FINAL_S),
+    );
+  }
+
+  const endS = Math.min(audioDurationS, startS + windowLengthS);
+  const overlapS = Math.min(AUTO_WINDOW_FALLBACK_OVERLAP_S, Math.max(0, windowLengthS - 1));
+  const advanceS = Math.max(1, windowLengthS - overlapS);
+
+  return { endS, windowLengthS, advanceS };
 }
 
 function createMetricsAccumulator(audioDurationS) {
@@ -163,129 +192,139 @@ function dedupeMergedWords(words) {
   return merged;
 }
 
-const STRONG_SENTENCE_END_REGEX = /[!?…](?:["')\]]+)?$/u;
-const PERIOD_SENTENCE_END_REGEX = /\.(?:["')\]]+)?$/u;
-const TRAILING_CLOSERS_REGEX = /["')\]]+$/gu;
-const LEADING_OPENERS_REGEX = /^[("'“‘\[{]+/u;
-const DOTTED_ACRONYM_REGEX = /^(?:[A-Z]\.){2,}$/;
-const SINGLE_LETTER_ENUM_REGEX = /^[A-Z]\.$/;
-const ROMAN_ENUM_REGEX = /^(?:[IVXLCDM]+)\.$/i;
-const NUMERIC_ENUM_REGEX = /^\d+\.$/;
-const FALLBACK_SEGMENT_GAP_S = 3.0;
-const NON_BREAKING_PERIOD_WORDS = new Set([
-  'mr.',
-  'mrs.',
-  'ms.',
-  'dr.',
-  'prof.',
-  'sr.',
-  'jr.',
-  'vs.',
-  'etc.',
-  'e.g.',
-  'i.e.',
-]);
-
-function stripTrailingClosers(text) {
-  return String(text ?? '').replace(TRAILING_CLOSERS_REGEX, '');
+function hasAudibleTailAudio(audio, samplingRate, startS, endS) {
+  const startSample = Math.max(0, Math.floor(startS * samplingRate));
+  const endSample = Math.min(audio.length, Math.ceil(endS * samplingRate));
+  for (let i = startSample; i < endSample; ++i) {
+    if (Math.abs(audio[i]) >= TAIL_RESCAN_ACTIVITY_THRESHOLD) {
+      return true;
+    }
+  }
+  return false;
 }
 
-function looksLikeSentenceStart(text) {
-  const cleaned = String(text ?? '').replace(LEADING_OPENERS_REGEX, '');
-  return /^[A-Z]/.test(cleaned);
-}
-
-function shouldEndSentenceAfterWord(currentWord, nextWord, gapS = 0) {
-  if (!nextWord) return false;
-  if (gapS >= FALLBACK_SEGMENT_GAP_S) return true;
-
-  const currentText = String(currentWord?.text ?? '');
-  if (!currentText) return false;
-  if (STRONG_SENTENCE_END_REGEX.test(currentText)) return true;
-  if (!PERIOD_SENTENCE_END_REGEX.test(currentText)) return false;
-
-  const stripped = stripTrailingClosers(currentText);
-  const lowered = stripped.toLowerCase();
-  if (
-    NON_BREAKING_PERIOD_WORDS.has(lowered) ||
-    DOTTED_ACRONYM_REGEX.test(stripped) ||
-    SINGLE_LETTER_ENUM_REGEX.test(stripped) ||
-    ROMAN_ENUM_REGEX.test(stripped) ||
-    NUMERIC_ENUM_REGEX.test(stripped)
-  ) {
-    return false;
+async function recoverTrailingTailWords({
+  audio,
+  samplingRate,
+  startS,
+  endS,
+  baseTimeOffset,
+  words,
+  transcribeWindow,
+}) {
+  if (!Array.isArray(words) || words.length === 0) {
+    return words;
   }
 
-  return looksLikeSentenceStart(nextWord.text);
+  const lastWordEndS = Number(words[words.length - 1]?.end_time) - baseTimeOffset;
+  if (!Number.isFinite(lastWordEndS)) {
+    return words;
+  }
+
+  const trailingGapS = endS - lastWordEndS;
+  if (trailingGapS < TAIL_RESCAN_TRIGGER_S) {
+    return words;
+  }
+  if (!hasAudibleTailAudio(audio, samplingRate, lastWordEndS, endS)) {
+    return words;
+  }
+
+  const tailStartS = Math.max(
+    startS,
+    Math.max(0, lastWordEndS - TAIL_RESCAN_CONTEXT_S),
+    endS - TAIL_RESCAN_MAX_WINDOW_S,
+  );
+  if (tailStartS >= endS - AUTO_WINDOW_EPSILON_S) {
+    return words;
+  }
+
+  const startSample = Math.max(0, Math.min(audio.length - 1, Math.floor(tailStartS * samplingRate)));
+  const endSample = Math.max(startSample + 1, Math.min(audio.length, Math.ceil(endS * samplingRate)));
+  const tailAudio = audio.subarray(startSample, endSample);
+  const tailOutput = await transcribeWindow(tailAudio, baseTimeOffset + tailStartS);
+  const tailWords = Array.isArray(tailOutput.words) ? tailOutput.words : [];
+  if (tailWords.length === 0) {
+    return words;
+  }
+
+  const recoveredLastWordEndS = Number(tailWords[tailWords.length - 1]?.end_time);
+  const originalLastWordEndS = Number(words[words.length - 1]?.end_time);
+  if (!Number.isFinite(recoveredLastWordEndS) || recoveredLastWordEndS <= originalLastWordEndS + AUTO_WINDOW_EPSILON_S) {
+    return words;
+  }
+
+  return dedupeMergedWords([...words, ...tailWords]);
 }
 
-function partitionWordsIntoSegments(words) {
+function toSentenceDetectorWords(words) {
+  return words.map((word, index) => ({
+    text: String(word?.text ?? ''),
+    start: Number(word?.start_time ?? 0),
+    end: Number(word?.end_time ?? 0),
+    wordIndex: index,
+    confidence: word?.confidence,
+  })).filter((word) => word.text.length > 0);
+}
+
+function partitionWordsIntoSegments(words, detector = new SentenceBoundaryDetector()) {
   if (!Array.isArray(words) || words.length === 0) {
     return [];
   }
 
-  const segments = [];
-  let current = [];
-  for (let i = 0; i < words.length; ++i) {
-    const word = words[i];
-    current.push(word);
-
-    const nextWord = words[i + 1] ?? null;
-    const gapS = nextWord ? Math.max(0, nextWord.start_time - word.end_time) : 0;
-    if (shouldEndSentenceAfterWord(word, nextWord, gapS)) {
-      segments.push({
-        words: current,
-        text: joinTimedWords(current),
-        timestamp: [current[0].start_time, current[current.length - 1].end_time],
-      });
-      current = [];
-    }
+  const detectorWords = toSentenceDetectorWords(words);
+  if (detectorWords.length === 0) {
+    return [];
   }
 
-  if (current.length > 0) {
+  const sentenceEndings = detector.detectSentenceEndings(detectorWords);
+  if (sentenceEndings.length === 0) {
+    return [{
+      words,
+      text: joinTimedWords(words),
+      timestamp: [words[0].start_time, words[words.length - 1].end_time],
+    }];
+  }
+
+  const segments = [];
+  let startIndex = 0;
+
+  for (const ending of sentenceEndings) {
+    const endIndex = ending.wordIndex;
+    if (!Number.isInteger(endIndex) || endIndex < startIndex || endIndex >= words.length) {
+      continue;
+    }
+
+    const sentenceWords = words.slice(startIndex, endIndex + 1);
+    if (sentenceWords.length === 0) continue;
     segments.push({
-      words: current,
-      text: joinTimedWords(current),
-      timestamp: [current[0].start_time, current[current.length - 1].end_time],
+      words: sentenceWords,
+      text: joinTimedWords(sentenceWords),
+      timestamp: [sentenceWords[0].start_time, sentenceWords[sentenceWords.length - 1].end_time],
+    });
+    startIndex = endIndex + 1;
+  }
+
+  if (startIndex < words.length) {
+    const trailingWords = words.slice(startIndex);
+    segments.push({
+      words: trailingWords,
+      text: joinTimedWords(trailingWords),
+      timestamp: [trailingWords[0].start_time, trailingWords[trailingWords.length - 1].end_time],
     });
   }
 
   return segments;
 }
 
-function buildSegmentChunks(words, text = '') {
+function buildSegmentChunks(words, text = '', detector = new SentenceBoundaryDetector()) {
   if (!Array.isArray(words) || words.length === 0) {
     return text ? [{ text, timestamp: [0, 0] }] : [];
   }
 
-  return partitionWordsIntoSegments(words).map((segment) => ({
+  return partitionWordsIntoSegments(words, detector).map((segment) => ({
     text: segment.text,
     timestamp: segment.timestamp,
   }));
-}
-
-function flattenSegmentWords(segments) {
-  return segments.flatMap((segment) => segment.words);
-}
-
-function mergePendingAndCurrentWords(pendingWords, currentWords) {
-  const normalizedPendingWords = Array.isArray(pendingWords) ? pendingWords : [];
-  const normalizedCurrentWords = Array.isArray(currentWords) ? currentWords : [];
-
-  if (normalizedPendingWords.length === 0) {
-    return dedupeMergedWords(normalizedCurrentWords);
-  }
-  if (normalizedCurrentWords.length === 0) {
-    return dedupeMergedWords(normalizedPendingWords);
-  }
-
-  const pendingStart = normalizedPendingWords[0].start_time;
-  const currentStart = normalizedCurrentWords[0].start_time;
-  if (currentStart <= pendingStart + AUTO_WINDOW_EPSILON_S) {
-    return dedupeMergedWords(normalizedCurrentWords);
-  }
-
-  return dedupeMergedWords([...normalizedPendingWords, ...normalizedCurrentWords]);
 }
 
 function normalizeSegmentText(text) {
@@ -315,31 +354,6 @@ function appendFinalizedSegment(finalizedSegments, segment) {
   }
 }
 
-function relocateCursorToNearbyGap(targetS, words) {
-  let best = targetS;
-  let bestDist = CURSOR_SNAP_WINDOW_S + 1;
-
-  for (let i = 0; i < words.length - 1; ++i) {
-    const current = words[i];
-    const next = words[i + 1];
-    const gapStart = current.end_time;
-    const gapEnd = next.start_time;
-    const gap = gapEnd - gapStart;
-    if (gap < CURSOR_GAP_THRESHOLD_S) continue;
-
-    for (const candidate of [gapStart, gapEnd]) {
-      if (candidate + AUTO_WINDOW_EPSILON_S < targetS) continue;
-      const dist = candidate - targetS;
-      if (dist <= CURSOR_SNAP_WINDOW_S && dist < bestDist) {
-        best = candidate;
-        bestDist = dist;
-      }
-    }
-  }
-
-  return best;
-}
-
 async function runAutoSentenceWindowing({
   audio,
   samplingRate,
@@ -348,21 +362,17 @@ async function runAutoSentenceWindowing({
   transcribeWindow,
 }) {
   const audioDurationS = audio.length / samplingRate;
-  const fallbackOverlapS = Math.min(AUTO_WINDOW_FALLBACK_OVERLAP_S, Math.max(0, chunkLengthS - 1));
-  const fallbackAdvanceS = Math.max(1, chunkLengthS - fallbackOverlapS);
   const maxWindows = Math.max(
     4,
     Math.ceil(Math.max(0, audioDurationS - chunkLengthS) / CURSOR_MIN_ADVANCE_S) + 2,
   );
 
   const finalizedSegments = [];
-  let pendingWords = [];
   let lastTextFallback = '';
   let startS = 0;
-  let shouldMergePending = false;
 
   for (let windowIndex = 0; windowIndex < maxWindows && startS < audioDurationS - AUTO_WINDOW_EPSILON_S; ++windowIndex) {
-    const endS = Math.min(audioDurationS, startS + chunkLengthS);
+    const { endS, advanceS: fallbackAdvanceS } = planWindowBounds(startS, audioDurationS, chunkLengthS);
     const startSample = Math.max(0, Math.min(audio.length - 1, Math.floor(startS * samplingRate)));
     const endSample = Math.max(startSample + 1, Math.min(audio.length, Math.ceil(endS * samplingRate)));
     const windowAudio = audio.subarray(startSample, endSample);
@@ -372,44 +382,47 @@ async function runAutoSentenceWindowing({
     lastTextFallback = output.text ?? lastTextFallback;
 
     const currentWords = Array.isArray(output.words) ? output.words : [];
-    const windowWords = shouldMergePending
-      ? mergePendingAndCurrentWords(pendingWords, currentWords)
-      : dedupeMergedWords(currentWords);
+    let windowWords = dedupeMergedWords(currentWords);
+    if (isLastWindow) {
+      windowWords = await recoverTrailingTailWords({
+        audio,
+        samplingRate,
+        startS,
+        endS,
+        baseTimeOffset,
+        words: windowWords,
+        transcribeWindow,
+      });
+    }
     const segments = partitionWordsIntoSegments(windowWords);
 
     if (isLastWindow) {
       for (const segment of segments) {
         appendFinalizedSegment(finalizedSegments, segment);
       }
-      pendingWords = [];
       break;
     }
 
     if (segments.length > 1) {
+      const readySegments = segments.slice(0, -1);
       const pendingSegment = segments[segments.length - 1];
       const pendingStartS = pendingSegment.timestamp[0];
       const pendingRelativeStartS = Math.max(0, pendingStartS - baseTimeOffset);
       if (pendingRelativeStartS >= startS + CURSOR_MIN_ADVANCE_S - AUTO_WINDOW_EPSILON_S) {
-        const readySegments = segments.slice(0, -1);
         for (const segment of readySegments) {
           appendFinalizedSegment(finalizedSegments, segment);
         }
 
-        pendingWords = dedupeMergedWords(pendingSegment.words);
         const nextStartS = Math.min(
           audioDurationS,
-          Math.max(0, relocateCursorToNearbyGap(pendingStartS, windowWords) - baseTimeOffset),
+          Math.max(0, pendingStartS - baseTimeOffset),
         );
-        shouldMergePending = nextStartS > pendingRelativeStartS + AUTO_WINDOW_EPSILON_S;
         if (nextStartS > startS + AUTO_WINDOW_EPSILON_S) {
           startS = nextStartS;
           continue;
         }
       }
     }
-
-    pendingWords = windowWords;
-    shouldMergePending = true;
 
     const fallbackStartS = Math.min(audioDurationS, startS + fallbackAdvanceS);
     if (fallbackStartS <= startS + AUTO_WINDOW_EPSILON_S) {
@@ -418,9 +431,12 @@ async function runAutoSentenceWindowing({
     startS = fallbackStartS;
   }
 
-  const words = dedupeMergedWords([...flattenSegmentWords(finalizedSegments), ...pendingWords]);
+  const words = finalizedSegments.flatMap((segment) => segment.words);
   const text = words.length > 0 ? joinTimedWords(words) : String(lastTextFallback ?? '').trim();
-  const chunks = buildSegmentChunks(words, text);
+  const chunks = finalizedSegments.map((segment) => ({
+    text: segment.text,
+    timestamp: segment.timestamp,
+  }));
 
   return { text, words, chunks };
 }
@@ -499,19 +515,28 @@ export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 1
     return result;
   }
 
-  const output = await model.transcribe(audio, sampleRate, {
+  let output = await model.transcribe(audio, sampleRate, {
     ...transcribeOptions,
     _skipAudioValidation: true,
-    returnTimestamps: wantTimestampChunks,
+    returnTimestamps: true,
     timeOffset,
   });
   accumulateMetrics(metricsAccumulator, output.metrics);
-  const text = output.utterance_text ?? '';
+  let words = Array.isArray(output.words) ? output.words : [];
+  words = await recoverTrailingTailWords({
+    audio,
+    samplingRate: sampleRate,
+    startS: 0,
+    endS: audioDurationS,
+    baseTimeOffset: timeOffset,
+    words,
+    transcribeWindow,
+  });
+  const text = words.length > 0 ? joinTimedWords(words) : (output.utterance_text ?? '');
   if (!wantTimestampChunks) {
     return { text, metrics: finalizeMetrics(metricsAccumulator) };
   }
 
-  const words = Array.isArray(output.words) ? output.words : [];
   return {
     text,
     words,

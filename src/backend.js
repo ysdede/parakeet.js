@@ -51,7 +51,9 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
   }
 
   // Set up WASM paths first (needed for all backends)
-  if (!ort.env.wasm.wasmPaths) {
+  if (wasmPaths) {
+    ort.env.wasm.wasmPaths = wasmPaths;
+  } else if (!ort.env.wasm.wasmPaths) {
     // Derive version from the ONNX Runtime environment
     const fallbackVer = '1.24.1';
     const ver = ort.env.versions?.common || fallbackVer;

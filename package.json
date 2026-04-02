@@ -57,12 +57,15 @@
     "test:watch": "vitest",
     "verify:frame-copy": "node tests/verify_copy.mjs",
     "bench:frame-copy": "node tests/bench_ops.mjs",
+    "eval:groundtruth": "node tests/eval_long_audio_groundtruth.mjs",
     "docs:clean": "node -e \"require('fs').rmSync('.typedoc-site', { recursive: true, force: true })\"",
     "docs:api": "typedoc --options typedoc.json",
     "docs:build": "npm run docs:clean && npm run docs:api"
   },
   "dependencies": {
-    "onnxruntime-web": "1.24.1"
+    "onnxruntime-web": "1.24.1",
+    "wink-eng-lite-web-model": "^1.8.1",
+    "wink-nlp": "^2.4.0"
   },
   "author": "Yunus Seyhan Dede",
   "license": "MIT",
