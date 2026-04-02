@@ -38,7 +38,7 @@ describe('long-audio chunking helpers', () => {
     expect(model.transcribe).toHaveBeenCalledTimes(1);
     expect(model.transcribe).toHaveBeenCalledWith(audio, 16000, expect.objectContaining({
       _skipAudioValidation: true,
-      returnTimestamps: false,
+      returnTimestamps: true,
       timeOffset: 5,
     }));
   });
@@ -90,6 +90,78 @@ describe('long-audio chunking helpers', () => {
       returnTimestamps: true,
       timeOffset: 1.25,
     }));
+  });
+
+  it('rescans an audible trailing tail on a single-window transcription', async () => {
+    const sampleRate = 16000;
+    const audio = new Float32Array(20 * sampleRate);
+    audio.fill(0.1, Math.floor(12.6 * sampleRate), Math.floor(13.6 * sampleRate));
+    const seenOffsets = [];
+    const scriptedOutputs = [
+      {
+        utterance_text: 'In the next chapter we will stroll further afield.',
+        words: [
+          { text: 'In', start_time: 8.0, end_time: 8.2 },
+          { text: 'the', start_time: 8.2, end_time: 8.4 },
+          { text: 'next', start_time: 8.4, end_time: 8.7 },
+          { text: 'chapter', start_time: 8.7, end_time: 9.2 },
+          { text: 'we', start_time: 9.2, end_time: 9.4 },
+          { text: 'will', start_time: 9.4, end_time: 9.6 },
+          { text: 'stroll', start_time: 9.6, end_time: 10.1 },
+          { text: 'further', start_time: 10.1, end_time: 10.5 },
+          { text: 'afield.', start_time: 10.5, end_time: 12.0 },
+        ],
+        metrics: {
+          preprocess_ms: 3,
+          encode_ms: 4,
+          decode_ms: 5,
+          tokenize_ms: 1,
+          total_ms: 13,
+          rtf: 1,
+        },
+      },
+      {
+        utterance_text: 'End of chapter four.',
+        words: [
+          { text: 'End', start_time: 12.8, end_time: 13.0 },
+          { text: 'of', start_time: 13.0, end_time: 13.1 },
+          { text: 'chapter', start_time: 13.1, end_time: 13.5 },
+          { text: 'four.', start_time: 13.5, end_time: 13.9 },
+        ],
+        metrics: {
+          preprocess_ms: 2,
+          encode_ms: 3,
+          decode_ms: 4,
+          tokenize_ms: 1,
+          total_ms: 10,
+          rtf: 1,
+        },
+      },
+    ];
+
+    const model = {
+      transcribe: vi.fn().mockImplementation(async (_windowAudio, _sampleRate, opts) => {
+        seenOffsets.push(opts.timeOffset);
+        return scriptedOutputs[seenOffsets.length - 1];
+      }),
+    };
+
+    const result = await transcribeLongAudioWithChunks(model, audio, sampleRate, {
+      timeOffset: 0,
+    });
+
+    expect(seenOffsets).toEqual([0, 11.5]);
+    expect(result).toEqual({
+      text: 'In the next chapter we will stroll further afield. End of chapter four.',
+      metrics: {
+        preprocess_ms: 5,
+        encode_ms: 7,
+        decode_ms: 9,
+        tokenize_ms: 2,
+        total_ms: 23,
+        rtf: expect.closeTo(20 / 0.023, 6),
+      },
+    });
   });
 
   it('uses sentence-aware window cursoring for long audio chunk assembly', async () => {
@@ -229,5 +301,206 @@ describe('long-audio chunking helpers', () => {
     ).rejects.toThrow('finite non-negative number');
 
     expect(model.transcribe).not.toHaveBeenCalled();
+  });
+
+  it('rebalances the penultimate fallback window to avoid a tiny final tail', async () => {
+    const sampleRate = 16000;
+    const audio = new Float32Array(183 * sampleRate);
+    const seenOffsets = [];
+    const model = {
+      transcribe: vi.fn().mockImplementation(async (_windowAudio, _sampleRate, opts) => {
+        seenOffsets.push(opts.timeOffset);
+        return {
+          utterance_text: `window-${seenOffsets.length}`,
+          words: [
+            { text: `window${seenOffsets.length}`, start_time: opts.timeOffset, end_time: opts.timeOffset + 1 },
+          ],
+          metrics: {
+            preprocess_ms: 1,
+            encode_ms: 1,
+            decode_ms: 1,
+            tokenize_ms: 1,
+            total_ms: 4,
+            rtf: 1,
+          },
+        };
+      }),
+    };
+
+    await transcribeLongAudioWithChunks(model, audio, sampleRate, {
+      chunkLengthS: 90,
+      timeOffset: 0,
+    });
+
+    expect(seenOffsets).toEqual([0, 80, 113]);
+    expect(model.transcribe).toHaveBeenCalledTimes(3);
+  });
+
+  it('replaces stale pending words when the next window refines the same sentence', async () => {
+    const sampleRate = 16000;
+    const audio = new Float32Array(30 * sampleRate);
+    const seenOffsets = [];
+    const scriptedOutputs = [
+      {
+        utterance_text: 'Not a trace of anything edible was to be found. Were they tried to',
+        words: [
+          { text: 'Not', start_time: 23.84, end_time: 24.0 },
+          { text: 'a', start_time: 24.0, end_time: 24.1 },
+          { text: 'trace', start_time: 24.1, end_time: 24.4 },
+          { text: 'of', start_time: 24.4, end_time: 24.5 },
+          { text: 'anything', start_time: 24.5, end_time: 24.9 },
+          { text: 'edible', start_time: 24.9, end_time: 25.3 },
+          { text: 'was', start_time: 25.3, end_time: 25.5 },
+          { text: 'to', start_time: 25.5, end_time: 25.6 },
+          { text: 'be', start_time: 25.6, end_time: 25.8 },
+          { text: 'found.', start_time: 25.8, end_time: 26.48 },
+          { text: 'Were', start_time: 26.48, end_time: 26.80 },
+          { text: 'they', start_time: 26.80, end_time: 27.00 },
+          { text: 'tried', start_time: 27.00, end_time: 27.16 },
+          { text: 'to', start_time: 27.16, end_time: 27.20 },
+        ],
+        metrics: {
+          preprocess_ms: 1,
+          encode_ms: 1,
+          decode_ms: 1,
+          tokenize_ms: 1,
+          total_ms: 4,
+          rtf: 1,
+        },
+      },
+      {
+        utterance_text: 'Were they trying to substitute ice for water?',
+        words: [
+          { text: 'Were', start_time: 26.80, end_time: 27.04 },
+          { text: 'they', start_time: 27.04, end_time: 27.20 },
+          { text: 'trying', start_time: 27.20, end_time: 27.60 },
+          { text: 'to', start_time: 27.60, end_time: 27.72 },
+          { text: 'substitute', start_time: 27.72, end_time: 28.40 },
+          { text: 'ice', start_time: 28.40, end_time: 28.64 },
+          { text: 'for', start_time: 28.64, end_time: 28.80 },
+          { text: 'water?', start_time: 28.80, end_time: 29.68 },
+        ],
+        metrics: {
+          preprocess_ms: 1,
+          encode_ms: 1,
+          decode_ms: 1,
+          tokenize_ms: 1,
+          total_ms: 4,
+          rtf: 1,
+        },
+      },
+    ];
+
+    const model = {
+      transcribe: vi.fn().mockImplementation(async (_windowAudio, _sampleRate, opts) => {
+        seenOffsets.push(opts.timeOffset);
+        return scriptedOutputs[seenOffsets.length - 1];
+      }),
+    };
+
+    const result = await transcribeLongAudioWithChunks(model, audio, sampleRate, {
+      chunkLengthS: 20,
+      returnTimestamps: true,
+      timeOffset: 0,
+    });
+
+    expect(result.text).toBe('Not a trace of anything edible was to be found. Were they trying to substitute ice for water?');
+    expect(result.chunks).toEqual([
+      { text: 'Not a trace of anything edible was to be found.', timestamp: [23.84, 26.48] },
+      { text: 'Were they trying to substitute ice for water?', timestamp: [26.80, 29.68] },
+    ]);
+  });
+
+  it('rescans an audible tail after the last chunk window', async () => {
+    const sampleRate = 16000;
+    const audio = new Float32Array(30 * sampleRate);
+    audio.fill(0.1, Math.floor(22.6 * sampleRate), Math.floor(23.8 * sampleRate));
+    const seenOffsets = [];
+    const scriptedOutputs = [
+      {
+        utterance_text: 'Earlier context. In the next chapter we will stroll further afield.',
+        words: [
+          { text: 'Earlier', start_time: 0.0, end_time: 0.4 },
+          { text: 'context.', start_time: 0.4, end_time: 0.9 },
+          { text: 'In', start_time: 18.0, end_time: 18.2 },
+          { text: 'the', start_time: 18.2, end_time: 18.4 },
+          { text: 'next', start_time: 18.4, end_time: 18.7 },
+          { text: 'chapter', start_time: 18.7, end_time: 19.2 },
+          { text: 'we', start_time: 19.2, end_time: 19.4 },
+          { text: 'will', start_time: 19.4, end_time: 19.6 },
+          { text: 'stroll', start_time: 19.6, end_time: 20.1 },
+          { text: 'further', start_time: 20.1, end_time: 20.5 },
+          { text: 'afield.', start_time: 20.5, end_time: 22.0 },
+        ],
+        metrics: {
+          preprocess_ms: 1,
+          encode_ms: 1,
+          decode_ms: 1,
+          tokenize_ms: 1,
+          total_ms: 4,
+          rtf: 1,
+        },
+      },
+      {
+        utterance_text: 'In the next chapter we will stroll further afield.',
+        words: [
+          { text: 'In', start_time: 18.0, end_time: 18.2 },
+          { text: 'the', start_time: 18.2, end_time: 18.4 },
+          { text: 'next', start_time: 18.4, end_time: 18.7 },
+          { text: 'chapter', start_time: 18.7, end_time: 19.2 },
+          { text: 'we', start_time: 19.2, end_time: 19.4 },
+          { text: 'will', start_time: 19.4, end_time: 19.6 },
+          { text: 'stroll', start_time: 19.6, end_time: 20.1 },
+          { text: 'further', start_time: 20.1, end_time: 20.5 },
+          { text: 'afield.', start_time: 20.5, end_time: 22.0 },
+        ],
+        metrics: {
+          preprocess_ms: 1,
+          encode_ms: 1,
+          decode_ms: 1,
+          tokenize_ms: 1,
+          total_ms: 4,
+          rtf: 1,
+        },
+      },
+      {
+        utterance_text: 'End of chapter four.',
+        words: [
+          { text: 'End', start_time: 22.8, end_time: 23.0 },
+          { text: 'of', start_time: 23.0, end_time: 23.1 },
+          { text: 'chapter', start_time: 23.1, end_time: 23.5 },
+          { text: 'four.', start_time: 23.5, end_time: 23.9 },
+        ],
+        metrics: {
+          preprocess_ms: 1,
+          encode_ms: 1,
+          decode_ms: 1,
+          tokenize_ms: 1,
+          total_ms: 4,
+          rtf: 1,
+        },
+      },
+    ];
+
+    const model = {
+      transcribe: vi.fn().mockImplementation(async (_windowAudio, _sampleRate, opts) => {
+        seenOffsets.push(opts.timeOffset);
+        return scriptedOutputs[seenOffsets.length - 1];
+      }),
+    };
+
+    const result = await transcribeLongAudioWithChunks(model, audio, sampleRate, {
+      chunkLengthS: 20,
+      returnTimestamps: true,
+      timeOffset: 0,
+    });
+
+    expect(seenOffsets).toEqual([0, 18, 21.5]);
+    expect(result.text).toBe('Earlier context. In the next chapter we will stroll further afield. End of chapter four.');
+    expect(result.chunks).toEqual([
+      { text: 'Earlier context.', timestamp: [0.0, 0.9] },
+      { text: 'In the next chapter we will stroll further afield.', timestamp: [18.0, 22.0] },
+      { text: 'End of chapter four.', timestamp: [22.8, 23.9] },
+    ]);
   });
 });
