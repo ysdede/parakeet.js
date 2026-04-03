@@ -13,3 +13,7 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2024-11-20 - Object.values allocating intermediate arrays in hot loops
+Learning: Iterating over `Object.values(out)` or using `Object.values(out)[0]` allocates an intermediate array, which causes measurable GC pressure in high-frequency inference loops (like decoding frame-by-frame). Using a `for...in` loop to access object properties is significantly faster and avoids these intermediate allocations.
+Action: Replace `Object.values()` with `for...in` loops in hot inference result accessors (e.g., in `joinerSession.run` and `encoderSession.run` wrappers).
