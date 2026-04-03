@@ -324,7 +324,9 @@ export class ParakeetModel {
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
     const seenOutputs = new Set();
-    for (const value of Object.values(out)) {
+    // Avoid Object.values() intermediate array allocation in hot loop
+    for (const key in out) {
+      const value = out[key];
       if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
       seenOutputs.add(value);
       if (value === logits || value === outputState1 || value === outputState2) continue;
@@ -683,10 +685,18 @@ export class ParakeetModel {
         const s = performance.now();
         const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
         tEncode = performance.now() - s;
-        enc = encOut['outputs'] ?? Object.values(encOut)[0];
+        enc = encOut['outputs'];
+        if (!enc) {
+          // Avoid Object.values() allocation
+          for (const k in encOut) { enc = encOut[k]; break; }
+        }
       } else {
         const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
-        enc = encOut['outputs'] ?? Object.values(encOut)[0];
+        enc = encOut['outputs'];
+        if (!enc) {
+          // Avoid Object.values() allocation
+          for (const k in encOut) { enc = encOut[k]; break; }
+        }
       }
     } finally {
       // Dispose per-call input tensors even when encoder execution fails.
