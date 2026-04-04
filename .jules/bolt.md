@@ -13,3 +13,7 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2024-11-20 - Unrolling Float32Array argmax - Part 2
+Learning: While unrolling the `Math.exp` accumulation loop (which has a relatively heavy inner body and independent operations) benefits from local variable caching to avoid property lookup overhead in V8, doing the same for a pure `argmax` loop slows it down. In the `argmax` case, the inner body is just a simple branch. Storing all 8 values into local variables first forces V8 to execute those assignments on every iteration, whereas the direct array access inside the `if` condition only executes the slower array bounds check/lookup, and only executes the assignment when a new max is found. Direct 8x array access is >10% faster than 8x array access with local variable caching.
+Action: For pure maximum/minimum reduction loops over TypedArrays, use 8x unrolling with direct array access instead of caching to local variables.
