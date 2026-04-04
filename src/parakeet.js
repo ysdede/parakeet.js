@@ -1950,9 +1950,34 @@ export class LCSPTFAMerger {
     for (let i = 1; i <= m; i++) {
       // Traverse right to left to avoid overwriting needed values
       let prev = 0;
-      for (let j = 1; j <= n; j++) {
+      const xi = X[i - 1];
+      let j = 1;
+
+      // Unroll inner loop 8x for performance, caching LCS[j] to avoid repeated TypedArray property lookups
+      for (; j <= n - 7; j += 8) {
+        const temp0 = LCS[j];
+        if (xi === Y[j - 1]) { LCS[j] = prev + 1; if (LCS[j] > maxLen) { maxLen = LCS[j]; endX = i; endY = j; } } else { LCS[j] = 0; }
+        const temp1 = LCS[j+1];
+        if (xi === Y[j]) { LCS[j+1] = temp0 + 1; if (LCS[j+1] > maxLen) { maxLen = LCS[j+1]; endX = i; endY = j+1; } } else { LCS[j+1] = 0; }
+        const temp2 = LCS[j+2];
+        if (xi === Y[j+1]) { LCS[j+2] = temp1 + 1; if (LCS[j+2] > maxLen) { maxLen = LCS[j+2]; endX = i; endY = j+2; } } else { LCS[j+2] = 0; }
+        const temp3 = LCS[j+3];
+        if (xi === Y[j+2]) { LCS[j+3] = temp2 + 1; if (LCS[j+3] > maxLen) { maxLen = LCS[j+3]; endX = i; endY = j+3; } } else { LCS[j+3] = 0; }
+        const temp4 = LCS[j+4];
+        if (xi === Y[j+3]) { LCS[j+4] = temp3 + 1; if (LCS[j+4] > maxLen) { maxLen = LCS[j+4]; endX = i; endY = j+4; } } else { LCS[j+4] = 0; }
+        const temp5 = LCS[j+5];
+        if (xi === Y[j+4]) { LCS[j+5] = temp4 + 1; if (LCS[j+5] > maxLen) { maxLen = LCS[j+5]; endX = i; endY = j+5; } } else { LCS[j+5] = 0; }
+        const temp6 = LCS[j+6];
+        if (xi === Y[j+5]) { LCS[j+6] = temp5 + 1; if (LCS[j+6] > maxLen) { maxLen = LCS[j+6]; endX = i; endY = j+6; } } else { LCS[j+6] = 0; }
+        const temp7 = LCS[j+7];
+        if (xi === Y[j+6]) { LCS[j+7] = temp6 + 1; if (LCS[j+7] > maxLen) { maxLen = LCS[j+7]; endX = i; endY = j+7; } } else { LCS[j+7] = 0; }
+        prev = temp7;
+      }
+
+      // Remainder loop
+      for (; j <= n; j++) {
         const temp = LCS[j];
-        if (X[i - 1] === Y[j - 1]) {
+        if (xi === Y[j - 1]) {
           LCS[j] = prev + 1;
           if (LCS[j] > maxLen) {
             maxLen = LCS[j];
