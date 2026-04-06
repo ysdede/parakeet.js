@@ -1695,10 +1695,18 @@ export class FrameAlignedMerger {
         this.stabilityMap.set(key, count);
 
         if (count >= this.stabilityThreshold) {
-          // Token is stable - add to confirmed if not already there
-          const alreadyConfirmed = this.confirmedTokens.some(
-            t => Math.abs(t.absTime - token.absTime) < this.timeTolerance && t.id === token.id
-          );
+          // Token is stable - add to confirmed if not already there.
+          // Optimization: Reverse loop with early termination avoids O(N) array scan.
+          let alreadyConfirmed = false;
+          for (let i = this.confirmedTokens.length - 1; i >= 0; i--) {
+            const t = this.confirmedTokens[i];
+            if (token.absTime - t.absTime >= this.timeTolerance) break;
+            if (Math.abs(t.absTime - token.absTime) < this.timeTolerance && t.id === token.id) {
+              alreadyConfirmed = true;
+              break;
+            }
+          }
+
           if (!alreadyConfirmed) {
             this.confirmedTokens.push(token);
           }
