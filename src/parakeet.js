@@ -69,6 +69,9 @@ export class ParakeetModel {
     this._onnxPreprocessor = onnxPreprocessor;
     this._jsPreprocessor = preprocessor instanceof JsPreprocessor ? preprocessor : null;
 
+    // Pre-allocated array for tensor disposal tracking in hot loops
+    this._seenOutputs = [];
+
     // Incremental mel processor for streaming with overlap caching
     this._incrementalMel = preprocessor instanceof JsPreprocessor
       ? new IncrementalMelProcessor({ nMels: preprocessor.nMels })
@@ -323,13 +326,20 @@ export class ParakeetModel {
     const logits = out['outputs'];
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
-    const seenOutputs = new Set();
-    for (const value of Object.values(out)) {
-      if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
-      seenOutputs.add(value);
+    let seenCount = 0;
+    for (const key in out) {
+      const value = out[key];
+      if (!value || typeof value.dispose !== 'function') continue;
+      let seen = false;
+      for (let j = 0; j < seenCount; j++) {
+        if (this._seenOutputs[j] === value) { seen = true; break; }
+      }
+      if (seen) continue;
+      this._seenOutputs[seenCount++] = value;
       if (value === logits || value === outputState1 || value === outputState2) continue;
       value.dispose();
     }
+    for (let j = 0; j < seenCount; j++) this._seenOutputs[j] = null;
     // Note: _targetTensor and _targetLenTensor are intentionally NOT disposed here.
     // They wrap a shared Int32Array (_targetIdArray / _targetLenArray) that is mutated
     // each call. ORT-WASM does not copy the data on Tensor creation, so these tensors
@@ -339,12 +349,12 @@ export class ParakeetModel {
     const failDecoderStep = (message) => {
       logits?.dispose?.();
 
-      const disposed = new Set();
+      const disposed = [];
       const disposeUniqueState = (state) => {
         if (!state) return;
         for (const tensor of [state.state1, state.state2]) {
-          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.has(tensor)) continue;
-          disposed.add(tensor);
+          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.includes(tensor)) continue;
+          disposed.push(tensor);
           tensor.dispose?.();
         }
       };
