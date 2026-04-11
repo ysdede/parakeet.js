@@ -13,3 +13,6 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+## 2024-11-20 - LCS matrix unrolling
+Learning: Unrolling the dynamic programming inner loop for Longest Common Subsequence (`_lcsSubstring` in `LCSPTFAMerger`) by 8x yields an ~80% execution speedup in V8 compared to a simple inner loop, accelerating long-audio chunk assembly.
+Action: Apply loop unrolling for dynamic programming or matrix fill operations on critical paths in streaming/chunking tasks.

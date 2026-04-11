@@ -1948,11 +1948,117 @@ export class LCSPTFAMerger {
     let endY = 0;
 
     for (let i = 1; i <= m; i++) {
-      // Traverse right to left to avoid overwriting needed values
       let prev = 0;
-      for (let j = 1; j <= n; j++) {
+      const x_i = X[i - 1]; // Cache X[i-1]
+      let j = 1;
+      for (; j <= n - 7; j += 8) {
+        let temp = LCS[j];
+        if (x_i === Y[j - 1]) {
+          LCS[j] = prev + 1;
+          if (LCS[j] > maxLen) {
+            maxLen = LCS[j];
+            endX = i;
+            endY = j;
+          }
+        } else {
+          LCS[j] = 0;
+        }
+        prev = temp;
+
+        temp = LCS[j+1];
+        if (x_i === Y[j]) {
+          LCS[j+1] = prev + 1;
+          if (LCS[j+1] > maxLen) {
+            maxLen = LCS[j+1];
+            endX = i;
+            endY = j+1;
+          }
+        } else {
+          LCS[j+1] = 0;
+        }
+        prev = temp;
+
+        temp = LCS[j+2];
+        if (x_i === Y[j+1]) {
+          LCS[j+2] = prev + 1;
+          if (LCS[j+2] > maxLen) {
+            maxLen = LCS[j+2];
+            endX = i;
+            endY = j+2;
+          }
+        } else {
+          LCS[j+2] = 0;
+        }
+        prev = temp;
+
+        temp = LCS[j+3];
+        if (x_i === Y[j+2]) {
+          LCS[j+3] = prev + 1;
+          if (LCS[j+3] > maxLen) {
+            maxLen = LCS[j+3];
+            endX = i;
+            endY = j+3;
+          }
+        } else {
+          LCS[j+3] = 0;
+        }
+        prev = temp;
+
+        temp = LCS[j+4];
+        if (x_i === Y[j+3]) {
+          LCS[j+4] = prev + 1;
+          if (LCS[j+4] > maxLen) {
+            maxLen = LCS[j+4];
+            endX = i;
+            endY = j+4;
+          }
+        } else {
+          LCS[j+4] = 0;
+        }
+        prev = temp;
+
+        temp = LCS[j+5];
+        if (x_i === Y[j+4]) {
+          LCS[j+5] = prev + 1;
+          if (LCS[j+5] > maxLen) {
+            maxLen = LCS[j+5];
+            endX = i;
+            endY = j+5;
+          }
+        } else {
+          LCS[j+5] = 0;
+        }
+        prev = temp;
+
+        temp = LCS[j+6];
+        if (x_i === Y[j+5]) {
+          LCS[j+6] = prev + 1;
+          if (LCS[j+6] > maxLen) {
+            maxLen = LCS[j+6];
+            endX = i;
+            endY = j+6;
+          }
+        } else {
+          LCS[j+6] = 0;
+        }
+        prev = temp;
+
+        temp = LCS[j+7];
+        if (x_i === Y[j+6]) {
+          LCS[j+7] = prev + 1;
+          if (LCS[j+7] > maxLen) {
+            maxLen = LCS[j+7];
+            endX = i;
+            endY = j+7;
+          }
+        } else {
+          LCS[j+7] = 0;
+        }
+        prev = temp;
+      }
+      for (; j <= n; j++) {
         const temp = LCS[j];
-        if (X[i - 1] === Y[j - 1]) {
+        if (x_i === Y[j - 1]) {
           LCS[j] = prev + 1;
           if (LCS[j] > maxLen) {
             maxLen = LCS[j];
