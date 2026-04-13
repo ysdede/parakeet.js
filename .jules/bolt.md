@@ -13,3 +13,6 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+## 2024-12-04 - Direct TypedArray loop iteration
+Learning: In V8, pure branch loops (like an unrolled `argmax`) that perform frequent read-only sequential comparisons over TypedArrays are faster when using direct index access (`arr[i]`) rather than manually caching values into local variables first (`const v0 = arr[i]`). Direct access avoids the overhead of forced assignments on every iteration.
+Action: Prefer direct array element access in simple, high-frequency branch loops without complex math operations.
