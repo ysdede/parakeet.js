@@ -1948,11 +1948,12 @@ export class LCSPTFAMerger {
     let endY = 0;
 
     for (let i = 1; i <= m; i++) {
+      const xi = X[i - 1]; // Cache X[i-1] locally for inner loop efficiency
       // Traverse right to left to avoid overwriting needed values
       let prev = 0;
       for (let j = 1; j <= n; j++) {
         const temp = LCS[j];
-        if (X[i - 1] === Y[j - 1]) {
+        if (xi === Y[j - 1]) {
           LCS[j] = prev + 1;
           if (LCS[j] > maxLen) {
             maxLen = LCS[j];
