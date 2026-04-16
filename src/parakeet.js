@@ -102,6 +102,7 @@ export class ParakeetModel {
     this._targetLenTensor = new ort.Tensor('int32', this._targetLenArray, [1]);
     this._encoderFrameBuffer = null; // Will be allocated when we know the dimension D
     this._encoderFrameTensor = null; // Will be allocated when we know D
+    this._seenOutputs = []; // Reusable array for tensor disposal tracking
 
     // Incremental decode cache: stores decoder state at the end of the prefix
     // keyed by a caller-provided cacheKey. This lets us skip decoding the
@@ -323,10 +324,23 @@ export class ParakeetModel {
     const logits = out['outputs'];
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
-    const seenOutputs = new Set();
-    for (const value of Object.values(out)) {
-      if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
-      seenOutputs.add(value);
+
+    // Performance: Avoid Object.values and per-frame Set allocations in this hot loop.
+    let seenCount = 0;
+    for (const key in out) {
+      const value = out[key];
+      if (!value || typeof value.dispose !== 'function') continue;
+
+      let alreadySeen = false;
+      for (let j = 0; j < seenCount; j++) {
+        if (this._seenOutputs[j] === value) {
+          alreadySeen = true;
+          break;
+        }
+      }
+      if (alreadySeen) continue;
+      this._seenOutputs[seenCount++] = value;
+
       if (value === logits || value === outputState1 || value === outputState2) continue;
       value.dispose();
     }
@@ -339,12 +353,20 @@ export class ParakeetModel {
     const failDecoderStep = (message) => {
       logits?.dispose?.();
 
-      const disposed = new Set();
+      let disposedCount = 0;
       const disposeUniqueState = (state) => {
         if (!state) return;
         for (const tensor of [state.state1, state.state2]) {
-          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.has(tensor)) continue;
-          disposed.add(tensor);
+          if (!tensor || tensor === this._combState1 || tensor === this._combState2) continue;
+          let alreadyDisposed = false;
+          for (let i = 0; i < disposedCount; i++) {
+            if (this._seenOutputs[i] === tensor) {
+              alreadyDisposed = true;
+              break;
+            }
+          }
+          if (alreadyDisposed) continue;
+          this._seenOutputs[disposedCount++] = tensor;
           tensor.dispose?.();
         }
       };
@@ -683,10 +705,22 @@ export class ParakeetModel {
         const s = performance.now();
         const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
         tEncode = performance.now() - s;
-        enc = encOut['outputs'] ?? Object.values(encOut)[0];
+        enc = encOut['outputs'];
+        if (enc === undefined) {
+          for (const key in encOut) {
+            enc = encOut[key];
+            break;
+          }
+        }
       } else {
         const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
-        enc = encOut['outputs'] ?? Object.values(encOut)[0];
+        enc = encOut['outputs'];
+        if (enc === undefined) {
+          for (const key in encOut) {
+            enc = encOut[key];
+            break;
+          }
+        }
       }
     } finally {
       // Dispose per-call input tensors even when encoder execution fails.
