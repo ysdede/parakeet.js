@@ -339,19 +339,27 @@ function fft(re, im, N, tw) {
   for (let len = 16; len <= N; len <<= 1) {
     const halfLen = len >> 1;
     const step = N / len;
-    for (let i = 0; i < N; i += len) {
-      for (let k = 0; k < halfLen; k++) {
-        const twIdx = k * step;
-        const wCos = tw.cos[twIdx];
-        const wSin = tw.sin[twIdx];
+    // Optimization: Swap inner loops (k and i) to hoist twiddle array lookups out of the innermost loop.
+    for (let k = 0; k < halfLen; k++) {
+      const twIdx = k * step;
+      const wCos = tw.cos[twIdx];
+      const wSin = tw.sin[twIdx];
+      for (let i = 0; i < N; i += len) {
         const p = i + k;
         const q = p + halfLen;
-        const tRe = re[q] * wCos - im[q] * wSin;
-        const tIm = re[q] * wSin + im[q] * wCos;
-        re[q] = re[p] - tRe;
-        im[q] = im[p] - tIm;
-        re[p] += tRe;
-        im[p] += tIm;
+
+        // Optimization: Cache array accesses to local variables to avoid repeating TypedArray lookups.
+        const req = re[q];
+        const imq = im[q];
+        const rep = re[p];
+        const imp = im[p];
+
+        const tRe = req * wCos - imq * wSin;
+        const tIm = req * wSin + imq * wCos;
+        re[q] = rep - tRe;
+        im[q] = imp - tIm;
+        re[p] = rep + tRe;
+        im[p] = imp + tIm;
       }
     }
   }
