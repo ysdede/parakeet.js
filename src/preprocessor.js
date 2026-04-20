@@ -97,7 +97,8 @@ export class OnnxPreprocessor {
 
     const waveforms = new this.ort.Tensor('float32', buffer, [1, buffer.length]);
 
-    const lenArr = new BigInt64Array([BigInt(buffer.length)]);
+    const lenArr = new BigInt64Array(1);
+    lenArr[0] = BigInt(buffer.length);
     const waveforms_lens = new this.ort.Tensor('int64', lenArr, [1]);
 
     const feeds = { waveforms, waveforms_lens };

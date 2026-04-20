@@ -676,7 +676,9 @@ export class ParakeetModel {
     // count of *valid* frames.  For the JS preprocessor T === validLength;
     // for the ONNX preprocessor T may be validLength+1.
     const encoderLength = validLength ?? T;
-    const lenTensor = new this.ort.Tensor('int64', BigInt64Array.from([BigInt(encoderLength)]), [1]);
+    const lenArr = new BigInt64Array(1);
+    lenArr[0] = BigInt(encoderLength);
+    const lenTensor = new this.ort.Tensor('int64', lenArr, [1]);
     let enc;
     try {
       if (perfEnabled) {
