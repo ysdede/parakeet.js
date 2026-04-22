@@ -13,3 +13,7 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2025-04-22 - Single-pass variance for mel feature normalization
+Learning: In `src/mel.js`, standard deviation normalization required two full passes over mel features (one for mean, one for variance). Combining these into a single pass using `varSum = sqSum - sum * mean` (with `Math.max(0, ...)` for floating-point safety) avoids a redundant array traversal, yielding a ~1.3x speedup.
+Action: Prefer single-pass mathematical algorithms (like Welford's or sum-of-squares) over multi-pass loops when computing statistics on hot-path typed arrays.

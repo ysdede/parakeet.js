@@ -600,19 +600,21 @@ export class JsPreprocessor {
       const dstBase = m * featuresLen;
 
       let sum = 0;
+      let sqSum = 0;
       for (let t = 0; t < featuresLen; t++) {
-        sum += rawMel[srcBase + t];
+        const v = rawMel[srcBase + t];
+        sum += v;
+        sqSum += v * v;
       }
-      const mean = sum / featuresLen;
 
-      let varSum = 0;
-      for (let t = 0; t < featuresLen; t++) {
-        const d = rawMel[srcBase + t] - mean;
-        varSum += d * d;
-      }
+      const mean = sum / featuresLen;
+      // Single-pass variance: sum((x - mean)^2) = sum(x^2) - sum(x)*mean
+      // Math.max(0, varSum) protects against negative values from floating point inaccuracies.
+      const varSum = sqSum - sum * mean;
+
       const invStd =
         featuresLen > 1
-          ? 1.0 / (Math.sqrt(varSum / (featuresLen - 1)) + 1e-5)
+          ? 1.0 / (Math.sqrt(Math.max(0, varSum) / (featuresLen - 1)) + 1e-5)
           : 0;
 
       for (let t = 0; t < featuresLen; t++) {
