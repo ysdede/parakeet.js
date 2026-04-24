@@ -339,11 +339,13 @@ function fft(re, im, N, tw) {
   for (let len = 16; len <= N; len <<= 1) {
     const halfLen = len >> 1;
     const step = N / len;
-    for (let i = 0; i < N; i += len) {
-      for (let k = 0; k < halfLen; k++) {
-        const twIdx = k * step;
-        const wCos = tw.cos[twIdx];
-        const wSin = tw.sin[twIdx];
+    // Optimization: Loop interchange to hoist twiddle factor lookups.
+    // Inner loop iterates over 'i' instead of 'k'.
+    for (let k = 0; k < halfLen; k++) {
+      const twIdx = k * step;
+      const wCos = tw.cos[twIdx];
+      const wSin = tw.sin[twIdx];
+      for (let i = 0; i < N; i += len) {
         const p = i + k;
         const q = p + halfLen;
         const tRe = re[q] * wCos - im[q] * wSin;

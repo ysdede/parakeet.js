@@ -13,3 +13,7 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2024-11-23 - TypedArray Single Element Initialization
+Learning: Replacing array literal initialization (e.g., `new Int32Array([1])`) with explicit sizing and assignment (e.g., `new Int32Array(1); arr[0] = 1;`) is an unjustified micro-optimization. In the context of ONNX model execution, this change will not yield a measurable performance improvement and directly violates the strict instruction: "Never do: Trade readability and maintainability for micro-optimizations".
+Action: Never perform speculative micro-optimizations that trade readability for negligible/unmeasurable theoretical gains. Focus on clear bottlenecks (like reactive updates or DOM operations).
