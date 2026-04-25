@@ -102,6 +102,7 @@ export class ParakeetModel {
     this._targetLenTensor = new ort.Tensor('int32', this._targetLenArray, [1]);
     this._encoderFrameBuffer = null; // Will be allocated when we know the dimension D
     this._encoderFrameTensor = null; // Will be allocated when we know D
+    this._recycledOutputs = []; // Reusable array for joiner output disposal
 
     // Incremental decode cache: stores decoder state at the end of the prefix
     // keyed by a caller-provided cacheKey. This lets us skip decoding the
@@ -323,10 +324,11 @@ export class ParakeetModel {
     const logits = out['outputs'];
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
-    const seenOutputs = new Set();
-    for (const value of Object.values(out)) {
-      if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
-      seenOutputs.add(value);
+    this._recycledOutputs.length = 0; // Clear recycled array
+    for (const key in out) {
+      const value = out[key];
+      if (!value || typeof value.dispose !== 'function' || this._recycledOutputs.includes(value)) continue;
+      this._recycledOutputs.push(value);
       if (value === logits || value === outputState1 || value === outputState2) continue;
       value.dispose();
     }
@@ -339,12 +341,12 @@ export class ParakeetModel {
     const failDecoderStep = (message) => {
       logits?.dispose?.();
 
-      const disposed = new Set();
+      const disposed = [];
       const disposeUniqueState = (state) => {
         if (!state) return;
         for (const tensor of [state.state1, state.state2]) {
-          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.has(tensor)) continue;
-          disposed.add(tensor);
+          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.includes(tensor)) continue;
+          disposed.push(tensor);
           tensor.dispose?.();
         }
       };
