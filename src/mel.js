@@ -600,16 +600,18 @@ export class JsPreprocessor {
       const dstBase = m * featuresLen;
 
       let sum = 0;
+      let sqSum = 0;
       for (let t = 0; t < featuresLen; t++) {
-        sum += rawMel[srcBase + t];
+        const val = rawMel[srcBase + t];
+        sum += val;
+        sqSum += val * val;
       }
       const mean = sum / featuresLen;
 
-      let varSum = 0;
-      for (let t = 0; t < featuresLen; t++) {
-        const d = rawMel[srcBase + t] - mean;
-        varSum += d * d;
-      }
+      // V(X) = E(X^2) - (E(X))^2
+      // Using sum/sqSum to calculate variance in one pass
+      const varSum = Math.max(0, sqSum - sum * mean);
+
       const invStd =
         featuresLen > 1
           ? 1.0 / (Math.sqrt(varSum / (featuresLen - 1)) + 1e-5)
