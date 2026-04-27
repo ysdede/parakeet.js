@@ -82,6 +82,9 @@ export class ParakeetModel {
     this.predLayers = 2;
     this.maxTokensPerStep = 10;
 
+    // Persistent array for hot loops to avoid GC churn from Object.values/Set allocations
+    this._recycledOutputs = [];
+
     // Allocate zero LSTM states for the combined decoder; will be reused.
     const numLayers = this.predLayers;
     const hidden = this.predHidden;
@@ -323,11 +326,22 @@ export class ParakeetModel {
     const logits = out['outputs'];
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
-    const seenOutputs = new Set();
-    for (const value of Object.values(out)) {
-      if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
-      seenOutputs.add(value);
+
+    this._recycledOutputs.length = 0;
+    for (const key in out) {
+      const value = out[key];
+      if (!value || typeof value.dispose !== 'function') continue;
       if (value === logits || value === outputState1 || value === outputState2) continue;
+
+      let seen = false;
+      for (let i = 0; i < this._recycledOutputs.length; i++) {
+        if (this._recycledOutputs[i] === value) {
+          seen = true;
+          break;
+        }
+      }
+      if (seen) continue;
+      this._recycledOutputs.push(value);
       value.dispose();
     }
     // Note: _targetTensor and _targetLenTensor are intentionally NOT disposed here.
@@ -339,12 +353,17 @@ export class ParakeetModel {
     const failDecoderStep = (message) => {
       logits?.dispose?.();
 
-      const disposed = new Set();
+      const disposed = [];
       const disposeUniqueState = (state) => {
         if (!state) return;
         for (const tensor of [state.state1, state.state2]) {
-          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.has(tensor)) continue;
-          disposed.add(tensor);
+          if (!tensor || tensor === this._combState1 || tensor === this._combState2) continue;
+          let seen = false;
+          for (let i = 0; i < disposed.length; i++) {
+            if (disposed[i] === tensor) { seen = true; break; }
+          }
+          if (seen) continue;
+          disposed.push(tensor);
           tensor.dispose?.();
         }
       };
@@ -683,10 +702,16 @@ export class ParakeetModel {
         const s = performance.now();
         const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
         tEncode = performance.now() - s;
-        enc = encOut['outputs'] ?? Object.values(encOut)[0];
+        enc = encOut['outputs'];
+        if (enc === undefined) {
+          for (const key in encOut) { enc = encOut[key]; break; }
+        }
       } else {
         const encOut = await this.encoderSession.run({ audio_signal: input, length: lenTensor });
-        enc = encOut['outputs'] ?? Object.values(encOut)[0];
+        enc = encOut['outputs'];
+        if (enc === undefined) {
+          for (const key in encOut) { enc = encOut[key]; break; }
+        }
       }
     } finally {
       // Dispose per-call input tensors even when encoder execution fails.
