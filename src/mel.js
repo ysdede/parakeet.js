@@ -599,23 +599,72 @@ export class JsPreprocessor {
       const srcBase = m * nFrames;
       const dstBase = m * featuresLen;
 
+      // 8x unroll of sum, variance, and normalization yields a measurable speedup.
       let sum = 0;
-      for (let t = 0; t < featuresLen; t++) {
+      let t = 0;
+      const len8 = featuresLen - (featuresLen % 8);
+
+      let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0, s6 = 0, s7 = 0;
+      for (; t < len8; t += 8) {
+        s0 += rawMel[srcBase + t];
+        s1 += rawMel[srcBase + t + 1];
+        s2 += rawMel[srcBase + t + 2];
+        s3 += rawMel[srcBase + t + 3];
+        s4 += rawMel[srcBase + t + 4];
+        s5 += rawMel[srcBase + t + 5];
+        s6 += rawMel[srcBase + t + 6];
+        s7 += rawMel[srcBase + t + 7];
+      }
+      sum = s0 + s1 + s2 + s3 + s4 + s5 + s6 + s7;
+      for (; t < featuresLen; t++) {
         sum += rawMel[srcBase + t];
       }
       const mean = sum / featuresLen;
 
       let varSum = 0;
-      for (let t = 0; t < featuresLen; t++) {
+      t = 0;
+      let v0 = 0, v1 = 0, v2 = 0, v3 = 0, v4 = 0, v5 = 0, v6 = 0, v7 = 0;
+      for (; t < len8; t += 8) {
+        const d0 = rawMel[srcBase + t] - mean;
+        const d1 = rawMel[srcBase + t + 1] - mean;
+        const d2 = rawMel[srcBase + t + 2] - mean;
+        const d3 = rawMel[srcBase + t + 3] - mean;
+        const d4 = rawMel[srcBase + t + 4] - mean;
+        const d5 = rawMel[srcBase + t + 5] - mean;
+        const d6 = rawMel[srcBase + t + 6] - mean;
+        const d7 = rawMel[srcBase + t + 7] - mean;
+        v0 += d0 * d0;
+        v1 += d1 * d1;
+        v2 += d2 * d2;
+        v3 += d3 * d3;
+        v4 += d4 * d4;
+        v5 += d5 * d5;
+        v6 += d6 * d6;
+        v7 += d7 * d7;
+      }
+      varSum = v0 + v1 + v2 + v3 + v4 + v5 + v6 + v7;
+      for (; t < featuresLen; t++) {
         const d = rawMel[srcBase + t] - mean;
         varSum += d * d;
       }
+
       const invStd =
         featuresLen > 1
           ? 1.0 / (Math.sqrt(varSum / (featuresLen - 1)) + 1e-5)
           : 0;
 
-      for (let t = 0; t < featuresLen; t++) {
+      t = 0;
+      for (; t < len8; t += 8) {
+        features[dstBase + t] = (rawMel[srcBase + t] - mean) * invStd;
+        features[dstBase + t + 1] = (rawMel[srcBase + t + 1] - mean) * invStd;
+        features[dstBase + t + 2] = (rawMel[srcBase + t + 2] - mean) * invStd;
+        features[dstBase + t + 3] = (rawMel[srcBase + t + 3] - mean) * invStd;
+        features[dstBase + t + 4] = (rawMel[srcBase + t + 4] - mean) * invStd;
+        features[dstBase + t + 5] = (rawMel[srcBase + t + 5] - mean) * invStd;
+        features[dstBase + t + 6] = (rawMel[srcBase + t + 6] - mean) * invStd;
+        features[dstBase + t + 7] = (rawMel[srcBase + t + 7] - mean) * invStd;
+      }
+      for (; t < featuresLen; t++) {
         features[dstBase + t] = (rawMel[srcBase + t] - mean) * invStd;
       }
     }
