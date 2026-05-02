@@ -13,3 +13,11 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2024-11-20 - Avoid Object.values for first element in hot loop
+Learning: In hot paths, using `Object.values(obj)[0]` or similar creates an intermediate array and iterates over all properties, which is significantly slower than using a `for...in` loop with an early `break`.
+Action: Avoid `Object.values` and use `for...in` when accessing a single or the first element of an object in performance-critical code.
+
+## 2024-11-20 - Set vs Array for small collections in hot loop
+Learning: In hot paths, using a `Set` to track a very small collection of items (e.g., 3-5 tensors) is significantly slower (nearly 4x) than using a local Array with `includes()`.
+Action: Use local arrays with `includes()` instead of `Set` for managing small tracking collections in high-frequency execution loops.
