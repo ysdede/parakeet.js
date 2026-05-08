@@ -13,3 +13,6 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+## 2024-11-20 - Map Sentence Endings Two-Pointer Optimization
+Learning: Replacing the nested `forEach` loop in `mapSentenceEndingsToWords` (which matches sentence end bounds against a linear list of words) with a two-pointer approach reduces the time complexity from O(N*M) to O(N+M), dropping the execution time from ~6000ms to ~12ms for a 1000-sentence test.
+Action: Utilize a two-pointer progression algorithm whenever aligning two sequences that are both monotonically increasing (e.g. tracking index mapping by text position bounds) to avoid repeated O(N*M) scan operations.

@@ -271,19 +271,29 @@ export class SentenceBoundaryDetector {
 
   mapSentenceEndingsToWords(sentences, originalWords, wordPositions) {
     const sentenceEndingWords = [];
+    let wordIdx = 0;
+    const numWords = wordPositions.length;
 
-    sentences.forEach((sentence) => {
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
       const sentenceEndPos = sentence.endPos;
       let closestWordIndex = -1;
       let minDistance = Infinity;
 
-      wordPositions.forEach((wordPos) => {
+      while (wordIdx < numWords) {
+        const wordPos = wordPositions[wordIdx];
         const distance = sentenceEndPos - wordPos.textEndPos;
-        if (distance >= 0 && distance < minDistance) {
-          minDistance = distance;
-          closestWordIndex = wordPos.wordIndex;
+
+        if (distance >= 0) {
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestWordIndex = wordPos.wordIndex;
+          }
+          wordIdx++;
+        } else {
+          break;
         }
-      });
+      }
 
       if (closestWordIndex === -1) {
         if (this.config.debug) {
@@ -291,13 +301,18 @@ export class SentenceBoundaryDetector {
             `[SentenceDetector] Could not find a word ending before sentence end position ${sentenceEndPos}. Falling back to absolute closest match.`,
           );
         }
-        wordPositions.forEach((wordPos) => {
+        for (let j = 0; j < numWords; j++) {
+          const wordPos = wordPositions[j];
           const distance = Math.abs(sentenceEndPos - wordPos.textEndPos);
           if (distance < minDistance) {
             minDistance = distance;
             closestWordIndex = wordPos.wordIndex;
           }
-        });
+        }
+      }
+
+      if (wordIdx > 0 && wordIdx < numWords) {
+        wordIdx--;
       }
 
       if (closestWordIndex !== -1 && closestWordIndex < originalWords.length) {
@@ -311,7 +326,7 @@ export class SentenceBoundaryDetector {
           },
         });
       }
-    });
+    }
 
     return sentenceEndingWords;
   }
