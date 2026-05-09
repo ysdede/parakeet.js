@@ -599,23 +599,67 @@ export class JsPreprocessor {
       const srcBase = m * nFrames;
       const dstBase = m * featuresLen;
 
-      let sum = 0;
-      for (let t = 0; t < featuresLen; t++) {
+      // 8x unrolled loop for mathematically stable multi-pass sum and variance
+      let sum0 = 0, sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0, sum5 = 0, sum6 = 0, sum7 = 0;
+      let t = 0;
+      for (; t <= featuresLen - 8; t += 8) {
+        sum0 += rawMel[srcBase + t];
+        sum1 += rawMel[srcBase + t + 1];
+        sum2 += rawMel[srcBase + t + 2];
+        sum3 += rawMel[srcBase + t + 3];
+        sum4 += rawMel[srcBase + t + 4];
+        sum5 += rawMel[srcBase + t + 5];
+        sum6 += rawMel[srcBase + t + 6];
+        sum7 += rawMel[srcBase + t + 7];
+      }
+      let sum = sum0 + sum1 + sum2 + sum3 + sum4 + sum5 + sum6 + sum7;
+      for (; t < featuresLen; t++) {
         sum += rawMel[srcBase + t];
       }
       const mean = sum / featuresLen;
 
-      let varSum = 0;
-      for (let t = 0; t < featuresLen; t++) {
+      let varSum0 = 0, varSum1 = 0, varSum2 = 0, varSum3 = 0, varSum4 = 0, varSum5 = 0, varSum6 = 0, varSum7 = 0;
+      for (t = 0; t <= featuresLen - 8; t += 8) {
+        const d0 = rawMel[srcBase + t] - mean;
+        const d1 = rawMel[srcBase + t + 1] - mean;
+        const d2 = rawMel[srcBase + t + 2] - mean;
+        const d3 = rawMel[srcBase + t + 3] - mean;
+        const d4 = rawMel[srcBase + t + 4] - mean;
+        const d5 = rawMel[srcBase + t + 5] - mean;
+        const d6 = rawMel[srcBase + t + 6] - mean;
+        const d7 = rawMel[srcBase + t + 7] - mean;
+
+        varSum0 += d0 * d0;
+        varSum1 += d1 * d1;
+        varSum2 += d2 * d2;
+        varSum3 += d3 * d3;
+        varSum4 += d4 * d4;
+        varSum5 += d5 * d5;
+        varSum6 += d6 * d6;
+        varSum7 += d7 * d7;
+      }
+      let varSum = varSum0 + varSum1 + varSum2 + varSum3 + varSum4 + varSum5 + varSum6 + varSum7;
+      for (; t < featuresLen; t++) {
         const d = rawMel[srcBase + t] - mean;
         varSum += d * d;
       }
+
       const invStd =
         featuresLen > 1
           ? 1.0 / (Math.sqrt(varSum / (featuresLen - 1)) + 1e-5)
           : 0;
 
-      for (let t = 0; t < featuresLen; t++) {
+      for (t = 0; t <= featuresLen - 8; t += 8) {
+        features[dstBase + t] = (rawMel[srcBase + t] - mean) * invStd;
+        features[dstBase + t + 1] = (rawMel[srcBase + t + 1] - mean) * invStd;
+        features[dstBase + t + 2] = (rawMel[srcBase + t + 2] - mean) * invStd;
+        features[dstBase + t + 3] = (rawMel[srcBase + t + 3] - mean) * invStd;
+        features[dstBase + t + 4] = (rawMel[srcBase + t + 4] - mean) * invStd;
+        features[dstBase + t + 5] = (rawMel[srcBase + t + 5] - mean) * invStd;
+        features[dstBase + t + 6] = (rawMel[srcBase + t + 6] - mean) * invStd;
+        features[dstBase + t + 7] = (rawMel[srcBase + t + 7] - mean) * invStd;
+      }
+      for (; t < featuresLen; t++) {
         features[dstBase + t] = (rawMel[srcBase + t] - mean) * invStd;
       }
     }
