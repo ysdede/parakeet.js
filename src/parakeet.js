@@ -1068,9 +1068,24 @@ export class ParakeetModel {
       console.table({ Preprocess: `${tPreproc.toFixed(1)} ms`, Encode: `${tEncode.toFixed(1)} ms`, Decode: `${tDecode.toFixed(1)} ms`, Tokenize: `${tToken.toFixed(1)} ms`, Total: `${total.toFixed(1)} ms` });
     }
 
-    const frameConfs = Array.from(frameConfidenceStats.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([, stats]) => stats.sum / stats.count);
+    let frameConfsStr = null;
+    let frameAvg = null;
+    // Optimization: avoid multiple intermediate array allocations (map, reduce)
+    // by using conditional execution and a single-pass loop on sorted Map entries.
+    // This is only computed if returnConfidences is true.
+    if (returnConfidences) {
+      const entries = Array.from(frameConfidenceStats.entries()).sort((a, b) => a[0] - b[0]);
+      frameConfsStr = new Array(entries.length);
+      let sum = 0;
+      for (let i = 0; i < entries.length; i++) {
+        const val = entries[i][1].sum / entries[i][1].count;
+        frameConfsStr[i] = +val.toFixed(4);
+        sum += val;
+      }
+      if (entries.length > 0) {
+        frameAvg = +(sum / entries.length).toFixed(4);
+      }
+    }
 
     const result = {
       utterance_text: text,
@@ -1081,8 +1096,8 @@ export class ParakeetModel {
         token_avg: +avgTokenConf?.toFixed(4),
         word: words.map(w => w.confidence),
         word_avg: +avgWordConf?.toFixed(4),
-        frame: frameConfs.map(f => +f.toFixed(4)),
-        frame_avg: frameConfs.length ? +(frameConfs.reduce((a, b) => a + b, 0) / frameConfs.length).toFixed(4) : null,
+        frame: frameConfsStr,
+        frame_avg: frameAvg,
         overall_log_prob: +overallLogProb.toFixed(6)
       } : { overall_log_prob: null, frame: null, frame_avg: null },
       metrics: perfEnabled ? {
