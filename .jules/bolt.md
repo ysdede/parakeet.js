@@ -13,3 +13,11 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2024-05-22 - JS Loops vs TypedArray.set
+Learning: When finding the maximum value (argmax) in a large typed array like `Float32Array`, unrolling the loop 8x is significantly faster than using a simple `for` loop, yielding a ~2x performance speedup in the hot path.
+Action: Apply loop unrolling for max reductions in high-frequency typed array operations.
+
+## 2024-05-23 - Loop Unrolling 32x for Transpose
+Learning: Unrolling the 8x inner loop in `transpose` to 32x, along with incrementing `srcOffset` by `Tenc` and using `outOffset`, yields a consistent speedup in V8 compared to the existing 8x loop implementation with repeated additions and multiplications.
+Action: Apply extreme loop unrolling (32x) and continuous indexing variables for purely sequential numeric memory transforms in hot paths.

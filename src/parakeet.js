@@ -705,20 +705,47 @@ export class ParakeetModel {
       const encData = enc.data;
 
       // Benchmark-driven transpose path: V8 is faster with sequential writes here
-      // than with the previous block-tiled loop.
+      // than with the previous block-tiled loop. 32x unrolled loop with outOffset and
+      // srcOffset incrementing improves speed over the previous 8x by avoiding repeated
+      // multiplication and additions.
       for (let t = 0; t < Tenc; t++) {
         const tOffset = t * D;
         let d = 0;
-        for (; d <= D - 8; d += 8) {
-          const srcOffset = d * Tenc + t;
-          transposed[tOffset + d] = encData[srcOffset];
-          transposed[tOffset + d + 1] = encData[srcOffset + Tenc];
-          transposed[tOffset + d + 2] = encData[srcOffset + 2 * Tenc];
-          transposed[tOffset + d + 3] = encData[srcOffset + 3 * Tenc];
-          transposed[tOffset + d + 4] = encData[srcOffset + 4 * Tenc];
-          transposed[tOffset + d + 5] = encData[srcOffset + 5 * Tenc];
-          transposed[tOffset + d + 6] = encData[srcOffset + 6 * Tenc];
-          transposed[tOffset + d + 7] = encData[srcOffset + 7 * Tenc];
+        for (; d <= D - 32; d += 32) {
+          const outOffset = tOffset + d;
+          let srcOffset = d * Tenc + t;
+          transposed[outOffset] = encData[srcOffset];
+          transposed[outOffset + 1] = encData[srcOffset += Tenc];
+          transposed[outOffset + 2] = encData[srcOffset += Tenc];
+          transposed[outOffset + 3] = encData[srcOffset += Tenc];
+          transposed[outOffset + 4] = encData[srcOffset += Tenc];
+          transposed[outOffset + 5] = encData[srcOffset += Tenc];
+          transposed[outOffset + 6] = encData[srcOffset += Tenc];
+          transposed[outOffset + 7] = encData[srcOffset += Tenc];
+          transposed[outOffset + 8] = encData[srcOffset += Tenc];
+          transposed[outOffset + 9] = encData[srcOffset += Tenc];
+          transposed[outOffset + 10] = encData[srcOffset += Tenc];
+          transposed[outOffset + 11] = encData[srcOffset += Tenc];
+          transposed[outOffset + 12] = encData[srcOffset += Tenc];
+          transposed[outOffset + 13] = encData[srcOffset += Tenc];
+          transposed[outOffset + 14] = encData[srcOffset += Tenc];
+          transposed[outOffset + 15] = encData[srcOffset += Tenc];
+          transposed[outOffset + 16] = encData[srcOffset += Tenc];
+          transposed[outOffset + 17] = encData[srcOffset += Tenc];
+          transposed[outOffset + 18] = encData[srcOffset += Tenc];
+          transposed[outOffset + 19] = encData[srcOffset += Tenc];
+          transposed[outOffset + 20] = encData[srcOffset += Tenc];
+          transposed[outOffset + 21] = encData[srcOffset += Tenc];
+          transposed[outOffset + 22] = encData[srcOffset += Tenc];
+          transposed[outOffset + 23] = encData[srcOffset += Tenc];
+          transposed[outOffset + 24] = encData[srcOffset += Tenc];
+          transposed[outOffset + 25] = encData[srcOffset += Tenc];
+          transposed[outOffset + 26] = encData[srcOffset += Tenc];
+          transposed[outOffset + 27] = encData[srcOffset += Tenc];
+          transposed[outOffset + 28] = encData[srcOffset += Tenc];
+          transposed[outOffset + 29] = encData[srcOffset += Tenc];
+          transposed[outOffset + 30] = encData[srcOffset += Tenc];
+          transposed[outOffset + 31] = encData[srcOffset += Tenc];
         }
         for (; d < D; d++) {
           transposed[tOffset + d] = encData[d * Tenc + t];
