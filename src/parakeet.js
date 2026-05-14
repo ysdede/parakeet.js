@@ -323,10 +323,14 @@ export class ParakeetModel {
     const logits = out['outputs'];
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
-    const seenOutputs = new Set();
-    for (const value of Object.values(out)) {
-      if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
-      seenOutputs.add(value);
+    // Optimization: Avoid Object.values() allocation and Set hashing overhead
+    // for small tensor collections in the hot loop.
+    const seenOutputs = [];
+    for (const key in out) {
+      if (!Object.hasOwn(out, key)) continue;
+      const value = out[key];
+      if (!value || typeof value.dispose !== 'function' || seenOutputs.includes(value)) continue;
+      seenOutputs.push(value);
       if (value === logits || value === outputState1 || value === outputState2) continue;
       value.dispose();
     }
