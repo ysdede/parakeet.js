@@ -323,10 +323,15 @@ export class ParakeetModel {
     const logits = out['outputs'];
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
-    const seenOutputs = new Set();
-    for (const value of Object.values(out)) {
-      if (!value || typeof value.dispose !== 'function' || seenOutputs.has(value)) continue;
-      seenOutputs.add(value);
+
+    // Performance optimization: Using an array and for...in loop instead of Set and Object.values()
+    // significantly reduces allocation overhead and GC churn in this hot path for small collections.
+    const seenOutputs = [];
+    for (const key in out) {
+      if (!Object.hasOwn(out, key)) continue;
+      const value = out[key];
+      if (!value || typeof value.dispose !== 'function' || seenOutputs.includes(value)) continue;
+      seenOutputs.push(value);
       if (value === logits || value === outputState1 || value === outputState2) continue;
       value.dispose();
     }
@@ -339,12 +344,14 @@ export class ParakeetModel {
     const failDecoderStep = (message) => {
       logits?.dispose?.();
 
-      const disposed = new Set();
+      // Performance optimization: Use Array instead of Set for tracking disposed tensors
+      // to avoid Set allocation overhead in the error path.
+      const disposed = [];
       const disposeUniqueState = (state) => {
         if (!state) return;
         for (const tensor of [state.state1, state.state2]) {
-          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.has(tensor)) continue;
-          disposed.add(tensor);
+          if (!tensor || tensor === this._combState1 || tensor === this._combState2 || disposed.includes(tensor)) continue;
+          disposed.push(tensor);
           tensor.dispose?.();
         }
       };

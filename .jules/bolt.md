@@ -13,3 +13,7 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2024-05-16 - Optimize tensor disposal loop
+Learning: In V8 hot loops handling model output disposal (like _runCombinedStep), using `Object.values()` and `new Set()` creates measurable GC churn and allocation overhead for small tensor collections.
+Action: Prefer tracking small tensor collections with local arrays (`[]` + `.includes()`) and iterating with `for...in` combined with `Object.hasOwn` instead of Sets and Object.values().
