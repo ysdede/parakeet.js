@@ -272,18 +272,34 @@ export class SentenceBoundaryDetector {
   mapSentenceEndingsToWords(sentences, originalWords, wordPositions) {
     const sentenceEndingWords = [];
 
+    // Performance optimization: two-pointer O(N+M) match instead of O(N*M) nested loop.
+    // Constraint: Requires `sentences` to be sorted by `endPos` and `wordPositions`
+    // to be sorted by `textEndPos` (guaranteed by left-to-right text parsing).
+    let wordIdx = 0;
+
     sentences.forEach((sentence) => {
       const sentenceEndPos = sentence.endPos;
       let closestWordIndex = -1;
       let minDistance = Infinity;
 
-      wordPositions.forEach((wordPos) => {
+      while (wordIdx < wordPositions.length) {
+        const wordPos = wordPositions[wordIdx];
         const distance = sentenceEndPos - wordPos.textEndPos;
-        if (distance >= 0 && distance < minDistance) {
-          minDistance = distance;
-          closestWordIndex = wordPos.wordIndex;
+
+        if (distance >= 0) {
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestWordIndex = wordPos.wordIndex;
+          }
+          wordIdx += 1;
+        } else {
+          break;
         }
-      });
+      }
+
+      if (wordIdx > 0) {
+        wordIdx -= 1;
+      }
 
       if (closestWordIndex === -1) {
         if (this.config.debug) {
