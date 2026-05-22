@@ -1950,9 +1950,14 @@ export class LCSPTFAMerger {
     for (let i = 1; i <= m; i++) {
       // Traverse right to left to avoid overwriting needed values
       let prev = 0;
+
+      // Performance optimization: Hoist invariant X[i-1] array lookup
+      // out of the inner j-loop to avoid redundant property accesses
+      // in V8 during DP matrix calculation.
+      const xi = X[i - 1];
       for (let j = 1; j <= n; j++) {
         const temp = LCS[j];
-        if (X[i - 1] === Y[j - 1]) {
+        if (xi === Y[j - 1]) {
           LCS[j] = prev + 1;
           if (LCS[j] > maxLen) {
             maxLen = LCS[j];
