@@ -56,6 +56,7 @@ jobs:
         working-directory: examples/demo
         env:
           PARAKEET_LOCAL: 'true'
+          VITE_PUBLIC_BASE: '/parakeet.js/'
         run: npm run build:local
         
       - name: Prepare deployment files

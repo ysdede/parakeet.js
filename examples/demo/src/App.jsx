@@ -32,10 +32,42 @@ const MODEL_CANONICAL_REVISIONS = {
   'parakeet-tdt-0.6b-v2': 'feat/fp16-canonical-v2',
   'parakeet-tdt-0.6b-v3': 'feat/fp16-canonical-v3',
 };
+const RAW_WARMUP_AUDIO_URLS = [
+  'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/Harvard-L2-1.ogg',
+  'https://raw.githubusercontent.com/ysdede/parakeet.js/main/examples/demo/public/assets/Harvard-L2-1.ogg',
+];
 const LONG_AUDIO_UPLOAD_THRESHOLD_S = 150;
 const LONG_AUDIO_UPLOAD_CHUNK_LENGTH_S = 90;
 const STREAMED_WAV_CHUNK_DURATION_S = 30;
 const WAV_HEADER_PROBE_BYTES = 1024 * 1024;
+
+function normalizeBaseUrl(baseUrl) {
+  if (typeof baseUrl !== 'string' || !baseUrl.trim()) return '/';
+  const trimmed = baseUrl.trim();
+  if (trimmed === '/') return '/';
+  return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+}
+
+function withBaseUrl(baseUrl, assetUrl) {
+  if (typeof assetUrl !== 'string' || !assetUrl) return assetUrl;
+  if (/^(?:https?:|blob:|data:)/i.test(assetUrl)) return assetUrl;
+  if (!assetUrl.startsWith('/')) return assetUrl;
+
+  const normalizedBase = normalizeBaseUrl(baseUrl);
+  if (normalizedBase === '/') return assetUrl;
+  if (assetUrl.startsWith(normalizedBase)) return assetUrl;
+
+  return `${normalizedBase.replace(/\/$/, '')}${assetUrl}`;
+}
+
+function getWarmupAudioCandidates() {
+  const baseFromVite = typeof import.meta?.env?.BASE_URL === 'string' ? import.meta.env.BASE_URL : '/';
+  const bundledCandidates = [
+    warmupAudioUrl,
+    withBaseUrl(baseFromVite, warmupAudioUrl),
+  ].filter(Boolean);
+  return Array.from(new Set([...bundledCandidates, ...RAW_WARMUP_AUDIO_URLS]));
+}
 
 function getBasename(path) {
   return String(path || '').split('/').pop() || '';
@@ -1353,12 +1385,7 @@ export default function App() {
       ];
 
       try {
-        const warmupUrls = [
-          // Prefer bundled local asset URL for deterministic local/prod behavior.
-          warmupAudioUrl,
-          // Fallback only if the deployed app is missing the local asset.
-          'https://raw.githubusercontent.com/ysdede/parakeet.js/master/examples/demo/public/assets/Harvard-L2-1.ogg',
-        ];
+        const warmupUrls = getWarmupAudioCandidates();
         let audioBlob = null;
         let warmupFetchError = null;
         for (const audioUrl of warmupUrls) {
