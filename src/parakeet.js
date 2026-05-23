@@ -238,8 +238,6 @@ export class ParakeetModel {
       }
     }
 
-    const tokenizerPromise = ParakeetTokenizer.fromUrl(tokenizerUrl);
-
     // Create preprocessor based on selected backend
     const detectedMels = nMels || 128;
     const jsPreprocessor = new JsPreprocessor({ nMels: detectedMels });
@@ -269,12 +267,18 @@ export class ParakeetModel {
       encoderSession = await createSession(encoderUrl, encoderSessionOptions);
       joinerSession = await createSession(decoderUrl, decoderSessionOptions);
     } else {
-      [encoderSession, joinerSession] = await Promise.all([
+      const sessionResults = await Promise.allSettled([
         createSession(encoderUrl, encoderSessionOptions),
         createSession(decoderUrl, decoderSessionOptions),
       ]);
+      const failedSession = sessionResults.find((result) => result.status === 'rejected');
+      if (failedSession) {
+        throw failedSession.reason;
+      }
+      [encoderSession, joinerSession] = sessionResults.map((result) => result.value);
     }
 
+    const tokenizerPromise = ParakeetTokenizer.fromUrl(tokenizerUrl);
     const [tokenizer, preprocessor] = await Promise.all([tokenizerPromise, preprocPromise]);
 
     // Warm up preprocessor to avoid first-call latency (ONNX session creation / JIT)

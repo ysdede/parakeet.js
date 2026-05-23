@@ -527,6 +527,7 @@ const MODEL_OPTIONS = Object.entries(MODELS).map(([key, config]) => ({
 async function getCachedAudioFile(url, cacheKey) {
   const dbName = 'parakeet-demo-cache';
   const storeName = 'audio-files';
+  const resolvedCacheKey = `${cacheKey}:v2:${url}`;
 
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(dbName, 1);
@@ -534,35 +535,45 @@ async function getCachedAudioFile(url, cacheKey) {
     request.onerror = () => reject(new Error('Failed to open IndexedDB'));
     request.onsuccess = async (event) => {
       const db = event.target.result;
-      const tx = db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-      const getReq = store.get(cacheKey);
+      const readTx = db.transaction(storeName, 'readonly');
+      const readStore = readTx.objectStore(storeName);
+      const getReq = readStore.get(resolvedCacheKey);
 
       getReq.onsuccess = async () => {
-        if (getReq.result) {
-          // Cache hit - return cached blob
-          console.log(`[Cache] Using cached audio: ${cacheKey}`);
-          resolve(getReq.result.blob);
-        } else {
-          // Cache miss - fetch from URL and cache
+        const fetchAndCache = async () => {
           console.log(`[Cache] Fetching audio from: ${url}`);
-          try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const blob = await response.blob();
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
 
-            // Store in cache
-            const writeTx = db.transaction(storeName, 'readwrite');
-            const writeStore = writeTx.objectStore(storeName);
-            writeStore.put({ key: cacheKey, blob, timestamp: Date.now() });
-            writeTx.oncomplete = () => {
-              console.log(`[Cache] Cached audio: ${cacheKey}`);
-              resolve(blob);
-            };
-            writeTx.onerror = () => resolve(blob); // Fallback: return without caching
-          } catch (err) {
-            reject(err);
+          const writeTx = db.transaction(storeName, 'readwrite');
+          const writeStore = writeTx.objectStore(storeName);
+          writeStore.put({ key: resolvedCacheKey, blob, timestamp: Date.now(), sourceUrl: url });
+          writeTx.oncomplete = () => {
+            console.log(`[Cache] Cached audio: ${cacheKey}`);
+            resolve(blob);
+          };
+          writeTx.onerror = () => resolve(blob); // Fallback: return without caching
+        };
+
+        if (getReq.result?.blob) {
+          // Cache hit - validate blob is still readable (self-heal stale entries).
+          try {
+            await getReq.result.blob.arrayBuffer();
+            console.log(`[Cache] Using cached audio: ${cacheKey}`);
+            resolve(getReq.result.blob);
+            return;
+          } catch (cacheErr) {
+            console.warn(`[Cache] Corrupt cached audio (${cacheKey}), refetching: ${cacheErr.message}`);
+            const deleteTx = db.transaction(storeName, 'readwrite');
+            deleteTx.objectStore(storeName).delete(resolvedCacheKey);
           }
+        }
+
+        try {
+          await fetchAndCache();
+        } catch (err) {
+          reject(err);
         }
       };
       getReq.onerror = () => reject(new Error('Failed to read from cache'));
