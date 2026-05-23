@@ -1,34 +1,42 @@
-# Compat Tests Guide
+# Compat Tests
 
-## Purpose
+Compatibility demos are frozen app snapshots from earlier releases.
 
-`compat-tests/` exists to verify that older demo apps still work with newer published `parakeet.js` npm releases.
+They answer one question: does the new library version still work with older demo app code?
 
-## Folder Convention
+## Layout
 
-- `demo-vX.Y.Z/`: app snapshot from that era (UI/app code baseline)
-- `shared/`: shared helper modules and shared static assets used by multiple compat demos
+- `demo-vX.Y.Z/`: demo snapshot from that release era.
+- `shared/`: common assets/helpers shared by compat demos.
 
-## Dependency Rule (Important)
+## Rules
 
-- Compat demos must use **npm dependency**, not local source linking.
-- Do **not** use `"parakeet.js": "file:../.."` unless explicitly requested.
-- Use one of:
-  - `"parakeet.js": "latest"` for rolling compatibility checks
-  - `"parakeet.js": "<target-version>"` for fixed-version checks
+- Compat demos should use the npm package dependency for package compatibility checks.
+- Keep `dev:local` / `build:local` when a snapshot supports local-source validation.
+- Do not commit `node_modules` or generated `dist` output.
+- Keep each snapshot small: source, public assets, config, package files, and README.
 
-## New Compat Snapshot Workflow
+## Creating a Snapshot
 
-1. Copy current demo source/config into a new `demo-vX.Y.Z` folder.
-2. Exclude non-required artifacts (`node_modules`, `dist`, deployment-only files).
-3. Keep only minimal runnable stack (`src`, `public`, `index.html`, Vite/PostCSS/Tailwind config, package files).
-4. Point `parakeet.js` dependency to npm (`latest` or fixed version).
-5. Reuse `compat-tests/shared/` for common JS modules/assets.
-6. Build check:
-   - `npm install`
-   - `npm run build`
+```bash
+# Example only. Pick the version that matches the demo snapshot.
+Copy-Item -Recurse examples/demo compat-tests/demo-v1.4.4
+```
 
-## Shared Assets Rule
+Then remove generated folders and verify:
 
-- Put common assets under `compat-tests/shared/assets/`.
-- Import shared assets from demo code instead of duplicating files in each demo's `public/assets`.
+```bash
+cd compat-tests/demo-v1.4.4
+npm install
+npm run build
+npm run build:local
+```
+
+Manual checks should cover:
+
+- local model folder load
+- Hugging Face model load
+- warm-up transcription
+- sample/audio upload transcription
+
+These checks are intentionally boring. If an old demo still works after a library change, that is the signal we want.
