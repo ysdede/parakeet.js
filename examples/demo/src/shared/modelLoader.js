@@ -30,14 +30,6 @@ function buildRetryOptions(options, quantisation) {
   return retryOptions;
 }
 
-function revokeBlobUrls(urls) {
-  for (const value of Object.values(urls || {})) {
-    if (typeof value === 'string' && value.startsWith('blob:')) {
-      URL.revokeObjectURL(value);
-    }
-  }
-}
-
 /**
  * Resolve model assets from hub and compile with one FP16 -> FP32 runtime retry.
  *
@@ -66,9 +58,6 @@ export async function loadModelWithFallback({
     if (!shouldRetryWithFp32(firstModelUrls.quantisation)) {
       throw firstError;
     }
-
-    // Free first-attempt blobs before downloading retry artifacts.
-    revokeBlobUrls(firstModelUrls.urls);
 
     const retryOptions = buildRetryOptions(options, firstModelUrls.quantisation);
     let retryModelUrls;
