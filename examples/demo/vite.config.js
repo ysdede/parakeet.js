@@ -31,6 +31,7 @@ const localPkg = readJson(path.resolve(repoRoot, 'package.json'));
 const npmPkg = readJson(path.resolve(__dirname, 'node_modules/parakeet.js/package.json'));
 const localVersion = localPkg?.version;
 const npmVersion = npmPkg?.version;
+const publicBase = process.env.VITE_PUBLIC_BASE || '/';
 
 const shortHash = getShortCommitHash(repoRoot);
 let parakeetVersion = useLocalSource ? localVersion : npmVersion;
@@ -41,6 +42,7 @@ if (!parakeetVersion) {
 }
 
 export default defineConfig({
+  base: publicBase,
   plugins: [react()],
   server: {
     port: 3000,
