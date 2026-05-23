@@ -8,6 +8,7 @@ import { getModelConfig } from './models.js';
 
 const DB_NAME = 'parakeet-cache-db';
 const STORE_NAME = 'file-store';
+const FILE_CACHE_VERSION = 'v2';
 let dbPromise = null;
 
 // Cache for repo file listings so we only hit the HF API once per page load.
@@ -187,6 +188,37 @@ async function saveFileToDb(key, blob) {
 }
 
 /**
+ * Remove a cached file blob from IndexedDB.
+ * @param {string} key - Cache key.
+ * @returns {Promise<void>}
+ */
+async function deleteFileFromDb(key) {
+  const db = await getDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.delete(key);
+    request.onerror = () => reject('Error deleting from DB');
+    request.onsuccess = () => resolve();
+  });
+}
+
+/**
+ * Verify that an IndexedDB blob can still be read before handing its URL to ORT.
+ * @param {Blob} blob
+ * @returns {Promise<void>}
+ */
+async function validateCachedBlob(blob) {
+  if (!blob || typeof blob.slice !== 'function') {
+    throw new Error('cached value is not a Blob');
+  }
+
+  // Reading a tiny slice catches browser-backed blobs whose underlying storage was lost
+  // without duplicating large ONNX files in memory.
+  await blob.slice(0, Math.min(1, blob.size || 1)).arrayBuffer();
+}
+
+/**
  * Download a file from HuggingFace Hub with caching support.
  *
  * NOTE:
@@ -219,12 +251,19 @@ export async function getModelFile(repoId, filename, options = {}) {
   pathParts.push(encodedFilename);
   const url = `${baseUrl}/${pathParts.join('/')}`;
 
-  const cacheKey = `hf-${repoId}-${revision}-${subfolder}-${filename}`;
+  const cacheKey = `hf-${FILE_CACHE_VERSION}-${repoId}-${revision}-${subfolder}-${filename}`;
 
   if (typeof indexedDB !== 'undefined') {
     try {
       const cachedBlob = await getFileFromDb(cacheKey);
       if (cachedBlob) {
+        try {
+          await validateCachedBlob(cachedBlob);
+        } catch (cacheErr) {
+          console.warn(`[Hub] Cached ${filename} is unreadable; redownloading`, cacheErr);
+          await deleteFileFromDb(cacheKey);
+          throw cacheErr;
+        }
         console.log(`[Hub] Using cached ${filename} from IndexedDB`);
         return URL.createObjectURL(cachedBlob);
       }
@@ -476,14 +515,16 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   }
 
   const optionalFiles = buildOptionalExternalDataDownloads(components, repoFiles);
-  for (const file of optionalFiles) {
-    try {
-      results.urls[file.key] = await getModelFile(repoId, file.name, { ...options, progress });
-    } catch {
-      console.warn(`[Hub] Optional external data file not found: ${file.name}. This is expected if the model is small.`);
-      results.urls[file.key] = null;
-    }
-  }
+  await Promise.all(
+    optionalFiles.map(async (file) => {
+      try {
+        results.urls[file.key] = await getModelFile(repoId, file.name, { ...options, progress });
+      } catch {
+        console.warn(`[Hub] Optional external data file not found: ${file.name}. This is expected if the model is small.`);
+        results.urls[file.key] = null;
+      }
+    })
+  );
 
   return results;
 }

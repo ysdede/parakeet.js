@@ -1,14 +1,14 @@
 {
-  "name": "parakeet-js-hf-spaces-demo",
+  "name": "parakeet-js-compat-demo-v1.4.4",
   "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:local": "cross-env PARAKEET_LOCAL=true vite",
     "build": "vite build",
-    "build:local": "cross-env PARAKEET_LOCAL=true vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:local": "cross-env PARAKEET_LOCAL=true vite",
+    "build:local": "cross-env PARAKEET_LOCAL=true vite build"
   },
   "dependencies": {
     "parakeet.js": "1.4.4",
