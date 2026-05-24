@@ -1175,7 +1175,12 @@ export class ParakeetModel {
     for (const file of files) {
       try {
         const txt = FS.readFile('/tmp/' + file, { encoding: 'utf8' });
-        const events = JSON.parse(txt);
+        let events = [];
+        try {
+          events = JSON.parse(txt);
+        } catch (e) {
+          console.warn('[Parakeet] Malformed JSON in profile', file, e);
+        }
         let gpu = 0, cpu = 0;
         for (const ev of events) {
           if (ev.cat === 'Node') {
