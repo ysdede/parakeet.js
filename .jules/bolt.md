@@ -13,3 +13,7 @@ Action: Apply loop unrolling for max reductions in high-frequency typed array op
 ## 2024-11-20 - Softmax math.exp 8x unrolling with local var cache
 Learning: Unrolling the `Math.exp` accumulation loop to 8x and caching the multiplication `(tokenLogits[i] - maxLogit) * invTemp` into local variables before passing to `Math.exp` yields a measurable performance improvement (~4%) over the previous 4x unrolled implementation in the V8 engine, by reducing property access and allowing better instruction-level parallelism.
 Action: Utilize 8x loop unrolling paired with local variable caching for tight floating-point accumulation loops over TypedArrays.
+
+## 2024-05-18 - String Hashing for Map Keys
+Learning: In V8 (JavaScript), computing string hashes character-by-character (e.g., manual djb2 loops) is extremely slow compared to native map string key lookups, and manual 32-bit hashes risk collision bugs.
+Action: Never manually hash string keys for JS Maps or Sets; simply pass the string directly and allow the V8 engine to handle hashing internally in C++.
