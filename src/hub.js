@@ -234,7 +234,7 @@ async function validateCachedBlob(blob) {
  * @param {(progress: {loaded: number, total: number, file: string}) => void} [options.progress] Progress callback.
  * @returns {Promise<string>} URL to cached file (blob URL).
  */
-export async function getModelFile(repoId, filename, options = {}) {
+async function _getModelBlob(repoId, filename, options = {}) {
   const { revision = 'main', subfolder = '', progress } = options;
   const encodedRevision = encodeURIComponent(revision);
   const encodedSubfolder = subfolder
@@ -265,7 +265,7 @@ export async function getModelFile(repoId, filename, options = {}) {
           throw cacheErr;
         }
         console.log(`[Hub] Using cached ${filename} from IndexedDB`);
-        return URL.createObjectURL(cachedBlob);
+        return cachedBlob;
       }
     } catch (e) {
       console.warn('[Hub] IndexedDB cache check failed:', e);
@@ -308,6 +308,11 @@ export async function getModelFile(repoId, filename, options = {}) {
     }
   }
 
+  return blob;
+}
+
+export async function getModelFile(repoId, filename, options = {}) {
+  const blob = await _getModelBlob(repoId, filename, options);
   return URL.createObjectURL(blob);
 }
 
@@ -319,11 +324,8 @@ export async function getModelFile(repoId, filename, options = {}) {
  * @returns {Promise<string>} File content as text.
  */
 export async function getModelText(repoId, filename, options = {}) {
-  const blobUrl = await getModelFile(repoId, filename, options);
-  const response = await fetch(blobUrl);
-  const text = await response.text();
-  URL.revokeObjectURL(blobUrl);
-  return text;
+  const blob = await _getModelBlob(repoId, filename, options);
+  return blob.text();
 }
 
 /**
