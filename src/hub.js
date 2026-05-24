@@ -219,7 +219,7 @@ async function validateCachedBlob(blob) {
 }
 
 /**
- * Download a file from HuggingFace Hub with caching support.
+ * Download a file from HuggingFace Hub and return its Blob.
  *
  * NOTE:
  * - `filename` and `subfolder` must be raw (not URL-encoded) path segments.
@@ -232,7 +232,7 @@ async function validateCachedBlob(blob) {
  * @param {string} [options.revision='main'] Git revision.
  * @param {string} [options.subfolder=''] Subfolder within repo.
  * @param {(progress: {loaded: number, total: number, file: string}) => void} [options.progress] Progress callback.
- * @returns {Promise<string>} URL to cached file (blob URL).
+ * @returns {Promise<Blob>} Raw Blob of the downloaded file.
  */
 async function _getModelBlob(repoId, filename, options = {}) {
   const { revision = 'main', subfolder = '', progress } = options;
@@ -311,6 +311,22 @@ async function _getModelBlob(repoId, filename, options = {}) {
   return blob;
 }
 
+/**
+ * Download a file from HuggingFace Hub with caching support.
+ *
+ * NOTE:
+ * - `filename` and `subfolder` must be raw (not URL-encoded) path segments.
+ * - This function performs per-segment encoding internally.
+ * - Passing pre-encoded values may cause double-encoding.
+ *
+ * @param {string} repoId Model repo ID (e.g., 'nvidia/parakeet-tdt-1.1b').
+ * @param {string} filename File to download (e.g., 'encoder-model.onnx').
+ * @param {Object} [options]
+ * @param {string} [options.revision='main'] Git revision.
+ * @param {string} [options.subfolder=''] Subfolder within repo.
+ * @param {(progress: {loaded: number, total: number, file: string}) => void} [options.progress] Progress callback.
+ * @returns {Promise<string>} URL to cached file (blob URL).
+ */
 export async function getModelFile(repoId, filename, options = {}) {
   const blob = await _getModelBlob(repoId, filename, options);
   return URL.createObjectURL(blob);
