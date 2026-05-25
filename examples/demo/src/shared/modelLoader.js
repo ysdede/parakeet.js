@@ -23,6 +23,28 @@ function shouldRetryWithFp32(quantisation) {
   return quantisation?.encoder === 'fp16' || quantisation?.decoder === 'fp16';
 }
 
+/**
+ * Check whether an error is likely FP16-related (compilation/capability).
+ * Only these errors warrant an FP32 fallback retry; other errors should
+ * propagate directly to avoid wasted re-download and re-compile cycles.
+ *
+ * @param {*} err - Error from ORT session creation or model compilation.
+ * @param {{encoder: string, decoder: string}} quantisation - Resolved quantization.
+ * @returns {boolean}
+ */
+function isFp16RelatedError(err, quantisation) {
+  const message = (err?.message || String(err)).toLowerCase();
+  // Direct FP16 mentions in error
+  if (message.includes('fp16')) return true;
+  // ORT session creation / compilation failures when FP16 was requested
+  if (quantisation?.encoder === 'fp16' || quantisation?.decoder === 'fp16') {
+    if (message.includes('compile') || message.includes('session') || message.includes('create')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function buildRetryOptions(options, quantisation) {
   const retryOptions = { ...options };
   if (quantisation?.encoder === 'fp16') retryOptions.encoderQuant = 'fp32';
@@ -55,7 +77,7 @@ export async function loadModelWithFallback({
     const model = await fromUrlsFn(toFromUrlsConfig(firstModelUrls, options));
     return { model, modelUrls: firstModelUrls, retryUsed: false };
   } catch (firstError) {
-    if (!shouldRetryWithFp32(firstModelUrls.quantisation)) {
+    if (!shouldRetryWithFp32(firstModelUrls.quantisation) || !isFp16RelatedError(firstError, firstModelUrls.quantisation)) {
       throw firstError;
     }
 
