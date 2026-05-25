@@ -19,7 +19,6 @@ import {
   detectLocalQuantModes,
   findLocalEntry,
   quantizedModelName,
-  collectDirectoryFilesRecursive,
   getLocalFile,
 } from './shared/localModelArtifacts.js';
 import warmupAudioUrl from './assets/Harvard-L2-1.ogg?url';
@@ -38,11 +37,6 @@ const MODEL_SOURCE_OPTIONS = {
 const isInIframe = (() => {
   try { return window.self !== window.top; } catch { return true; }
 })();
-const QUANT_TO_FILENAME = {
-  fp32: '.onnx',
-  fp16: '.fp16.onnx',
-  int8: '.int8.onnx',
-};
 const MODEL_CANONICAL_REVISIONS = {
   'parakeet-tdt-0.6b-v2': 'feat/fp16-canonical-v2',
   'parakeet-tdt-0.6b-v3': 'feat/fp16-canonical-v3',
@@ -84,36 +78,6 @@ function getWarmupAudioCandidates() {
   return Array.from(new Set([...bundledCandidates, ...RAW_WARMUP_AUDIO_URLS]));
 }
 
-function getBasename(path) {
-  return String(path || '').split('/').pop() || '';
-}
-
-function normalizeRelPath(path) {
-  return String(path || '').replace(/\\/g, '/').replace(/^\.\//, '');
-}
-
-function detectLocalQuantModes(entries, baseName) {
-  const names = new Set(entries.map((entry) => entry.basename.toLowerCase()));
-  const out = [];
-  if (names.has(`${baseName}.onnx`)) out.push('fp32');
-  if (names.has(`${baseName}.fp16.onnx`)) out.push('fp16');
-  if (names.has(`${baseName}.int8.onnx`)) out.push('int8');
-  return out;
-}
-
-function findLocalEntry(entries, expectedName) {
-  const lower = expectedName.toLowerCase();
-  return (
-    entries.find((entry) => entry.path.toLowerCase() === lower) ||
-    entries.find((entry) => entry.basename.toLowerCase() === lower) ||
-    entries.find((entry) => entry.path.toLowerCase().endsWith(`/${lower}`)) ||
-    null
-  );
-}
-
-function quantizedModelName(baseName, quant) {
-  return `${baseName}${QUANT_TO_FILENAME[quant] || '.onnx'}`;
-}
 
 function getAverageWordConfidence(words) {
   const confidences = Array.isArray(words)
