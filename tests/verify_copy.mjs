@@ -52,6 +52,13 @@ function main() {
     { tEnc: 64, d: 128, seed: 4 },
     { tEnc: 96, d: 640, seed: 5 },
     { tEnc: 257, d: 640, seed: 6 },
+    // Edge cases
+    { tEnc: 1, d: 640, seed: 7 },    // single frame, full mel
+    { tEnc: 512, d: 1, seed: 8 },     // single mel bin
+    { tEnc: 2, d: 640, seed: 9 },     // minimal frames
+    { tEnc: 128, d: 640, seed: 10 },  // power-of-two frames
+    { tEnc: 0, d: 1, seed: 11 },      // zero frames
+    { tEnc: 1, d: 0, seed: 12 },      // zero mel bins
   ];
 
   for (const c of cases) {

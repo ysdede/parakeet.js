@@ -18,17 +18,16 @@ function parseIntArg(flag, fallback) {
 }
 
 function measure(name, fn, cfg) {
-  const { iterations, rounds, tEnc, d } = cfg;
+  const { iterations, rounds, warmupIterations, tEnc, d } = cfg;
   const src = new Float32Array(tEnc * d);
   for (let i = 0; i < src.length; i++) {
     src[i] = i % 17;
   }
   const dst = new Float32Array(d);
 
-  for (let i = 0; i < 2; i++) {
-    for (let k = 0; k < iterations; k++) {
-      fn(dst, src, (k % tEnc) * d, d);
-    }
+  // Warmup with fewer iterations
+  for (let k = 0; k < warmupIterations; k++) {
+    fn(dst, src, (k % tEnc) * d, d);
   }
 
   const samples = [];
@@ -53,6 +52,7 @@ function main() {
     tEnc: parseIntArg('--tenc', 512),
     iterations: parseIntArg('--iterations', 200000),
     rounds: parseIntArg('--rounds', 5),
+    warmupIterations: parseIntArg('--warmup', 1000),
   };
 
   const loopRes = measure('manual_loop', copyLoop, cfg);
