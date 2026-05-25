@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getParakeetModel } from '../src/hub.js';
+import { clearRepoFileCache, getParakeetModel } from '../src/hub.js';
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -86,6 +86,7 @@ function installFetchMock({
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  clearRepoFileCache();
 });
 
 describe('getParakeetModel quantization resolution (strict mode)', () => {
