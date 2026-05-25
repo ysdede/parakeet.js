@@ -7,6 +7,21 @@ import {
   pickPreferredQuant,
 } from './shared/modelSelection.js';
 import { formatResolvedQuantization, loadModelWithFallback } from './shared/modelLoader.js';
+import {
+  supportsDirectoryHandlePersistence,
+  readPersistedDirectoryHandle,
+  persistDirectoryHandle,
+  clearPersistedDirectoryHandle,
+} from './shared/localModelStorage.js';
+import {
+  normalizeRelPath,
+  getBasename,
+  detectLocalQuantModes,
+  findLocalEntry,
+  quantizedModelName,
+  collectDirectoryFilesRecursive,
+  getLocalFile,
+} from './shared/localModelArtifacts.js';
 import warmupAudioUrl from './assets/Harvard-L2-1.ogg?url';
 import './App.css';
 
@@ -341,155 +356,6 @@ async function getEntryFile(entry) {
   throw new Error(`Could not access local file entry: ${entry?.path || entry?.basename || 'unknown'}`);
 }
 
-function supportsDirectoryHandlePersistence() {
-  if (typeof window === 'undefined' || typeof window.showDirectoryPicker !== 'function' || typeof indexedDB === 'undefined') return false;
-  // showDirectoryPicker is blocked in cross-origin iframes (e.g. HF Spaces)
-  try { if (window.self !== window.top) return false; } catch { return false; }
-  return true;
-}
-
-function openLocalModelDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(LOCAL_MODEL_DB_NAME, 1);
-    request.onerror = () => reject(new Error('Failed to open local model IndexedDB'));
-    request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(LOCAL_MODEL_STORE_NAME)) {
-        db.createObjectStore(LOCAL_MODEL_STORE_NAME);
-      }
-    };
-  });
-}
-
-async function readPersistedDirectoryHandle() {
-  const db = await openLocalModelDb();
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const closeDb = () => {
-      try {
-        db.close();
-      } catch {
-        // Ignore close errors.
-      }
-    };
-    const resolveOnce = (value) => {
-      if (settled) return;
-      settled = true;
-      resolve(value);
-    };
-    const rejectOnce = (error) => {
-      if (settled) return;
-      settled = true;
-      reject(error);
-    };
-    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readonly');
-    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
-    const req = store.get(LOCAL_MODEL_DIR_KEY);
-    req.onerror = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to read persisted folder handle'));
-    };
-    req.onsuccess = () => {
-      closeDb();
-      resolveOnce(req.result || null);
-    };
-    tx.onabort = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to read persisted folder handle'));
-    };
-    tx.onerror = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to read persisted folder handle'));
-    };
-  });
-}
-
-async function persistDirectoryHandle(dirHandle) {
-  const db = await openLocalModelDb();
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const closeDb = () => {
-      try {
-        db.close();
-      } catch {
-        // Ignore close errors.
-      }
-    };
-    const resolveOnce = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    const rejectOnce = (error) => {
-      if (settled) return;
-      settled = true;
-      reject(error);
-    };
-    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readwrite');
-    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
-    const req = store.put(dirHandle, LOCAL_MODEL_DIR_KEY);
-    req.onerror = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to persist folder handle'));
-    };
-    req.onsuccess = () => {
-      closeDb();
-      resolveOnce();
-    };
-    tx.onabort = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to persist folder handle'));
-    };
-    tx.onerror = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to persist folder handle'));
-    };
-  });
-}
-
-async function clearPersistedDirectoryHandle() {
-  const db = await openLocalModelDb();
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const closeDb = () => {
-      try {
-        db.close();
-      } catch {
-        // Ignore close errors.
-      }
-    };
-    const resolveOnce = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    const rejectOnce = (error) => {
-      if (settled) return;
-      settled = true;
-      reject(error);
-    };
-    const tx = db.transaction([LOCAL_MODEL_STORE_NAME], 'readwrite');
-    const store = tx.objectStore(LOCAL_MODEL_STORE_NAME);
-    const req = store.delete(LOCAL_MODEL_DIR_KEY);
-    req.onerror = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to clear persisted folder handle'));
-    };
-    req.onsuccess = () => {
-      closeDb();
-      resolveOnce();
-    };
-    tx.onabort = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to clear persisted folder handle'));
-    };
-    tx.onerror = () => {
-      closeDb();
-      rejectOnce(new Error('Failed to clear persisted folder handle'));
-    };
-  });
-}
 
 function parseThemeValue(value) {
   if (typeof value !== 'string') return null;
