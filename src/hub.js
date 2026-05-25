@@ -266,12 +266,15 @@ async function _getModelBlob(repoId, filename, options = {}) {
   if (typeof indexedDB !== 'undefined') {
     try {
       let cachedBlob = await getFileFromDb(cacheKey);
+      let cacheSource = 'v2';
       // Fall back to legacy (unversioned) cache key for seamless migration
       if (!cachedBlob) {
         cachedBlob = await getFileFromDb(legacyCacheKey);
         if (cachedBlob) {
+          cacheSource = 'legacy';
           // Migrate to versioned key so future reads hit the fast path
           try { await saveFileToDb(cacheKey, cachedBlob); } catch { /* best effort */ }
+          console.log(`[Hub] Migrated legacy cache entry for ${filename} -> ${cacheKey}`);
         }
       }
       if (cachedBlob) {
@@ -282,7 +285,7 @@ async function _getModelBlob(repoId, filename, options = {}) {
           await deleteFileFromDb(cacheKey);
           throw cacheErr;
         }
-        console.log(`[Hub] Using cached ${filename} from IndexedDB`);
+        console.log(`[Hub] Using cached ${filename} from IndexedDB (${cacheSource}; key=${cacheKey})`);
         return cachedBlob;
       }
     } catch (e) {
@@ -290,7 +293,7 @@ async function _getModelBlob(repoId, filename, options = {}) {
     }
   }
 
-  console.log(`[Hub] Downloading ${filename} from ${repoId}...`);
+  console.log(`[Hub] Cache miss for ${filename}; downloading from ${repoId} (key=${cacheKey})`);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to download ${filename}: ${response.status} ${response.statusText}`);
@@ -320,7 +323,7 @@ async function _getModelBlob(repoId, filename, options = {}) {
   if (typeof indexedDB !== 'undefined') {
     try {
       await saveFileToDb(cacheKey, blob);
-      console.log(`[Hub] Cached ${filename} in IndexedDB`);
+      console.log(`[Hub] Cached ${filename} in IndexedDB (key=${cacheKey})`);
     } catch (e) {
       console.warn('[Hub] Failed to cache in IndexedDB:', e);
     }
