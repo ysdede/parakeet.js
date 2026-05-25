@@ -260,10 +260,20 @@ async function _getModelBlob(repoId, filename, options = {}) {
   const url = `${baseUrl}/${pathParts.join('/')}`;
 
   const cacheKey = `hf-${FILE_CACHE_VERSION}-${repoId}-${revision}-${subfolder}-${filename}`;
+  // Backward compat: old cache entries used keys without version prefix.
+  const legacyCacheKey = `hf-${repoId}-${revision}-${subfolder}-${filename}`;
 
   if (typeof indexedDB !== 'undefined') {
     try {
-      const cachedBlob = await getFileFromDb(cacheKey);
+      let cachedBlob = await getFileFromDb(cacheKey);
+      // Fall back to legacy (unversioned) cache key for seamless migration
+      if (!cachedBlob) {
+        cachedBlob = await getFileFromDb(legacyCacheKey);
+        if (cachedBlob) {
+          // Migrate to versioned key so future reads hit the fast path
+          try { await saveFileToDb(cacheKey, cachedBlob); } catch { /* best effort */ }
+        }
+      }
       if (cachedBlob) {
         try {
           await validateCachedBlob(cachedBlob);
