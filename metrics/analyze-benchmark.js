@@ -38,23 +38,34 @@ function std(a) {
 }
 function p50(a) {
   const s = [...a].sort((x, y) => x - y);
-  return s[Math.floor(s.length * 0.5)];
+  const idx = (s.length - 1) * 0.5;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return s[lo];
+  return s[lo] + (s[hi] - s[lo]) * (idx - lo);
 }
 function p95(a) {
   const s = [...a].sort((x, y) => x - y);
-  return s[Math.floor((s.length - 1) * 0.95)];
+  const idx = (s.length - 1) * 0.95;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return s[lo];
+  return s[lo] + (s[hi] - s[lo]) * (idx - lo);
 }
 
 // Linear regression: y ≈ a*x + b, return { a, b, r2 }
+// Degenerate inputs (n < 2, all-identical x) return a=0, b=mean(y), r2=0
 function linearFit(x, y) {
   const n = x.length;
+  if (n < 2) return { a: 0, b: n ? y[0] : 0, r2: 0 };
   const mx = mean(x), my = mean(y);
   let num = 0, den = 0;
   for (let i = 0; i < n; i++) {
     num += (x[i] - mx) * (y[i] - my);
     den += (x[i] - mx) ** 2;
   }
-  const a = den === 0 ? 0 : num / den;
+  if (den === 0) return { a: 0, b: my, r2: 0 };
+  const a = num / den;
   const b = my - a * mx;
   let ssRes = 0, ssTot = 0;
   for (let i = 0; i < n; i++) {
@@ -62,7 +73,7 @@ function linearFit(x, y) {
     ssRes += (y[i] - pred) ** 2;
     ssTot += (y[i] - my) ** 2;
   }
-  const r2 = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
   return { a, b, r2 };
 }
 
