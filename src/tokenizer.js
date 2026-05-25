@@ -55,8 +55,12 @@ export class ParakeetTokenizer {
 
   /**
    * Decode an array of token IDs into a human readable string.
-   * Implements the SentencePiece rule where leading `▁` marks a space.
-   * Matches the Python reference regex pattern: r"\A\s|\s\B|(\s)\b"
+   * Implements the SentencePiece rule where leading ▁ marks a word boundary.
+   *
+   * The native SentencePiece decode_ids() joins pieces after ▁ → space
+   * conversion with NO additional regex post-processing. We mirror that here:
+   * ▁word → " word", word-without-▁ attaches directly to the previous token.
+   *
    * @param {number[]} ids - Token IDs from decoder output.
    * @returns {string} Decoded transcript text.
    */
@@ -70,18 +74,16 @@ export class ParakeetTokenizer {
       tokens.push(token);
     }
 
-    // Join all tokens
+    // Join all tokens. SentencePiece ▁ markers already encode word boundaries
+    // correctly — ▁word gets a space, word-without-▁ attaches directly.
+    // Native SentencePiece decode_ids() does no regex post-processing beyond
+    // ▁ → space conversion, so we mirror that behavior here.
     let text = tokens.join('');
 
-    // Apply the same regex pattern as Python reference:
-    // Pattern: r"\A\s|\s\B|(\s)\b"
-    // - \A\s: Remove leading whitespace
-    // - \s\B: Remove whitespace before non-word boundaries
-    // - (\s)\b: Keep space at word boundaries (captured group)
-    text = text.replace(/^\s+/, '');  // Remove leading whitespace (\A\s)
-    text = text.replace(/\s+(?=[^\w\s])/g, '');  // Remove space before punctuation (\s\B approximation)
+    // Safe cleanups only (no heuristic space removal)
+    text = text.replace(/^\s+/, '');  // Remove leading whitespace
     text = text.replace(/\s+/g, ' ');  // Normalize multiple spaces to single space
 
     return text.trim();
   }
-} 
+}

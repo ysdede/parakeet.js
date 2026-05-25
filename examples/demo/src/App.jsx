@@ -660,7 +660,7 @@ function pcmToWavBlob(pcm, sampleRate = 16000) {
 }
 
 export default function App() {
-  const initialSettings = loadSettings();
+  const [initialSettings] = useState(() => loadSettings());
   const initialSelectedModel = initialSettings.selectedModel;
   const initialModelSource = initialSettings.modelSource;
   const resolvedInitialModel = MODELS[initialSelectedModel] ? initialSelectedModel : 'parakeet-tdt-0.6b-v2';
