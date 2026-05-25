@@ -2,18 +2,28 @@
 // At runtime the caller can specify preferred backend ("webgpu", "wasm").
 // The function resolves once ONNX Runtime is ready and returns the `ort` module.
 
+// Singleton promise: initOrt is NOT re-entrant — concurrent callers
+// must share the same initialization to avoid double WASM init races.
+let _initPromise = null;
+
 /**
  * Initialise ONNX Runtime Web and pick the execution provider.
  * If WebGPU is requested but not supported, we transparently fall back to WASM.
  * Higher-level APIs may accept `'webgpu-hybrid'`/`'webgpu-strict'` and normalize
  * those values to `'webgpu'` before calling this low-level initializer.
+ *
+ * Concurrent calls are safe — the first caller's initialization is shared.
+ *
  * @param {Object} opts
  * @param {('webgpu'|'wasm')} [opts.backend='webgpu'] Desired backend.
  * @param {string} [opts.wasmPaths] Optional path prefix for WASM binaries.
  * @param {number} [opts.numThreads] Number of WASM threads to use when SharedArrayBuffer is available.
  * @returns {Promise<typeof import('onnxruntime-web').default>}
  */
-export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}) {
+export function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}) {
+  if (_initPromise) return _initPromise;
+
+  _initPromise = (async () => {
   // Dynamic import to handle Vite bundling issues
   let ort;
 
@@ -111,4 +121,7 @@ export async function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}
 
   // Return the ort module for use in creating sessions and tensors
   return ort;
+  })();
+
+  return _initPromise;
 }
