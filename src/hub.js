@@ -476,6 +476,8 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
     preprocessorBackend = 'js',
     backend = 'webgpu',
     progress,
+    revision,
+    subfolder,
     verbose = false,
   } = options;
 
@@ -490,7 +492,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
     decoder: createComponent('decoder', decoderQuant),
   };
 
-  const repoFiles = await listRepoFiles(repoId, options.revision || 'main');
+  const repoFiles = await listRepoFiles(repoId, revision || 'main');
 
   validateRequestedFp16Component(components.encoder, repoId, repoFiles);
   validateRequestedFp16Component(components.decoder, repoId, repoFiles);
@@ -513,7 +515,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
 
   for (const file of requiredFiles) {
     try {
-      results.urls[file.key] = await getModelFile(repoId, file.name, { ...options, progress });
+      results.urls[file.key] = await getModelFile(repoId, file.name, { revision, subfolder, progress });
     } catch (err) {
       if (!file.componentName) {
         throw err;
@@ -536,7 +538,7 @@ export async function getParakeetModel(repoIdOrModelKey, options = {}) {
   await Promise.all(
     optionalFiles.map(async (file) => {
       try {
-        results.urls[file.key] = await getModelFile(repoId, file.name, { ...options, progress });
+        results.urls[file.key] = await getModelFile(repoId, file.name, { revision, subfolder, progress });
       } catch {
         console.warn(`[Hub] Optional external data file not found: ${file.name}. This is expected if the model is small.`);
         results.urls[file.key] = null;
