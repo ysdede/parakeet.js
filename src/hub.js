@@ -15,6 +15,14 @@ let dbPromise = null;
 // Cache successful lookups only. Failed lookups intentionally do not cache.
 const repoFileCache = new Map();
 
+/**
+ * Clear the repo file listing cache. Exported for test determinism only;
+ * production code does not need to call this.
+ */
+export function clearRepoFileCache() {
+  repoFileCache.clear();
+}
+
 const QUANT_SUFFIX = {
   int8: '.int8.onnx',
   fp16: '.fp16.onnx',
