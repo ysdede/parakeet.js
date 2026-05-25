@@ -77,7 +77,7 @@ export function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}) {
   if (backend === 'wasm' || backend === 'webgpu') {
     // Enable multi-threading if supported
     if (typeof SharedArrayBuffer !== 'undefined') {
-      ort.env.wasm.numThreads = numThreads || navigator.hardwareConcurrency || 4;
+      ort.env.wasm.numThreads = numThreads || (typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : 4) || 4;
       ort.env.wasm.simd = true;
       console.log(`[Parakeet.js] WASM configured with ${ort.env.wasm.numThreads} threads, SIMD enabled`);
     } else {
@@ -91,7 +91,7 @@ export function initOrt({ backend = 'webgpu', wasmPaths, numThreads } = {}) {
 
   if (backend === 'webgpu') {
     // Check WebGPU support properly
-    const webgpuSupported = 'gpu' in navigator;
+    const webgpuSupported = typeof navigator !== 'undefined' && 'gpu' in navigator;
     console.log(`[Parakeet.js] WebGPU supported: ${webgpuSupported}`);
 
     if (webgpuSupported) {
