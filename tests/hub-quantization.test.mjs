@@ -325,4 +325,27 @@ describe('getParakeetModel quantization resolution (strict mode)', () => {
     expect(calls.some((x) => x.includes(`/api/models/${repoId}/tree/feat%2Ffp16-canonical-v2`))).toBe(true);
     expect(calls.some((x) => x.includes('/resolve/feat%2Ffp16-canonical-v2/encoder-model.fp16.onnx'))).toBe(true);
   });
+
+  it('throws explicit error when FP16 is missing and no FP32 fallback exists', async () => {
+    const repoId = 'test/repo-fp16-missing-entirely';
+    const { calls } = installFetchMock({
+      repoId,
+      siblings: [
+        'decoder_joint-model.fp16.onnx',
+        'vocab.txt',
+      ],
+    });
+
+    await expect(
+      getParakeetModel(repoId, {
+        backend: 'webgpu-hybrid',
+        encoderQuant: 'fp16',
+        decoderQuant: 'fp16',
+        preprocessorBackend: 'js',
+      })
+    ).rejects.toThrow(/Missing encoder model in test\/repo-fp16-missing-entirely: requested encoder-model\.fp16\.onnx\./i);
+
+    // Error is preflight, before resolve downloads.
+    expect(calls.some((x) => x.includes('/resolve/'))).toBe(false);
+  });
 });
