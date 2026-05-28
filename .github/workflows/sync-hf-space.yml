@@ -85,7 +85,6 @@ jobs:
           pinned: false
           header: mini
           fullWidth: true
-          app_file: index.html
           license: mit
           short_description: NVIDIA Parakeet speech recognition for the browser
           models:
