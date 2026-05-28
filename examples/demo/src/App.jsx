@@ -49,6 +49,10 @@ const LONG_AUDIO_UPLOAD_THRESHOLD_S = 150;
 const LONG_AUDIO_UPLOAD_CHUNK_LENGTH_S = 90;
 const STREAMED_WAV_CHUNK_DURATION_S = 30;
 const WAV_HEADER_PROBE_BYTES = 1024 * 1024;
+const GITHUB_REPO_URL = 'https://github.com/ysdede/parakeet.js';
+const GITHUB_REPO_API_URL = 'https://api.github.com/repos/ysdede/parakeet.js';
+const GITHUB_STARS_CACHE_KEY = 'parakeet.demo.githubStars.v1';
+const GITHUB_STARS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function normalizeBaseUrl(baseUrl) {
   if (typeof baseUrl !== 'string' || !baseUrl.trim()) return '/';
@@ -448,6 +452,99 @@ async function getCachedAudioFile(url, cacheKey) {
       }
     };
   });
+}
+
+function formatGitHubStars(count) {
+  if (!Number.isFinite(count) || count < 0) return null;
+  if (count < 1000) return String(count);
+  if (count < 1_000_000) {
+    const value = count / 1000;
+    return `${value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  const value = count / 1_000_000;
+  return `${value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')}m`;
+}
+
+function readCachedGitHubStars() {
+  try {
+    const raw = window.localStorage?.getItem(GITHUB_STARS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Number.isFinite(parsed?.count) || !Number.isFinite(parsed?.fetchedAt)) return null;
+    return { count: parsed.count, fetchedAt: parsed.fetchedAt };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedGitHubStars(count) {
+  try {
+    window.localStorage?.setItem(
+      GITHUB_STARS_CACHE_KEY,
+      JSON.stringify({ count, fetchedAt: Date.now() }),
+    );
+  } catch {
+    // localStorage can be unavailable in some embedded/private contexts.
+  }
+}
+
+function GitHubStarsBadge() {
+  const [starCount, setStarCount] = useState(() => readCachedGitHubStars()?.count ?? null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cached = readCachedGitHubStars();
+    const hasFreshCache = cached && Date.now() - cached.fetchedAt < GITHUB_STARS_CACHE_TTL_MS;
+
+    if (cached?.count != null) {
+      setStarCount(cached.count);
+    }
+    if (hasFreshCache) return undefined;
+
+    fetch(GITHUB_REPO_API_URL, {
+      headers: { Accept: 'application/vnd.github+json' },
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('GitHub API request failed');
+        return response.json();
+      })
+      .then((data) => {
+        const count = Number(data?.stargazers_count);
+        if (!Number.isFinite(count)) return;
+        writeCachedGitHubStars(count);
+        if (!cancelled) setStarCount(count);
+      })
+      .catch(() => {
+        if (!cancelled && cached?.count != null) setStarCount(cached.count);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const formattedStars = formatGitHubStars(starCount);
+
+  return (
+    <a
+      href={GITHUB_REPO_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center overflow-hidden rounded-lg border border-gray-300 bg-gray-100 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+      title="View parakeet.js on GitHub"
+      aria-label={formattedStars ? `View parakeet.js on GitHub, ${formattedStars} stars` : 'View parakeet.js on GitHub'}
+    >
+      <span className="inline-flex items-center gap-1.5 px-3 py-2">
+        <span className="material-icons-outlined text-base">star</span>
+        Stars
+      </span>
+      {formattedStars && (
+        <span className="border-l border-gray-300 px-3 py-2 tabular-nums dark:border-gray-600">
+          {formattedStars}
+        </span>
+      )}
+    </a>
+  );
 }
 
 // Convert Float32Array PCM to WAV blob for playback
@@ -1460,19 +1557,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <a
-              href="https://github.com/ysdede/parakeet.js"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center hover:opacity-80 transition-opacity"
-              title="View on GitHub"
-            >
-              <img
-                src="https://img.shields.io/github/stars/ysdede/parakeet%2Ejs?style=social"
-                alt="GitHub stars"
-                className="h-6"
-              />
-            </a>
+            <GitHubStarsBadge />
             <button
               className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               onClick={() => setDarkMode(!darkMode)}
