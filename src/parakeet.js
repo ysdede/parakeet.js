@@ -326,15 +326,11 @@ export class ParakeetModel {
     const logits = out['outputs'];
     const outputState1 = out['output_states_1'];
     const outputState2 = out['output_states_2'];
-    // [Perf] Tracking small collections via Array is ~4x faster than Set instantiation
-    const seenOutputs = [];
+    // [Perf] Skip known keys explicitly to avoid array tracking overhead
     for (const key in out) {
-      if (!Object.hasOwn(out, key)) continue;
+      if (key === 'outputs' || key === 'output_states_1' || key === 'output_states_2' || !Object.hasOwn(out, key)) continue;
       const value = out[key];
-      if (!value || typeof value.dispose !== 'function' || seenOutputs.includes(value)) continue;
-      seenOutputs.push(value);
-      if (value === logits || value === outputState1 || value === outputState2) continue;
-      value.dispose();
+      if (value?.dispose) value.dispose();
     }
     // Note: _targetTensor and _targetLenTensor are intentionally NOT disposed here.
     // They wrap a shared Int32Array (_targetIdArray / _targetLenArray) that is mutated
