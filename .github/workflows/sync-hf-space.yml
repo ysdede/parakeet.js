@@ -15,12 +15,10 @@ on:
       space_id:
         description: "Hugging Face Space repo id to deploy to"
         required: false
-        default: "ysdede/parakeet.js-test"
+        default: "ysdede/parakeet.js-demo"
 
 env:
-  # Test Space while validating the no-HF-build deployment. Switch to
-  # ysdede/parakeet.js-demo after manual verification.
-  HF_SPACE_ID: ${{ github.event.inputs.space_id || 'ysdede/parakeet.js-test' }}
+  HF_SPACE_ID: ${{ github.event.inputs.space_id || 'ysdede/parakeet.js-demo' }}
 
 jobs:
   sync:

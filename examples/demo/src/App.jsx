@@ -1464,14 +1464,11 @@ export default function App() {
               href="https://github.com/ysdede/parakeet.js"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center hover:opacity-80 transition-opacity"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
               title="View on GitHub"
             >
-              <img
-                src="https://img.shields.io/github/stars/ysdede/parakeet%2Ejs?style=social"
-                alt="GitHub stars"
-                className="h-6"
-              />
+              <span className="material-icons-outlined text-base">code</span>
+              GitHub
             </a>
             <button
               className="flex items-center justify-center p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
