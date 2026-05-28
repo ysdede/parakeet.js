@@ -42,7 +42,16 @@ export class ParakeetTokenizer {
     const lines = text.split(/\r?\n/).filter(Boolean);
     const id2token = [];
     for (const line of lines) {
-      const [tok, idStr] = line.split(/\s+/);
+      let spaceIdx = line.lastIndexOf(' ');
+      const tabIdx = line.lastIndexOf('\t');
+      if (tabIdx > spaceIdx) spaceIdx = tabIdx;
+
+      let tok, idStr;
+      if (spaceIdx !== -1) {
+        tok = line.slice(0, spaceIdx);
+        idStr = line.slice(spaceIdx + 1);
+      }
+
       const id = parseInt(idStr, 10);
       if (isNaN(id) || !tok) {
         console.warn(`[ParakeetTokenizer] Skipping invalid vocab line: ${JSON.stringify(line)}`);
