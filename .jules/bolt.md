@@ -17,3 +17,6 @@ Action: Utilize 8x loop unrolling paired with local variable caching for tight f
 ## 2026-05-24 - PR hygiene for mel/performance changes
 Learning: Repeated micro-optimization PRs on `src/mel.js` create review noise and risk regressions when gains are not reproducible. The mel preprocessor path is currently considered tuned and stable.
 Action: Do not open new mel/perf PRs unless all of the following are true: (1) there is a real bug or measured regression, (2) benchmark evidence is reproducible against current `master`, and (3) tests pass with no behavior changes. Avoid duplicate/alternative PRs for the same idea; update the existing PR instead.
+## 2024-05-24 - Single Map lookup optimization
+Learning: In V8, a single Map `.get()` lookup followed by a check for `undefined` is measurably faster than a `.has()` check followed by a `.get()` lookup.
+Action: Always use a single `.get()` and check against `undefined` for Map cache lookups instead of redundant `.has()` + `.get()` sequences.
