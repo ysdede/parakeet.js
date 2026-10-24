@@ -909,7 +909,7 @@ export class ParakeetModel {
         if (returnConfidences) tokenConfs.push(confVal);
         emittedTokens += 1;
       } else {
-        // Blank token: newState is unused, free its tensors (keep current decoderState)
+        // Blank token: free the new state tensors (keep current decoderState)
         this._disposeDecoderState(newState, decoderState);
       }
 
