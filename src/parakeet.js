@@ -1529,8 +1529,8 @@ export class MelFeatureCache {
 
     const key = this._generateKey(audio);
 
-    if (this.cache.has(key)) {
-      const cached = this.cache.get(key);
+    const cached = this.cache.get(key);
+    if (cached !== undefined) {
       // Update timestamp for LRU
       cached.timestamp = Date.now();
       return { ...cached, cached: true };
