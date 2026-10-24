@@ -180,8 +180,9 @@ export class SentenceBoundaryDetector {
 
     const { fullText, wordPositions } = this.reconstructTextWithPositions(words);
     const cacheKey = this.generateCacheKey(fullText);
-    if (this.cache.has(cacheKey)) {
-      return this.mapSentenceEndingsToWords(this.cache.get(cacheKey), words, wordPositions);
+    const cached = this.cache.get(cacheKey);
+    if (cached !== undefined) {
+      return this.mapSentenceEndingsToWords(cached, words, wordPositions);
     }
 
     const doc = this.nlp.readDoc(fullText);
