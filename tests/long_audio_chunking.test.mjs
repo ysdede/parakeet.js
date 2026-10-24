@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ParakeetModel } from '../src/parakeet.js';
-import { transcribeLongAudioWithChunks } from '../src/long_audio.js';
+import { transcribeLongAudioWithChunks, validateAudio } from '../src/long_audio.js';
 
 describe('long-audio chunking helpers', () => {
   it('returns a simple text result when timestamps are not requested', async () => {
@@ -502,5 +502,38 @@ describe('long-audio chunking helpers', () => {
       { text: 'In the next chapter we will stroll further afield.', timestamp: [18.0, 22.0] },
       { text: 'End of chapter four.', timestamp: [22.8, 23.9] },
     ]);
+  });
+});
+
+describe('validateAudio', () => {
+  it('throws TypeError for invalid types', () => {
+    const invalidInputs = [
+      [],
+      [1, 2, 3],
+      new Uint8Array([1, 2, 3]),
+      'string',
+      null,
+      undefined,
+      {},
+    ];
+    for (const input of invalidInputs) {
+      expect(() => validateAudio(input)).toThrow(TypeError);
+    }
+  });
+
+  it('throws Error if audio contains non-finite values', () => {
+    expect(() => validateAudio(Float32Array.from([1, NaN, 3]))).toThrow(/finite audio samples/);
+    expect(() => validateAudio(Float64Array.from([1, Infinity, 3]))).toThrow(/finite audio samples/);
+    expect(() => validateAudio(Float32Array.from([-Infinity]))).toThrow(/finite audio samples/);
+  });
+
+  it('passes for empty typed arrays', () => {
+    expect(() => validateAudio(new Float32Array(0))).not.toThrow();
+    expect(() => validateAudio(new Float64Array(0))).not.toThrow();
+  });
+
+  it('passes for valid finite typed arrays', () => {
+    expect(() => validateAudio(Float32Array.from([1.5, -2.5, 0]))).not.toThrow();
+    expect(() => validateAudio(Float64Array.from([1.5, -2.5, 0]))).not.toThrow();
   });
 });

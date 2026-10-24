@@ -456,6 +456,7 @@ async function runAutoSentenceWindowing({
  * @param {number} [opts.timeOffset=0]
  * @returns {Promise<{text: string, chunks?: Array<{ text: string, timestamp: [number, number] }>, words?: Array<{ text: string, start_time: number, end_time: number, confidence?: number }>}>}
  */
+export { validateAudio };
 export async function transcribeLongAudioWithChunks(model, audio, sampleRate = 16000, opts = {}) {
   validateAudio(audio);
   if (typeof sampleRate !== 'number' || !Number.isFinite(sampleRate) || sampleRate <= 0) {
